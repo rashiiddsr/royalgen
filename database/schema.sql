@@ -121,3 +121,16 @@ CREATE TABLE IF NOT EXISTS `financing` (
   `funding_date` DATE DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- User activity logs
+CREATE TABLE IF NOT EXISTS `activity_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `entity_type` VARCHAR(100) NOT NULL,
+  `entity_id` INT NOT NULL,
+  `action` VARCHAR(50) NOT NULL,
+  `description` TEXT,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_user_action` (`user_id`, `entity_type`, `entity_id`),
+  CONSTRAINT `fk_activity_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);

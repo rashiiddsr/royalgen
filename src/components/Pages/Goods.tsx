@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Edit2, Trash2, Search, Package, Eye } from 'lucide-react';
+import { addRecord, getRecord, getRecords, updateRecord } from '../../lib/api';
+import { Plus, Edit2, Search, Package, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Good {
@@ -18,7 +18,9 @@ interface Good {
   created_at: string;
 }
 
-type GoodFormData = Omit<Good, 'id' | 'created_at' | 'suppliers'>;
+type GoodFormData = Omit<Good, 'id' | 'created_at' | 'suppliers'> & {
+  performed_by?: string | number;
+};
 
 export default function Goods() {
   const [goods, setGoods] = useState<Good[]>([]);
@@ -38,11 +40,11 @@ export default function Goods() {
     status: 'active',
   });
   const [detailGood, setDetailGood] = useState<Good | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const { profile } = useAuth();
 
   const canChangeStatus =
     !!editingGood && ['admin', 'manager'].includes(profile?.role ?? '');
-  const canDeleteGood = ['admin', 'manager', 'owner'].includes(profile?.role ?? '');
 
   const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
 
@@ -97,6 +99,7 @@ export default function Goods() {
         price: Number(formData.price),
         stock_quantity: Number(formData.stock_quantity),
         minimum_order_quantity: Number(formData.minimum_order_quantity),
+        performed_by: profile?.id,
       };
 
       if (editingGood) {
@@ -112,18 +115,17 @@ export default function Goods() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!canDeleteGood) {
-      alert('Only admin, manager, or owner roles can delete goods.');
-      return;
-    }
-    if (!confirm('Are you sure you want to delete this item?')) return;
+  const openDetails = async (good: Good) => {
+    setDetailLoading(true);
+    setDetailGood(good);
 
     try {
-      await deleteRecord('goods', id);
-      fetchGoods();
+      const detailedGood = await getRecord<Good>('goods', good.id);
+      setDetailGood(detailedGood);
     } catch (error) {
-      console.error('Error deleting good:', error);
+      console.error('Error loading good details:', error);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -275,7 +277,7 @@ export default function Goods() {
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
-                        onClick={() => setDetailGood(good)}
+                        onClick={() => openDetails(good)}
                         className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
                         aria-label="View details"
                       >
@@ -287,14 +289,6 @@ export default function Goods() {
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      {canDeleteGood && (
-                        <button
-                          onClick={() => handleDelete(good.id)}
-                          className="inline-flex items-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
                     </td>
                   </tr>
                 ))
@@ -321,7 +315,7 @@ export default function Goods() {
                     {formData.sku || 'Generating SKU...'}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    SKU dibuat otomatis dengan format rgi-(kategori)-0001 sesuai urutan.
+                    SKU is generated automatically using rgi-(category)-0001 format based on sequence.
                   </p>
                 </div>
 
@@ -460,7 +454,7 @@ export default function Goods() {
                   </div>
                 ) : (
                   <div className="md:col-span-2 text-sm text-gray-600">
-                    Status default Active dan tidak dapat diubah saat pembuatan barang.
+                    Status defaults to Active and cannot be changed during creation.
                   </div>
                 )}
               </div>
@@ -544,6 +538,31 @@ export default function Goods() {
               <div className="md:col-span-2">
                 <p className="font-semibold text-gray-700">Description</p>
                 <p>{detailGood.description || '-'}</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200 space-y-3 text-sm text-gray-800">
+              {detailLoading && (
+                <p className="text-gray-500">Loading the latest supplier information...</p>
+              )}
+              <div>
+                <p className="font-semibold text-gray-700">Suppliers</p>
+                {detailGood.suppliers && detailGood.suppliers.length > 0 ? (
+                  <ul className="mt-2 space-y-2">
+                    {detailGood.suppliers.map((supplier) => (
+                      <li
+                        key={supplier.id}
+                        className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2"
+                      >
+                        <span className="font-medium text-gray-900">{supplier.name}</span>
+                        {supplier.status && (
+                          <span className="text-xs text-gray-500">Status: {supplier.status}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-600 mt-1">No linked suppliers yet.</p>
+                )}
               </div>
             </div>
           </div>
