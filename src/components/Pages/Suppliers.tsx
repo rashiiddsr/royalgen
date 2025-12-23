@@ -18,6 +18,8 @@ interface Supplier {
   created_at: string;
 }
 
+type SupplierFormData = Omit<Supplier, 'id' | 'created_at'> & { performed_by?: string | number };
+
 export default function Suppliers() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ export default function Suppliers() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SupplierFormData>({
     name: '',
     contact_person: '',
     email: '',
@@ -64,10 +66,12 @@ export default function Suppliers() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload: SupplierFormData = { ...formData, performed_by: profile?.id };
+
       if (editingSupplier) {
-        await updateRecord<Supplier>('suppliers', editingSupplier.id, formData);
+        await updateRecord<Supplier>('suppliers', editingSupplier.id, payload as Supplier);
       } else {
-        await addRecord<Supplier>('suppliers', formData as Supplier);
+        await addRecord<Supplier>('suppliers', payload as Supplier);
       }
 
       await fetchSuppliers();

@@ -33,6 +33,7 @@ const TABLES = [
   'invoices',
   'financing',
   'users',
+  'activity_logs',
 ];
 
 const isValidTable = (name) => TABLES.includes(name);
@@ -76,6 +77,19 @@ const sanitizeUserPayload = (payload, allowedFields) => {
 };
 
 const preventOwnerCreation = (role) => role === 'owner';
+
+const logActivity = async ({ performedBy, entityType, entityId, action, description }) => {
+  if (!performedBy || !entityType || !entityId || !action) return;
+
+  try {
+    await query(
+      'INSERT INTO activity_logs (user_id, entity_type, entity_id, action, description) VALUES (?, ?, ?, ?, ?)',
+      [performedBy, entityType, entityId, action, description || null]
+    );
+  } catch (error) {
+    console.error('Activity log error', error);
+  }
+};
 
 const attachSuppliersToGoods = async (goodsRows) => {
   if (!goodsRows.length) return goodsRows;
@@ -141,13 +155,12 @@ app.get('/api/:table', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
+
     if (table === 'goods') {
-      const goodsRows = await query('SELECT * FROM `goods` ORDER BY created_at DESC');
-      const goodsWithSuppliers = await attachSuppliersToGoods(goodsRows);
-      return res.json(goodsWithSuppliers);
+      return res.json(rows);
     }
 
-    const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
     return res.json(rows);
   } catch (error) {
     console.error('Fetch error', error);
@@ -190,7 +203,7 @@ app.post('/api/:table', async (req, res) => {
     const payload = req.body || {};
 
     if (table === 'goods') {
-      const { suppliers = [], ...goodPayload } = payload;
+      const { suppliers = [], performed_by: performedBy, ...goodPayload } = payload;
       const result = await query('INSERT INTO ?? SET ?', [table, goodPayload]);
 
       if (Array.isArray(suppliers) && suppliers.length > 0) {
@@ -201,6 +214,31 @@ app.post('/api/:table', async (req, res) => {
       const [created] = await attachSuppliersToGoods(
         await query('SELECT * FROM `goods` WHERE id = ?', [result.insertId])
       );
+
+      await logActivity({
+        performedBy,
+        entityType: 'goods',
+        entityId: result.insertId,
+        action: 'create',
+        description: `Created good ${goodPayload.name}`,
+      });
+      return res.status(201).json(created);
+    }
+
+    if (table === 'suppliers') {
+      const { performed_by: performedBy, ...supplierPayload } = payload;
+
+      const result = await query('INSERT INTO ?? SET ?', [table, supplierPayload]);
+      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'suppliers',
+        entityId: result.insertId,
+        action: 'create',
+        description: `Created supplier ${supplierPayload.name}`,
+      });
+
       return res.status(201).json(created);
     }
 
@@ -235,7 +273,7 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(404).json({ error: 'Record not found' });
       }
 
-      const { suppliers = [], ...goodUpdates } = req.body || {};
+      const { suppliers = [], performed_by: performedBy, ...goodUpdates } = req.body || {};
       if (Object.keys(goodUpdates).length > 0) {
         await query('UPDATE ?? SET ? WHERE id = ?', [table, goodUpdates, id]);
       }
@@ -247,6 +285,29 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       const [updated] = await attachSuppliersToGoods(await query('SELECT * FROM `goods` WHERE id = ?', [id]));
+
+      await logActivity({
+        performedBy,
+        entityType: 'goods',
+        entityId: id,
+        action: 'update',
+        description: `Updated good ${goodUpdates.name || existingGood.name}`,
+      });
+      return res.json(updated);
+    }
+
+    if (table === 'suppliers') {
+      const { performed_by: performedBy, ...supplierUpdates } = req.body || {};
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, supplierUpdates, id]);
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'suppliers',
+        entityId: id,
+        action: 'update',
+        description: `Updated supplier ${supplierUpdates.name || updated?.name}`,
+      });
       return res.json(updated);
     }
 
@@ -322,6 +383,10 @@ app.delete('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'goods') {
+      return res.status(403).json({ error: 'Goods cannot be deleted' });
+    }
+
     if (table === 'users') {
       const [target] = await query('SELECT role FROM ?? WHERE id = ? LIMIT 1', [table, id]);
       if (target?.role === 'owner') {
