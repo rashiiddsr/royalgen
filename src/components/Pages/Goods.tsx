@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/supabase';
 import { Plus, Edit2, Trash2, Search, Package } from 'lucide-react';
 
 interface Good {
@@ -40,13 +40,11 @@ export default function Goods() {
 
   const fetchGoods = async () => {
     try {
-      const { data, error } = await supabase
-        .from('goods')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setGoods(data || []);
+      const data = await getRecords<Good>('goods');
+      const sorted = [...data].sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setGoods(sorted);
     } catch (error) {
       console.error('Error fetching goods:', error);
     } finally {
@@ -58,21 +56,12 @@ export default function Goods() {
     e.preventDefault();
     try {
       if (editingGood) {
-        const { error } = await supabase
-          .from('goods')
-          .update(formData)
-          .eq('id', editingGood.id);
-
-        if (error) throw error;
+        await updateRecord<Good>('goods', editingGood.id, formData);
       } else {
-        const { error } = await supabase
-          .from('goods')
-          .insert([formData]);
-
-        if (error) throw error;
+        await addRecord<Good>('goods', formData as Good);
       }
 
-      fetchGoods();
+      await fetchGoods();
       closeModal();
     } catch (error) {
       console.error('Error saving good:', error);
@@ -83,12 +72,7 @@ export default function Goods() {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
     try {
-      const { error } = await supabase
-        .from('goods')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await deleteRecord('goods', id);
       fetchGoods();
     } catch (error) {
       console.error('Error deleting good:', error);

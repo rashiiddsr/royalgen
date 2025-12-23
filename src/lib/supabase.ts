@@ -1,21 +1,72 @@
-import { createClient } from '@supabase/supabase-js';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-export type UserRole = 'admin' | 'procurement' | 'sales' | 'finance' | 'warehouse';
+export type UserRole = 'staff' | 'manager' | 'owner';
 
 export interface UserProfile {
-  id: string;
+  id?: number | string;
+  email: string;
   full_name: string;
   role: UserRole;
-  division: string | null;
-  created_at: string;
-  updated_at: string;
+}
+
+type TableName =
+  | 'suppliers'
+  | 'goods'
+  | 'rfqs'
+  | 'quotations'
+  | 'sales_orders'
+  | 'invoices'
+  | 'financing'
+  | 'users';
+
+type BaseRecord = { id: string | number; created_at?: string } & Record<string, unknown>;
+
+async function handleResponse(response: Response) {
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = data?.error || 'Request failed';
+    throw new Error(message);
+  }
+  return data;
+}
+
+export async function getRecords<T extends BaseRecord>(table: TableName): Promise<T[]> {
+  const response = await fetch(`${API_BASE_URL}/${table}`);
+  return handleResponse(response);
+}
+
+export async function addRecord<T extends BaseRecord>(
+  table: TableName,
+  record: Omit<T, 'id' | 'created_at'> & Partial<Pick<T, 'id' | 'created_at'>>,
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/${table}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  });
+  return handleResponse(response);
+}
+
+export async function updateRecord<T extends BaseRecord>(
+  table: TableName,
+  id: string | number,
+  updates: Partial<T>,
+): Promise<T | null> {
+  const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteRecord(table: TableName, id: string | number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const message = data.error || 'Failed to delete record';
+    throw new Error(message);
+  }
 }

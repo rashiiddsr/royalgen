@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Auth/Login';
-import Register from './components/Auth/Register';
 import Dashboard from './components/Layout/Dashboard';
 import DashboardHome from './components/Pages/DashboardHome';
 import Suppliers from './components/Pages/Suppliers';
@@ -11,10 +10,10 @@ import Quotations from './components/Pages/Quotations';
 import Orders from './components/Pages/Orders';
 import Invoices from './components/Pages/Invoices';
 import Financing from './components/Pages/Financing';
+import Users from './components/Pages/Users';
 
 function App() {
   const { user, profile, loading } = useAuth();
-  const [showRegister, setShowRegister] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
 
   if (loading) {
@@ -29,11 +28,7 @@ function App() {
   }
 
   if (!user || !profile) {
-    return showRegister ? (
-      <Register onToggle={() => setShowRegister(false)} />
-    ) : (
-      <Login onToggle={() => setShowRegister(true)} />
-    );
+    return <Login />;
   }
 
   const renderPage = () => {
@@ -54,6 +49,8 @@ function App() {
         return <Invoices />;
       case 'financing':
         return <Financing />;
+      case 'users':
+        return <Users />;
       default:
         return <DashboardHome />;
     }

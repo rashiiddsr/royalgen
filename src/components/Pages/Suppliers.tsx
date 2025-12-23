@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/supabase';
 import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 
 interface Supplier {
@@ -42,13 +42,11 @@ export default function Suppliers() {
 
   const fetchSuppliers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSuppliers(data || []);
+      const data = await getRecords<Supplier>('suppliers');
+      const sorted = [...data].sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setSuppliers(sorted);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
     } finally {
@@ -60,21 +58,12 @@ export default function Suppliers() {
     e.preventDefault();
     try {
       if (editingSupplier) {
-        const { error } = await supabase
-          .from('suppliers')
-          .update(formData)
-          .eq('id', editingSupplier.id);
-
-        if (error) throw error;
+        await updateRecord<Supplier>('suppliers', editingSupplier.id, formData);
       } else {
-        const { error } = await supabase
-          .from('suppliers')
-          .insert([formData]);
-
-        if (error) throw error;
+        await addRecord<Supplier>('suppliers', formData as Supplier);
       }
 
-      fetchSuppliers();
+      await fetchSuppliers();
       closeModal();
     } catch (error) {
       console.error('Error saving supplier:', error);
@@ -85,12 +74,7 @@ export default function Suppliers() {
     if (!confirm('Are you sure you want to delete this supplier?')) return;
 
     try {
-      const { error } = await supabase
-        .from('suppliers')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await deleteRecord('suppliers', id);
       fetchSuppliers();
     } catch (error) {
       console.error('Error deleting supplier:', error);
