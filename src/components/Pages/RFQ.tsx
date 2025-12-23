@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRecords } from '../../lib/supabase';
+import { getRecords } from '../../lib/api';
 import { Plus, Eye, Edit2, FileText } from 'lucide-react';
 
 interface RFQType {

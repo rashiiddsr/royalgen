@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/supabase';
+import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, Search, Package } from 'lucide-react';
 
 interface Good {

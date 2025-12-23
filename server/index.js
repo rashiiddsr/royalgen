@@ -24,6 +24,29 @@ const TABLES = [
 
 const isValidTable = (name) => TABLES.includes(name);
 
+const normalizePhone = (value) => {
+  if (value === undefined || value === null) return value;
+  const digits = String(value).replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('62')) return `+${digits}`;
+  if (digits.startsWith('0')) return `+62${digits.slice(1)}`;
+  return `+62${digits}`;
+};
+
+const sanitizeUserPayload = (payload, allowedFields) => {
+  const clean = {};
+
+  allowedFields.forEach((field) => {
+    if (payload[field] !== undefined) {
+      clean[field] = field === 'phone' ? normalizePhone(payload[field]) : payload[field];
+    }
+  });
+
+  return clean;
+};
+
+const preventOwnerCreation = (role) => role === 'owner';
+
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -74,6 +97,18 @@ app.post('/api/:table', async (req, res) => {
 
   try {
     const payload = req.body || {};
+
+    if (table === 'users') {
+      if (preventOwnerCreation(payload.role)) {
+        return res.status(403).json({ error: 'Owner account cannot be created' });
+      }
+
+      const cleanPayload = sanitizeUserPayload(payload, ['full_name', 'email', 'password', 'role', 'phone']);
+      const result = await query('INSERT INTO ?? SET ?', [table, cleanPayload]);
+      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+      return res.status(201).json(created);
+    }
+
     const result = await query('INSERT INTO ?? SET ?', [table, payload]);
     const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
     return res.status(201).json(created);
@@ -88,6 +123,39 @@ app.put('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'users') {
+      const [existing] = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
+      if (!existing) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (existing.role === 'owner') {
+        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone']);
+        updates.role = existing.role;
+
+        if (Object.keys(updates).length === 1 && updates.role) {
+          return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
+      } else {
+        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'role']);
+
+        if (preventOwnerCreation(updates.role)) {
+          return res.status(403).json({ error: 'Cannot promote user to owner' });
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
+      }
+
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+      return res.json(updated);
+    }
+
     await query('UPDATE ?? SET ? WHERE id = ?', [table, req.body || {}, id]);
     const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
     return res.json(updated);
@@ -102,6 +170,12 @@ app.delete('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'users') {
+      const [target] = await query('SELECT role FROM ?? WHERE id = ? LIMIT 1', [table, id]);
+      if (target?.role === 'owner') {
+        return res.status(403).json({ error: 'Owner account cannot be deleted' });
+      }
+    }
     await query('DELETE FROM ?? WHERE id = ?', [table, id]);
     return res.status(204).send();
   } catch (error) {

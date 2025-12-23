@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { addRecord, getRecords } from '../../lib/supabase';
+import { addRecord, getRecords } from '../../lib/api';
 import { Plus, Eye, Receipt, X } from 'lucide-react';
 
 interface InvoiceType {
