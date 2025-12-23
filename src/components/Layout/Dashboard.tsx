@@ -11,6 +11,7 @@ import {
   Receipt,
   CreditCard,
   UserCog,
+  UserCircle,
   LogOut,
   Menu,
   X,
@@ -25,6 +26,7 @@ interface DashboardProps {
 export default function Dashboard({ children, currentPage, onNavigate }: DashboardProps) {
   const { profile, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
   const navigation = [
     { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['owner', 'manager', 'staff'] },
@@ -35,6 +37,7 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
     { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['owner', 'manager', 'staff'] },
     { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['owner', 'manager', 'staff'] },
     { name: 'Financing', icon: CreditCard, page: 'financing', roles: ['owner', 'manager', 'staff'] },
+    { name: 'Profile', icon: UserCircle, page: 'profile', roles: ['owner', 'manager', 'staff'] },
     { name: 'User Management', icon: UserCog, page: 'users', roles: ['owner'] },
   ];
 
@@ -128,9 +131,23 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
           </nav>
 
           <div className="p-4 border-t border-gray-200/50">
-            <div className="mb-4 p-4 bg-gradient-to-br from-blue-50 to-emerald-50 rounded-xl border border-blue-100">
-              <p className="text-sm font-semibold text-gray-900">{profile?.full_name}</p>
-              <p className="text-xs text-gray-600 capitalize font-medium mt-1">{profile?.role}</p>
+            <div className="mb-4 p-4 bg-gradient-to-br from-blue-50 to-emerald-50 rounded-xl border border-blue-100 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full overflow-hidden bg-white border border-blue-100 flex items-center justify-center text-blue-700 font-semibold">
+                {profile?.photo_url ? (
+                  <img src={`${apiRoot}${profile.photo_url}`} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  profile?.full_name
+                    ?.split(' ')
+                    .filter(Boolean)
+                    .map((part) => part[0]?.toUpperCase())
+                    .slice(0, 2)
+                    .join('') || 'U'
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{profile?.full_name}</p>
+                <p className="text-xs text-gray-600 capitalize font-medium mt-1">{profile?.role}</p>
+              </div>
             </div>
             <button
               onClick={handleSignOut}
