@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { getRecords } from '../../lib/supabase';
 import { Plus, Eye, FileCheck } from 'lucide-react';
 
 interface QuotationType {
@@ -17,6 +17,16 @@ interface QuotationType {
   rfqs?: { title: string };
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
+interface RFQTypeLite {
+  id: string;
+  title: string;
+}
+
 export default function Quotations() {
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,17 +37,26 @@ export default function Quotations() {
 
   const fetchQuotations = async () => {
     try {
-      const { data, error } = await supabase
-        .from('quotations')
-        .select(`
-          *,
-          suppliers (name),
-          rfqs (title)
-        `)
-        .order('created_at', { ascending: false });
+      const [quotationData, supplierData, rfqData] = await Promise.all([
+        getRecords<QuotationType>('quotations'),
+        getRecords<Supplier>('suppliers'),
+        getRecords<RFQTypeLite>('rfqs'),
+      ]);
 
-      if (error) throw error;
-      setQuotations(data || []);
+      const suppliersById = new Map(supplierData.map((supplier) => [supplier.id, supplier]));
+      const rfqsById = new Map(rfqData.map((rfq) => [rfq.id, rfq]));
+
+      const mappedQuotations = quotationData
+        .map((quotation) => ({
+          ...quotation,
+          suppliers: suppliersById.get(quotation.supplier_id),
+          rfqs: rfqsById.get(quotation.rfq_id),
+        }))
+        .sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+
+      setQuotations(mappedQuotations);
     } catch (error) {
       console.error('Error fetching quotations:', error);
     } finally {

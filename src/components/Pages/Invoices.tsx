@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { addRecord, getRecords } from '../../lib/supabase';
 import { Plus, Eye, Receipt, X } from 'lucide-react';
 
 interface InvoiceType {
@@ -52,16 +52,22 @@ export default function Invoices() {
 
   const fetchInvoices = async () => {
     try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select(`
-          *,
-          suppliers (name)
-        `)
-        .order('created_at', { ascending: false });
+      const [invoiceData, supplierData] = await Promise.all([
+        getRecords<InvoiceType>('invoices'),
+        getRecords<Supplier>('suppliers'),
+      ]);
 
-      if (error) throw error;
-      setInvoices(data || []);
+      const suppliersById = new Map(supplierData.map((supplier) => [supplier.id, supplier]));
+      const mappedInvoices = invoiceData
+        .map((invoice) => ({
+          ...invoice,
+          suppliers: suppliersById.get(invoice.supplier_id),
+        }))
+        .sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+
+      setInvoices(mappedInvoices);
     } catch (error) {
       console.error('Error fetching invoices:', error);
     } finally {
@@ -71,13 +77,9 @@ export default function Invoices() {
 
   const fetchSuppliers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setSuppliers(data || []);
+      const data = await getRecords<Supplier>('suppliers');
+      const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
+      setSuppliers(sorted);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
     }
@@ -85,13 +87,11 @@ export default function Invoices() {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('sales_orders')
-        .select('id, order_number')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setOrders(data || []);
+      const data = await getRecords<Order>('sales_orders');
+      const sorted = [...data].sort(
+        (a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime(),
+      );
+      setOrders(sorted);
     } catch (error) {
       console.error('Error fetching orders:', error);
     }
@@ -105,20 +105,18 @@ export default function Invoices() {
     const grandTotal = totalAmount + taxAmount;
 
     try {
-      const { error } = await supabase.from('invoices').insert([
-        {
-          invoice_number: formData.invoice_number,
-          order_id: formData.order_id,
-          supplier_id: formData.supplier_id,
-          total_amount: totalAmount,
-          tax_amount: taxAmount,
-          grand_total: grandTotal,
-          status: formData.status,
-          due_date: formData.due_date,
-        },
-      ]);
-
-      if (error) throw error;
+      await addRecord<InvoiceType>('invoices', {
+        invoice_number: formData.invoice_number,
+        order_id: formData.order_id,
+        supplier_id: formData.supplier_id,
+        total_amount: totalAmount,
+        tax_amount: taxAmount,
+        grand_total: grandTotal,
+        status: formData.status,
+        due_date: formData.due_date,
+        paid_date: null,
+        payment_method: null,
+      } as InvoiceType);
 
       setShowModal(false);
       setFormData({

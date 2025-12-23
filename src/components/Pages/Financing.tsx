@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { getRecords } from '../../lib/supabase';
 import { Plus, Eye, CreditCard } from 'lucide-react';
 
 interface FinancingType {
@@ -20,6 +20,19 @@ interface FinancingType {
   };
 }
 
+interface Invoice {
+  id: string;
+  invoice_number: string;
+  supplier_id: string;
+  suppliers?: { name: string };
+  created_at: string;
+}
+
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 export default function Financing() {
   const [financings, setFinancings] = useState<FinancingType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,19 +43,33 @@ export default function Financing() {
 
   const fetchFinancings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('financing')
-        .select(`
-          *,
-          invoices (
-            invoice_number,
-            suppliers (name)
-          )
-        `)
-        .order('created_at', { ascending: false });
+      const [financingData, invoiceData, supplierData] = await Promise.all([
+        getRecords<FinancingType>('financing'),
+        getRecords<Invoice>('invoices'),
+        getRecords<Supplier>('suppliers'),
+      ]);
 
-      if (error) throw error;
-      setFinancings(data || []);
+      const suppliersById = new Map(supplierData.map((supplier) => [supplier.id, supplier]));
+      const invoicesById = new Map(
+        invoiceData.map((invoice) => [
+          invoice.id,
+          {
+            ...invoice,
+            suppliers: suppliersById.get(invoice.supplier_id),
+          },
+        ]),
+      );
+
+      const mappedFinancing = financingData
+        .map((financing) => ({
+          ...financing,
+          invoices: invoicesById.get(financing.invoice_id),
+        }))
+        .sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+
+      setFinancings(mappedFinancing);
     } catch (error) {
       console.error('Error fetching financing:', error);
     } finally {

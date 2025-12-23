@@ -1,103 +1,73 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase, UserProfile } from '../lib/supabase';
+import { UserProfile } from '../lib/supabase';
 
 interface AuthContextType {
-  user: User | null;
+  user: { email: string } | null;
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
+const SESSION_STORAGE_KEY = 'mysql_session_user';
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const loadSession = (): UserProfile | null => {
+  const storedSession = localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!storedSession) return null;
+
+  try {
+    return JSON.parse(storedSession);
+  } catch (error) {
+    console.error('Failed to parse session', error);
+    return null;
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<{ email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      })();
-    });
-
-    return () => subscription.unsubscribe();
+    const sessionProfile = loadSession();
+    if (sessionProfile) {
+      setUser({ email: sessionProfile.email });
+      setProfile(sessionProfile);
+    }
+    setLoading(false);
   }, []);
 
-  const loadProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-  };
-
-  const signUp = async (email: string, password: string, fullName: string, role: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+    const response = await fetch(`${apiBase}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
 
-    if (error) throw error;
+    const data = await response.json();
 
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([
-          {
-            id: data.user.id,
-            full_name: fullName,
-            role: role,
-          },
-        ]);
-
-      if (profileError) throw profileError;
+    if (!response.ok) {
+      throw new Error(data?.error || 'Invalid email or password');
     }
+
+    const sessionProfile: UserProfile = data.profile;
+
+    setUser({ email: sessionProfile.email });
+    setProfile(sessionProfile);
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionProfile));
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setUser(null);
+    setProfile(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
