@@ -38,14 +38,14 @@ const TABLES = [
 
 const isValidTable = (name) => TABLES.includes(name);
 
-const saveBase64Image = (photoData, filenamePrefix = 'user') => {
-  const matches = photoData.match(/^data:(.+);base64,(.+)$/);
+const saveBase64File = (fileData, filenamePrefix = 'upload') => {
+  const matches = fileData.match(/^data:(.+);base64,(.+)$/);
   if (!matches || matches.length !== 3) {
-    throw new Error('Invalid image data');
+    throw new Error('Invalid file data');
   }
 
   const mimeType = matches[1];
-  const extension = mimeType.split('/')[1] || 'png';
+  const extension = mimeType.split('/')[1] || 'bin';
   const buffer = Buffer.from(matches[2], 'base64');
   const filename = `${filenamePrefix}-${Date.now()}.${extension}`;
   const filePath = path.join(uploadDir, filename);
@@ -54,6 +54,8 @@ const saveBase64Image = (photoData, filenamePrefix = 'user') => {
 
   return `/uploads/${filename}`;
 };
+
+const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
 
 const normalizePhone = (value) => {
   if (value === undefined || value === null) return value;
@@ -143,6 +145,14 @@ app.post('/api/auth/login', async (req, res) => {
       photo_url: rows[0].photo_url,
     };
 
+    await logActivity({
+      performedBy: rows[0].id,
+      entityType: 'auth',
+      entityId: rows[0].id,
+      action: 'login',
+      description: 'User logged in',
+    });
+
     return res.json({ profile });
   } catch (error) {
     console.error('Login error', error);
@@ -150,16 +160,67 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+app.post('/api/auth/logout', async (req, res) => {
+  const { user_id: userId } = req.body || {};
+
+  try {
+    await logActivity({
+      performedBy: userId,
+      entityType: 'auth',
+      entityId: userId || 0,
+      action: 'logout',
+      description: 'User logged out',
+    });
+  } catch (error) {
+    console.error('Logout log error', error);
+  }
+
+  return res.json({ success: true });
+});
+
 app.get('/api/:table', async (req, res) => {
   const { table } = req.params;
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
-    const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
-
-    if (table === 'goods') {
+    if (table === 'activity_logs') {
+      const { user_id: userId } = req.query;
+      const rows = userId
+        ? await query('SELECT * FROM `activity_logs` WHERE user_id = ? ORDER BY created_at DESC', [userId])
+        : await query('SELECT * FROM `activity_logs` ORDER BY created_at DESC');
       return res.json(rows);
     }
+
+    if (table === 'rfqs') {
+      const rows = await query('SELECT * FROM `rfqs` ORDER BY created_at DESC');
+      const goodsRows = await query('SELECT id, name FROM `goods`');
+      const goodsMap = goodsRows.reduce((acc, row) => ({ ...acc, [row.id]: row.name }), {});
+
+      const parsed = rows.map((row) => {
+        let goods = [];
+        try {
+          goods = JSON.parse(row.goods || '[]');
+        } catch {
+          goods = [];
+        }
+
+        const mappedGoods = goods.map((item) => ({
+          ...item,
+          display_name: item.type === 'existing' ? goodsMap[item.good_id] || item.name || 'Existing good' : item.name,
+        }));
+
+        return { ...row, goods: mappedGoods };
+      });
+
+      return res.json(parsed);
+    }
+
+    if (table === 'goods') {
+      const rows = await attachSuppliersToGoods(await query('SELECT * FROM `goods` ORDER BY created_at DESC'));
+      return res.json(rows);
+    }
+
+    const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
 
     return res.json(rows);
   } catch (error) {
@@ -182,6 +243,22 @@ app.get('/api/:table/:id', async (req, res) => {
       return res.json(goodWithSuppliers);
     }
 
+    if (table === 'rfqs') {
+      const rows = await query('SELECT * FROM `rfqs` WHERE id = ? LIMIT 1', [id]);
+      if (!rows.length) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+
+      let goods = [];
+      try {
+        goods = JSON.parse(rows[0].goods || '[]');
+      } catch {
+        goods = [];
+      }
+
+      return res.json({ ...rows[0], goods });
+    }
+
     const rows = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
 
     if (!rows.length) {
@@ -201,6 +278,19 @@ app.post('/api/:table', async (req, res) => {
 
   try {
     const payload = req.body || {};
+
+    if (table === 'activity_logs') {
+      const { user_id: userId, entity_type, entity_id, action, description } = payload;
+      if (!userId || !entity_type || !entity_id || !action) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      const result = await query(
+        'INSERT INTO activity_logs (user_id, entity_type, entity_id, action, description) VALUES (?, ?, ?, ?, ?)',
+        [userId, entity_type, entity_id, action, description || null],
+      );
+      const [created] = await query('SELECT * FROM activity_logs WHERE id = ?', [result.insertId]);
+      return res.status(201).json(created);
+    }
 
     if (table === 'goods') {
       const { suppliers = [], performed_by: performedBy, ...goodPayload } = payload;
@@ -223,6 +313,36 @@ app.post('/api/:table', async (req, res) => {
         description: `Created good ${goodPayload.name}`,
       });
       return res.status(201).json(created);
+    }
+
+    if (table === 'rfqs') {
+      const { goods = [], attachment_data: attachmentData, performed_by: performedBy, ...rfqPayload } = payload;
+      let attachmentUrl = null;
+
+      if (attachmentData) {
+        attachmentUrl = saveBase64File(attachmentData, 'rfq');
+      }
+
+      const cleanedGoods = Array.isArray(goods)
+        ? goods.map((item) => ({
+            type: item.type || (item.good_id ? 'existing' : 'other'),
+            good_id: item.good_id || null,
+            name: item.name || null,
+          }))
+        : [];
+
+      const result = await query('INSERT INTO ?? SET ?', [table, { ...rfqPayload, goods: JSON.stringify(cleanedGoods), attachment_url: attachmentUrl }]);
+      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'rfqs',
+        entityId: result.insertId,
+        action: 'create',
+        description: `Created RFQ ${rfqPayload.rfq_number || rfqPayload.title || result.insertId}`,
+      });
+
+      return res.status(201).json({ ...created, goods: cleanedGoods, attachment_url: attachmentUrl });
     }
 
     if (table === 'suppliers') {
@@ -250,6 +370,17 @@ app.post('/api/:table', async (req, res) => {
       const cleanPayload = sanitizeUserPayload(payload, ['full_name', 'email', 'password', 'role', 'phone', 'photo_url']);
       const result = await query('INSERT INTO ?? SET ?', [table, cleanPayload]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+
+      if (payload.performed_by && ['owner', 'admin', 'manager'].includes(payload.creator_role)) {
+        await logActivity({
+          performedBy: payload.performed_by,
+          entityType: 'users',
+          entityId: result.insertId,
+          action: 'create',
+          description: `Created user ${cleanPayload.full_name}`,
+        });
+      }
+
       return res.status(201).json(created);
     }
 
@@ -267,6 +398,41 @@ app.put('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'rfqs') {
+      const { goods = [], attachment_data: attachmentData, performed_by: performedBy, ...rfqUpdates } = req.body || {};
+      const [existing] = await query('SELECT * FROM `rfqs` WHERE id = ? LIMIT 1', [id]);
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+
+      let attachmentUrl = existing.attachment_url;
+      if (attachmentData) {
+        attachmentUrl = saveBase64File(attachmentData, `rfq-${id}`);
+      }
+
+      const cleanedGoods = Array.isArray(goods)
+        ? goods.map((item) => ({
+            type: item.type || (item.good_id ? 'existing' : 'other'),
+            good_id: item.good_id || null,
+            name: item.name || null,
+          }))
+        : JSON.parse(existing.goods || '[]');
+
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, { ...rfqUpdates, goods: JSON.stringify(cleanedGoods), attachment_url: attachmentUrl }, id]);
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'rfqs',
+        entityId: id,
+        action: 'update',
+        description: `Updated RFQ ${rfqUpdates.rfq_number || updated?.rfq_number || id}`,
+      });
+
+      return res.json({ ...updated, goods: cleanedGoods });
+    }
+
     if (table === 'goods') {
       const [existingGood] = await query('SELECT * FROM `goods` WHERE id = ? LIMIT 1', [id]);
       if (!existingGood) {
@@ -383,6 +549,8 @@ app.delete('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    const { performed_by: performedBy } = req.body || {};
+
     if (table === 'goods') {
       return res.status(403).json({ error: 'Goods cannot be deleted' });
     }
@@ -393,6 +561,16 @@ app.delete('/api/:table/:id', async (req, res) => {
         return res.status(403).json({ error: 'Owner account cannot be deleted' });
       }
     }
+    if (table === 'suppliers') {
+      await logActivity({
+        performedBy,
+        entityType: 'suppliers',
+        entityId: id,
+        action: 'delete',
+        description: `Deleted supplier ${id}`,
+      });
+    }
+
     await query('DELETE FROM ?? WHERE id = ?', [table, id]);
     return res.status(204).send();
   } catch (error) {

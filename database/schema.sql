@@ -64,11 +64,14 @@ CREATE TABLE IF NOT EXISTS `goods_suppliers` (
 -- RFQs
 CREATE TABLE IF NOT EXISTS `rfqs` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `title` VARCHAR(255) NOT NULL,
-  `reference_number` VARCHAR(120) NOT NULL,
-  `supplier` VARCHAR(255) DEFAULT NULL,
-  `delivery_terms` VARCHAR(255) DEFAULT NULL,
-  `due_date` DATE DEFAULT NULL,
+  `rfq_number` VARCHAR(120) NOT NULL,
+  `company_name` VARCHAR(255) NOT NULL,
+  `project_name` VARCHAR(255) NOT NULL,
+  `pic_name` VARCHAR(255) NOT NULL,
+  `pic_email` VARCHAR(255) NOT NULL,
+  `pic_phone` VARCHAR(100) NOT NULL,
+  `goods` JSON DEFAULT NULL,
+  `attachment_url` VARCHAR(500) DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT 'draft',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -1,6 +1,7 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ManagedUser {
   id: number | string;
@@ -36,6 +37,7 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [formData, setFormData] = useState<Partial<ManagedUser>>(DEFAULT_FORM);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
+  const { profile } = useAuth();
 
   useEffect(() => {
     fetchUsers();
@@ -73,13 +75,14 @@ export default function Users() {
     event.preventDefault();
     try {
       const payload = { ...formData, phone: formData.phone ? normalizePhoneInput(formData.phone) : undefined };
+      const creatorContext = { performed_by: profile?.id, creator_role: profile?.role };
       if (editingUser) {
         if (!payload.password) {
           delete payload.password;
         }
-        await updateRecord<ManagedUser>('users', editingUser.id, payload);
+        await updateRecord<ManagedUser>('users', editingUser.id, { ...payload, ...creatorContext });
       } else {
-        await addRecord<ManagedUser>('users', payload as ManagedUser);
+        await addRecord<ManagedUser>('users', { ...(payload as ManagedUser), ...creatorContext });
       }
       await fetchUsers();
       closeModal();
