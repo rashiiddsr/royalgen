@@ -68,6 +68,7 @@ export default function RFQ() {
   const editableRoles = ['owner', 'admin', 'manager'];
   const canEditRfq = (rfq: RFQType) => {
     if (!profile) return false;
+    if (rfq.status === 'process') return false;
     if (editableRoles.includes(profile.role)) return true;
     if (!rfq.performed_by || !profile.id) return false;
     return String(rfq.performed_by) === String(profile.id);
