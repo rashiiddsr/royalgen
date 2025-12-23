@@ -26,6 +26,7 @@ app.use('/uploads', express.static(uploadDir));
 const TABLES = [
   'suppliers',
   'goods',
+  'goods_suppliers',
   'rfqs',
   'quotations',
   'sales_orders',
@@ -76,6 +77,32 @@ const sanitizeUserPayload = (payload, allowedFields) => {
 
 const preventOwnerCreation = (role) => role === 'owner';
 
+const attachSuppliersToGoods = async (goodsRows) => {
+  if (!goodsRows.length) return goodsRows;
+
+  const goodsIds = goodsRows.map((good) => good.id);
+  const supplierRows = await query(
+    `SELECT gs.good_id, s.id, s.name
+     FROM goods_suppliers gs
+     JOIN suppliers s ON gs.supplier_id = s.id
+     WHERE gs.good_id IN (?)`,
+    [goodsIds]
+  );
+
+  const supplierMap = supplierRows.reduce((acc, row) => {
+    if (!acc[row.good_id]) {
+      acc[row.good_id] = [];
+    }
+    acc[row.good_id].push({ id: row.id, name: row.name });
+    return acc;
+  }, {});
+
+  return goodsRows.map((good) => ({
+    ...good,
+    suppliers: supplierMap[good.id] || [],
+  }));
+};
+
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -114,6 +141,12 @@ app.get('/api/:table', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'goods') {
+      const goodsRows = await query('SELECT * FROM `goods` ORDER BY created_at DESC');
+      const goodsWithSuppliers = await attachSuppliersToGoods(goodsRows);
+      return res.json(goodsWithSuppliers);
+    }
+
     const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
     return res.json(rows);
   } catch (error) {
@@ -127,6 +160,15 @@ app.get('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'goods') {
+      const goodsRows = await query('SELECT * FROM `goods` WHERE id = ? LIMIT 1', [id]);
+      if (!goodsRows.length) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      const [goodWithSuppliers] = await attachSuppliersToGoods(goodsRows);
+      return res.json(goodWithSuppliers);
+    }
+
     const rows = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
 
     if (!rows.length) {
@@ -146,6 +188,21 @@ app.post('/api/:table', async (req, res) => {
 
   try {
     const payload = req.body || {};
+
+    if (table === 'goods') {
+      const { suppliers = [], ...goodPayload } = payload;
+      const result = await query('INSERT INTO ?? SET ?', [table, goodPayload]);
+
+      if (Array.isArray(suppliers) && suppliers.length > 0) {
+        const supplierValues = suppliers.map((supplierId) => [result.insertId, supplierId]);
+        await query('INSERT INTO goods_suppliers (good_id, supplier_id) VALUES ?', [supplierValues]);
+      }
+
+      const [created] = await attachSuppliersToGoods(
+        await query('SELECT * FROM `goods` WHERE id = ?', [result.insertId])
+      );
+      return res.status(201).json(created);
+    }
 
     if (table === 'users') {
       if (preventOwnerCreation(payload.role)) {
@@ -172,6 +229,27 @@ app.put('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'goods') {
+      const [existingGood] = await query('SELECT * FROM `goods` WHERE id = ? LIMIT 1', [id]);
+      if (!existingGood) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+
+      const { suppliers = [], ...goodUpdates } = req.body || {};
+      if (Object.keys(goodUpdates).length > 0) {
+        await query('UPDATE ?? SET ? WHERE id = ?', [table, goodUpdates, id]);
+      }
+
+      await query('DELETE FROM goods_suppliers WHERE good_id = ?', [id]);
+      if (Array.isArray(suppliers) && suppliers.length > 0) {
+        const supplierValues = suppliers.map((supplierId) => [id, supplierId]);
+        await query('INSERT INTO goods_suppliers (good_id, supplier_id) VALUES ?', [supplierValues]);
+      }
+
+      const [updated] = await attachSuppliersToGoods(await query('SELECT * FROM `goods` WHERE id = ?', [id]));
+      return res.json(updated);
+    }
+
     if (table === 'users') {
       const [existing] = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
       if (!existing) {

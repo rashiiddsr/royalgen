@@ -1,18 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, Search, Package } from 'lucide-react';
+
+interface SupplierOption {
+  id: number | string;
+  name: string;
+  status?: string;
+}
 
 interface Good {
   id: string;
   sku: string;
   name: string;
   description: string;
-  category: string;
+  category: 'consumable' | 'instrument' | 'electrical' | 'piping' | 'other';
   unit: string;
   price: number;
   stock_quantity: number;
   minimum_order_quantity: number;
   status: string;
+  suppliers: SupplierOption[];
   created_at: string;
 }
 
@@ -22,11 +29,13 @@ export default function Goods() {
   const [showModal, setShowModal] = useState(false);
   const [editingGood, setEditingGood] = useState<Good | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
     description: '',
-    category: '',
+    category: 'other' as Good['category'],
     unit: 'pcs',
     price: 0,
     stock_quantity: 0,
@@ -36,7 +45,10 @@ export default function Goods() {
 
   useEffect(() => {
     fetchGoods();
+    fetchSuppliers();
   }, []);
+
+  const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
 
   const fetchGoods = async () => {
     try {
@@ -44,7 +56,7 @@ export default function Goods() {
       const sorted = [...data].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
-      setGoods(sorted);
+      setGoods(sorted.map((item) => ({ ...item, suppliers: item.suppliers || [] })));
     } catch (error) {
       console.error('Error fetching goods:', error);
     } finally {
@@ -52,13 +64,27 @@ export default function Goods() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const fetchSuppliers = async () => {
+    try {
+      const data = await getRecords<SupplierOption>('suppliers');
+      setSupplierOptions(data);
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...formData,
+        suppliers: selectedSuppliers.map((supplierId) => Number(supplierId)),
+      };
+
       if (editingGood) {
-        await updateRecord<Good>('goods', editingGood.id, formData);
+        await updateRecord<Good>('goods', editingGood.id, payload as unknown as Good);
       } else {
-        await addRecord<Good>('goods', formData as Good);
+        await addRecord<Good>('goods', payload as unknown as Good);
       }
 
       await fetchGoods();
@@ -93,19 +119,21 @@ export default function Goods() {
         minimum_order_quantity: good.minimum_order_quantity,
         status: good.status,
       });
+      setSelectedSuppliers(good.suppliers?.map((supplier) => String(supplier.id)) || []);
     } else {
       setEditingGood(null);
       setFormData({
         sku: '',
         name: '',
         description: '',
-        category: '',
+        category: 'other',
         unit: 'pcs',
         price: 0,
         stock_quantity: 0,
         minimum_order_quantity: 1,
         status: 'active',
       });
+      setSelectedSuppliers([]);
     }
     setShowModal(true);
   };
@@ -113,6 +141,7 @@ export default function Goods() {
   const closeModal = () => {
     setShowModal(false);
     setEditingGood(null);
+    setSelectedSuppliers([]);
   };
 
   const filteredGoods = goods.filter(good =>
@@ -176,6 +205,9 @@ export default function Goods() {
                   Stock
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Suppliers
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -186,7 +218,7 @@ export default function Goods() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredGoods.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     No goods found. Add your first product to get started.
                   </td>
                 </tr>
@@ -215,6 +247,22 @@ export default function Goods() {
                       <div className="text-xs text-gray-500">
                         MOQ: {good.minimum_order_quantity}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {good.suppliers?.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {good.suppliers.map((supplier) => (
+                            <span
+                              key={`${good.id}-${supplier.id}`}
+                              className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-800"
+                            >
+                              {supplier.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-500">No suppliers linked</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -297,12 +345,17 @@ export default function Goods() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as Good['category'] })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  >
+                    {categories.map((category) => (
+                      <option key={category} value={category} className="capitalize">
+                        {category}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -378,6 +431,37 @@ export default function Goods() {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Suppliers</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-3 border border-gray-200 rounded-lg">
+                  {supplierOptions.length === 0 ? (
+                    <p className="text-sm text-gray-500">No suppliers available. Add suppliers first.</p>
+                  ) : (
+                    supplierOptions.map((supplier) => (
+                      <label key={supplier.id} className="inline-flex items-center space-x-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedSuppliers.includes(String(supplier.id))}
+                          onChange={(e) => {
+                            const id = String(supplier.id);
+                            if (e.target.checked) {
+                              setSelectedSuppliers([...selectedSuppliers, id]);
+                            } else {
+                              setSelectedSuppliers(selectedSuppliers.filter((existing) => existing !== id));
+                            }
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="font-medium">{supplier.name}</span>
+                        {supplier.status && (
+                          <span className="text-xs text-gray-500">({supplier.status})</span>
+                        )}
+                      </label>
+                    ))
+                  )}
                 </div>
               </div>
 

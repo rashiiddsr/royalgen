@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
 
@@ -7,7 +7,7 @@ interface ManagedUser {
   full_name: string;
   email: string;
   password?: string;
-  role: 'owner' | 'manager' | 'staff';
+  role: 'owner' | 'admin' | 'manager' | 'staff';
   phone?: string;
   photo_url?: string | null;
   created_at?: string;
@@ -69,7 +69,7 @@ export default function Users() {
     setFormData(DEFAULT_FORM);
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
       const payload = { ...formData, phone: formData.phone ? normalizePhoneInput(formData.phone) : undefined };
@@ -114,7 +114,7 @@ export default function Users() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">
-            Owner-only access to add, edit, or remove system users with roles.
+            Owners, admins, and managers can add, edit, or remove system users with roles.
           </p>
         </div>
         <button
@@ -265,6 +265,7 @@ export default function Users() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent capitalize"
                     >
                       <option value="manager">Manager</option>
+                      <option value="admin">Admin</option>
                       <option value="staff">Staff</option>
                     </select>
                   )}

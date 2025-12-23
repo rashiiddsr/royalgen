@@ -29,16 +29,16 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
   const navigation = [
-    { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['owner', 'manager', 'staff'] },
-    { name: 'Suppliers', icon: Users, page: 'suppliers', roles: ['owner', 'manager', 'staff'] },
-    { name: 'Goods', icon: Package, page: 'goods', roles: ['owner', 'manager', 'staff'] },
-    { name: 'RFQ', icon: FileText, page: 'rfq', roles: ['owner', 'manager', 'staff'] },
-    { name: 'Quotations', icon: FileCheck, page: 'quotations', roles: ['owner', 'manager', 'staff'] },
-    { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['owner', 'manager', 'staff'] },
-    { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['owner', 'manager', 'staff'] },
-    { name: 'Financing', icon: CreditCard, page: 'financing', roles: ['owner', 'manager', 'staff'] },
-    { name: 'Profile', icon: UserCircle, page: 'profile', roles: ['owner', 'manager', 'staff'] },
-    { name: 'User Management', icon: UserCog, page: 'users', roles: ['owner'] },
+    { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'Suppliers', icon: Users, page: 'suppliers', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'Goods', icon: Package, page: 'goods', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'RFQ', icon: FileText, page: 'rfq', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'Quotations', icon: FileCheck, page: 'quotations', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'Financing', icon: CreditCard, page: 'financing', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'Profile', icon: UserCircle, page: 'profile', roles: ['owner', 'admin', 'manager', 'staff'] },
+    { name: 'User Management', icon: UserCog, page: 'users', roles: ['owner', 'admin', 'manager'] },
   ];
 
   const filteredNavigation = navigation.filter(item =>
