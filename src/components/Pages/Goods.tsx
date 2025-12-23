@@ -1,12 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Edit2, Trash2, Search, Package } from 'lucide-react';
-
-interface SupplierOption {
-  id: number | string;
-  name: string;
-  status?: string;
-}
+import { addRecord, getRecord, getRecords, updateRecord } from '../../lib/api';
+import { Plus, Edit2, Search, Package, Eye } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Good {
   id: string;
@@ -19,9 +14,11 @@ interface Good {
   stock_quantity: number;
   minimum_order_quantity: number;
   status: string;
-  suppliers: SupplierOption[];
+  suppliers?: { id: string | number; name: string; status?: string }[];
   created_at: string;
 }
+
+type GoodFormData = Omit<Good, 'id' | 'created_at' | 'suppliers'>;
 
 export default function Goods() {
   const [goods, setGoods] = useState<Good[]>([]);
@@ -29,13 +26,48 @@ export default function Goods() {
   const [showModal, setShowModal] = useState(false);
   const [editingGood, setEditingGood] = useState<Good | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
-  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<GoodFormData>({
     sku: '',
     name: '',
     description: '',
-    category: 'other' as Good['category'],
+    category: 'other',
+    unit: 'pcs',
+    price: 0,
+    stock_quantity: 0,
+    minimum_order_quantity: 1,
+    status: 'active',
+  });
+  const [detailGood, setDetailGood] = useState<Good | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const { profile } = useAuth();
+
+  const canChangeStatus =
+    !!editingGood && ['admin', 'manager'].includes(profile?.role ?? '');
+
+  const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
+
+  useEffect(() => {
+    fetchGoods();
+  }, []);
+
+  const generateSku = (category: Good['category']) => {
+    const matchingGoods = goods.filter((item) => item.category === category && item.sku);
+    const highestSequence = matchingGoods.reduce((max, item) => {
+      const match = item.sku.match(/rgi-[^-]+-(\d{4})/i);
+      if (!match) return max;
+      const sequence = parseInt(match[1]);
+      return Number.isFinite(sequence) && sequence > max ? sequence : max;
+    }, 0);
+
+    const nextSequence = (highestSequence || 0) + 1;
+    return `rgi-${category}-${String(nextSequence).padStart(4, '0')}`;
+  };
+
+  const getInitialForm = (category: Good['category'] = 'other'): GoodFormData => ({
+    sku: generateSku(category),
+    name: '',
+    description: '',
+    category,
     unit: 'pcs',
     price: 0,
     stock_quantity: 0,
@@ -43,20 +75,13 @@ export default function Goods() {
     status: 'active',
   });
 
-  useEffect(() => {
-    fetchGoods();
-    fetchSuppliers();
-  }, []);
-
-  const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
-
   const fetchGoods = async () => {
     try {
       const data = await getRecords<Good>('goods');
       const sorted = [...data].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
-      setGoods(sorted.map((item) => ({ ...item, suppliers: item.suppliers || [] })));
+      setGoods(sorted.map((item) => ({ ...item })));
     } catch (error) {
       console.error('Error fetching goods:', error);
     } finally {
@@ -64,44 +89,26 @@ export default function Goods() {
     }
   };
 
-  const fetchSuppliers = async () => {
-    try {
-      const data = await getRecords<SupplierOption>('suppliers');
-      setSupplierOptions(data);
-    } catch (error) {
-      console.error('Error fetching suppliers:', error);
-    }
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const payload = {
+      const payload: GoodFormData = {
         ...formData,
-        suppliers: selectedSuppliers.map((supplierId) => Number(supplierId)),
+        price: Number(formData.price),
+        stock_quantity: Number(formData.stock_quantity),
+        minimum_order_quantity: Number(formData.minimum_order_quantity),
       };
 
       if (editingGood) {
-        await updateRecord<Good>('goods', editingGood.id, payload as unknown as Good);
+        await updateRecord<Good>('goods', editingGood.id, payload as Good);
       } else {
-        await addRecord<Good>('goods', payload as unknown as Good);
+        await addRecord<Good>('goods', payload as Good);
       }
 
       await fetchGoods();
       closeModal();
     } catch (error) {
       console.error('Error saving good:', error);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
-
-    try {
-      await deleteRecord('goods', id);
-      fetchGoods();
-    } catch (error) {
-      console.error('Error deleting good:', error);
     }
   };
 
@@ -119,21 +126,9 @@ export default function Goods() {
         minimum_order_quantity: good.minimum_order_quantity,
         status: good.status,
       });
-      setSelectedSuppliers(good.suppliers?.map((supplier) => String(supplier.id)) || []);
     } else {
       setEditingGood(null);
-      setFormData({
-        sku: '',
-        name: '',
-        description: '',
-        category: 'other',
-        unit: 'pcs',
-        price: 0,
-        stock_quantity: 0,
-        minimum_order_quantity: 1,
-        status: 'active',
-      });
-      setSelectedSuppliers([]);
+      setFormData(getInitialForm());
     }
     setShowModal(true);
   };
@@ -141,7 +136,14 @@ export default function Goods() {
   const closeModal = () => {
     setShowModal(false);
     setEditingGood(null);
-    setSelectedSuppliers([]);
+  };
+
+  const handleCategoryChange = (category: Good['category']) => {
+    if (editingGood) {
+      setFormData({ ...formData, category });
+    } else {
+      setFormData((prev) => ({ ...prev, category, sku: generateSku(category) }));
+    }
   };
 
   const filteredGoods = goods.filter(good =>
@@ -149,6 +151,21 @@ export default function Goods() {
     good.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
     good.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleViewDetails = async (good: Good) => {
+    setDetailGood(good);
+    setDetailLoading(true);
+    try {
+      const fullGood = await getRecord<Good>('goods', good.id);
+      setDetailGood((current) =>
+        current && current.id === good.id ? { ...current, ...fullGood } : current
+      );
+    } catch (error) {
+      console.error('Error loading good details:', error);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -205,9 +222,6 @@ export default function Goods() {
                   Stock
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Suppliers
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -218,7 +232,7 @@ export default function Goods() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredGoods.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     No goods found. Add your first product to get started.
                   </td>
                 </tr>
@@ -249,22 +263,6 @@ export default function Goods() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {good.suppliers?.length ? (
-                        <div className="flex flex-wrap gap-2">
-                          {good.suppliers.map((supplier) => (
-                            <span
-                              key={`${good.id}-${supplier.id}`}
-                              className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-800"
-                            >
-                              {supplier.name}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-500">No suppliers linked</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           good.status === 'active'
@@ -277,16 +275,17 @@ export default function Goods() {
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
+                        onClick={() => handleViewDetails(good)}
+                        className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                        aria-label="View details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => openModal(good)}
                         className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                       >
                         <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(good.id)}
-                        className="inline-flex items-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                      >
-                        <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
@@ -308,16 +307,14 @@ export default function Goods() {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
-                  <input
-                    type="text"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                    disabled={!!editingGood}
-                  />
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Auto)</label>
+                  <div className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-800">
+                    {formData.sku || 'Generating SKU...'}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    SKU is generated automatically using the format rgi-(category)-0001 in sequence order.
+                  </p>
                 </div>
 
                 <div>
@@ -347,7 +344,7 @@ export default function Goods() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as Good['category'] })}
+                    onChange={(e) => handleCategoryChange(e.target.value as Good['category'])}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     {categories.map((category) => (
@@ -381,7 +378,9 @@ export default function Goods() {
                   <input
                     type="number"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, price: Number(e.target.value) || 0 })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="0"
                     step="0.01"
@@ -396,7 +395,10 @@ export default function Goods() {
                     type="number"
                     value={formData.stock_quantity}
                     onChange={(e) =>
-                      setFormData({ ...formData, stock_quantity: parseInt(e.target.value) })
+                      setFormData({
+                        ...formData,
+                        stock_quantity: Math.max(0, Number(e.target.value) || 0),
+                      })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="0"
@@ -413,7 +415,7 @@ export default function Goods() {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        minimum_order_quantity: parseInt(e.target.value),
+                        minimum_order_quantity: Math.max(1, Number(e.target.value) || 1),
                       })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -421,48 +423,38 @@ export default function Goods() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Suppliers</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-3 border border-gray-200 rounded-lg">
-                  {supplierOptions.length === 0 ? (
-                    <p className="text-sm text-gray-500">No suppliers available. Add suppliers first.</p>
-                  ) : (
-                    supplierOptions.map((supplier) => (
-                      <label key={supplier.id} className="inline-flex items-center space-x-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedSuppliers.includes(String(supplier.id))}
-                          onChange={(e) => {
-                            const id = String(supplier.id);
-                            if (e.target.checked) {
-                              setSelectedSuppliers([...selectedSuppliers, id]);
-                            } else {
-                              setSelectedSuppliers(selectedSuppliers.filter((existing) => existing !== id));
-                            }
-                          }}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="font-medium">{supplier.name}</span>
-                        {supplier.status && (
-                          <span className="text-xs text-gray-500">({supplier.status})</span>
-                        )}
-                      </label>
-                    ))
-                  )}
-                </div>
+                {canChangeStatus ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                ) : editingGood ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <div className="mt-1">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          formData.status === 'active'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {formData.status}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="md:col-span-2 text-sm text-gray-600">
+                    Status defaults to Active and cannot be changed when creating a new good.
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
@@ -481,6 +473,102 @@ export default function Goods() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {detailGood && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-xl w-full overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Goods Details</h3>
+                <p className="text-sm text-gray-600">SKU {detailGood.sku}</p>
+              </div>
+              <button
+                onClick={() => setDetailGood(null)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close details"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-800">
+              <div>
+                <p className="font-semibold text-gray-700">Name</p>
+                <p>{detailGood.name}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Category</p>
+                <p className="capitalize">{detailGood.category}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Unit</p>
+                <p>{detailGood.unit}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Price</p>
+                <p>Rp {detailGood.price.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Stock</p>
+                <p>
+                  {detailGood.stock_quantity} {detailGood.unit}
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Minimum Order</p>
+                <p>{detailGood.minimum_order_quantity}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Status</p>
+                <span
+                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    detailGood.status === 'active'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {detailGood.status}
+                </span>
+              </div>
+              <div className="md:col-span-2">
+                <p className="font-semibold text-gray-700">Description</p>
+                <p>{detailGood.description || '-'}</p>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="font-semibold text-gray-700">Suppliers</p>
+                {detailLoading ? (
+                  <p className="text-gray-600 mt-1">Loading suppliers...</p>
+                ) : detailGood.suppliers && detailGood.suppliers.length > 0 ? (
+                  <ul className="mt-1 space-y-2">
+                    {detailGood.suppliers.map((supplier) => (
+                      <li
+                        key={supplier.id}
+                        className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2"
+                      >
+                        <span className="text-gray-800">{supplier.name}</span>
+                        {supplier.status && (
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              supplier.status === 'active'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {supplier.status}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-600 mt-1">No suppliers linked to this item.</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
