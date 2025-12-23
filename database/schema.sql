@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS `rfqs` (
   `goods` JSON DEFAULT NULL,
   `attachment_url` VARCHAR(500) DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT 'draft',
+  `performed_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
