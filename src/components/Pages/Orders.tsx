@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { getRecords } from '../../lib/supabase';
 import { Plus, Eye, ShoppingCart } from 'lucide-react';
 
 interface OrderType {
@@ -17,6 +17,11 @@ interface OrderType {
   suppliers?: { name: string };
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState<OrderType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,16 +32,22 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('sales_orders')
-        .select(`
-          *,
-          suppliers (name)
-        `)
-        .order('created_at', { ascending: false });
+      const [orderData, supplierData] = await Promise.all([
+        getRecords<OrderType>('sales_orders'),
+        getRecords<Supplier>('suppliers'),
+      ]);
 
-      if (error) throw error;
-      setOrders(data || []);
+      const supplierLookup = new Map(supplierData.map((supplier) => [supplier.id, supplier]));
+      const mappedOrders = orderData
+        .map((order) => ({
+          ...order,
+          suppliers: supplierLookup.get(order.supplier_id),
+        }))
+        .sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+
+      setOrders(mappedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {

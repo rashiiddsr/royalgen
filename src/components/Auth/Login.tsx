@@ -2,11 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Building2 } from 'lucide-react';
 
-interface LoginProps {
-  onToggle: () => void;
-}
-
-export default function Login({ onToggle }: LoginProps) {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -46,16 +42,14 @@ export default function Login({ onToggle }: LoginProps) {
             </div>
             <div className="ml-4">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
-                Royal General
+                RGI NexaProc
               </h1>
-              <p className="text-sm text-gray-600 font-medium">Indonesia</p>
+              <p className="text-sm text-gray-600 font-medium">Procurement Platform</p>
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-            Welcome Back
-          </h2>
-          <p className="text-gray-600 text-center mb-6">Sign in to continue to your account</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Sign in</h2>
+          <p className="text-gray-600 text-center mb-6">Masuk dengan akun sistem Anda</p>
 
           {error && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm backdrop-blur-sm">
@@ -102,20 +96,10 @@ export default function Login({ onToggle }: LoginProps) {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <button
-              onClick={onToggle}
-              className="text-blue-600 hover:text-emerald-600 font-semibold transition-colors"
-            >
-              Sign up
-            </button>
-          </p>
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-6 font-medium">
-          Procurement Management System
+          RGI NexaProc Procurement Suite
         </p>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { getRecords } from '../../lib/supabase';
 import { Plus, Eye, Edit2, FileText } from 'lucide-react';
 
 interface RFQType {
@@ -14,6 +14,11 @@ interface RFQType {
   suppliers?: { name: string };
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 export default function RFQ() {
   const [rfqs, setRfqs] = useState<RFQType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,16 +29,22 @@ export default function RFQ() {
 
   const fetchRFQs = async () => {
     try {
-      const { data, error } = await supabase
-        .from('rfqs')
-        .select(`
-          *,
-          suppliers (name)
-        `)
-        .order('created_at', { ascending: false });
+      const [rfqData, supplierData] = await Promise.all([
+        getRecords<RFQType>('rfqs'),
+        getRecords<Supplier>('suppliers'),
+      ]);
 
-      if (error) throw error;
-      setRfqs(data || []);
+      const suppliersById = new Map(supplierData.map((supplier) => [supplier.id, supplier]));
+      const mapped = rfqData
+        .map((rfq) => ({
+          ...rfq,
+          suppliers: suppliersById.get(rfq.supplier_id),
+        }))
+        .sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+
+      setRfqs(mapped);
     } catch (error) {
       console.error('Error fetching RFQs:', error);
     } finally {

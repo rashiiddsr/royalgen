@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Receipt,
   CreditCard,
+  UserCog,
   LogOut,
   Menu,
   X,
@@ -26,14 +27,15 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
-    { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['admin', 'procurement', 'sales', 'finance', 'warehouse'] },
-    { name: 'Suppliers', icon: Users, page: 'suppliers', roles: ['admin', 'procurement', 'sales'] },
-    { name: 'Goods', icon: Package, page: 'goods', roles: ['admin', 'procurement', 'warehouse'] },
-    { name: 'RFQ', icon: FileText, page: 'rfq', roles: ['admin', 'procurement'] },
-    { name: 'Quotations', icon: FileCheck, page: 'quotations', roles: ['admin', 'procurement', 'sales'] },
-    { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['admin', 'sales'] },
-    { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['admin', 'finance'] },
-    { name: 'Financing', icon: CreditCard, page: 'financing', roles: ['admin', 'finance'] },
+    { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['owner', 'manager', 'staff'] },
+    { name: 'Suppliers', icon: Users, page: 'suppliers', roles: ['owner', 'manager', 'staff'] },
+    { name: 'Goods', icon: Package, page: 'goods', roles: ['owner', 'manager', 'staff'] },
+    { name: 'RFQ', icon: FileText, page: 'rfq', roles: ['owner', 'manager', 'staff'] },
+    { name: 'Quotations', icon: FileCheck, page: 'quotations', roles: ['owner', 'manager', 'staff'] },
+    { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['owner', 'manager', 'staff'] },
+    { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['owner', 'manager', 'staff'] },
+    { name: 'Financing', icon: CreditCard, page: 'financing', roles: ['owner', 'manager', 'staff'] },
+    { name: 'User Management', icon: UserCog, page: 'users', roles: ['owner'] },
   ];
 
   const filteredNavigation = navigation.filter(item =>
@@ -51,18 +53,18 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/30">
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-gray-200 z-40 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg blur opacity-50"></div>
-            <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-2 rounded-lg">
-              <Building2 className="h-5 w-5 text-white" />
+          <div className="flex items-center">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg blur opacity-50"></div>
+              <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-2 rounded-lg">
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+            </div>
+            <div className="ml-3">
+              <h1 className="text-base font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">RGI NexaProc</h1>
+              <p className="text-xs text-gray-600 font-medium">Procurement</p>
             </div>
           </div>
-          <div className="ml-3">
-            <h1 className="text-base font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">Royal General</h1>
-            <p className="text-xs text-gray-600 font-medium">Indonesia</p>
-          </div>
-        </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 rounded-xl hover:bg-gray-100 transition-all"
@@ -94,9 +96,9 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
               </div>
               <div className="ml-4">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
-                  Royal General
+                  RGI NexaProc
                 </h1>
-                <p className="text-sm text-gray-600 font-medium">Indonesia</p>
+                <p className="text-sm text-gray-600 font-medium">Procurement</p>
               </div>
             </div>
           </div>
