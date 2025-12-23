@@ -7,6 +7,8 @@ export interface UserProfile {
   email: string;
   full_name: string;
   role: UserRole;
+  phone?: string | null;
+  photo_url?: string | null;
 }
 
 type TableName =
@@ -35,6 +37,11 @@ export async function getRecords<T extends BaseRecord>(table: TableName): Promis
   return handleResponse(response);
 }
 
+export async function getRecord<T extends BaseRecord>(table: TableName, id: string | number): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/${table}/${id}`);
+  return handleResponse(response);
+}
+
 export async function addRecord<T extends BaseRecord>(
   table: TableName,
   record: Omit<T, 'id' | 'created_at'> & Partial<Pick<T, 'id' | 'created_at'>>,
@@ -43,6 +50,15 @@ export async function addRecord<T extends BaseRecord>(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
+  });
+  return handleResponse(response);
+}
+
+export async function uploadUserPhoto(id: string | number, photoData: string): Promise<{ photo_url: string }> {
+  const response = await fetch(`${API_BASE_URL}/users/${id}/photo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoData }),
   });
   return handleResponse(response);
 }

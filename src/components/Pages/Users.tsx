@@ -9,6 +9,7 @@ interface ManagedUser {
   password?: string;
   role: 'owner' | 'manager' | 'staff';
   phone?: string;
+  photo_url?: string | null;
   created_at?: string;
 }
 
@@ -34,6 +35,7 @@ export default function Users() {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [formData, setFormData] = useState<Partial<ManagedUser>>(DEFAULT_FORM);
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
   useEffect(() => {
     fetchUsers();
@@ -147,7 +149,7 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.length === 0 ? (
+              {users.filter((user) => user.role !== 'owner').length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                     <UserPlus className="h-10 w-10 text-gray-400 mx-auto mb-4" />
@@ -155,10 +157,26 @@ export default function Users() {
                   </td>
                 </tr>
               ) : (
-                users.map((user) => (
+                users
+                  .filter((user) => user.role !== 'owner')
+                  .map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-900">{user.full_name}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-600 font-semibold">
+                          {user.photo_url ? (
+                            <img src={`${apiRoot}${user.photo_url}`} alt={user.full_name} className="w-full h-full object-cover" />
+                          ) : (
+                            user.full_name
+                              .split(' ')
+                              .filter(Boolean)
+                              .map((part) => part[0]?.toUpperCase())
+                              .slice(0, 2)
+                              .join('') || 'U'
+                          )}
+                        </div>
+                        <div className="font-semibold text-gray-900">{user.full_name}</div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-gray-700">{user.email}</td>
                     <td className="px-6 py-4">

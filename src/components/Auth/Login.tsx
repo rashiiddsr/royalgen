@@ -1,21 +1,41 @@
-import { useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Building2 } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    const savedCredentials = localStorage.getItem('mysql_saved_credentials');
+    if (savedCredentials) {
+      try {
+        const parsed = JSON.parse(savedCredentials) as { email?: string; password?: string };
+        if (parsed.email) setEmail(parsed.email);
+        if (parsed.password) setPassword(parsed.password);
+        setRememberMe(true);
+      } catch (err) {
+        console.error('Failed to load saved credentials', err);
+      }
+    }
+  }, []);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
       await signIn(email, password);
+      if (rememberMe) {
+        localStorage.setItem('mysql_saved_credentials', JSON.stringify({ email, password }));
+      } else {
+        localStorage.removeItem('mysql_saved_credentials');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');
     } finally {
@@ -48,9 +68,7 @@ export default function Login() {
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-            Welcome Back
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Sign In</h2>
           <p className="text-gray-600 text-center mb-6">Sign in with your system account</p>
 
           {error && (
@@ -88,6 +106,18 @@ export default function Login() {
                 placeholder="••••••••"
                 required
               />
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-gray-700">
+              <label className="inline-flex items-center gap-2 font-semibold">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Save credentials
+              </label>
             </div>
 
             <button

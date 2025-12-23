@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 import { UserProfile } from '../lib/api';
 
 interface AuthContextType {
@@ -8,37 +8,15 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  setProfileState: (profile: UserProfile | null) => void;
 }
 
-const SESSION_STORAGE_KEY = 'mysql_session_user';
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const loadSession = (): UserProfile | null => {
-  const storedSession = localStorage.getItem(SESSION_STORAGE_KEY);
-  if (!storedSession) return null;
-
-  try {
-    return JSON.parse(storedSession);
-  } catch (error) {
-    console.error('Failed to parse session', error);
-    return null;
-  }
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const sessionProfile = loadSession();
-    if (sessionProfile) {
-      setUser({ email: sessionProfile.email });
-      setProfile(sessionProfile);
-    }
-    setLoading(false);
-  }, []);
+  const [loading, setLoading] = useState(false);
 
   const signIn = async (email: string, password: string) => {
     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
@@ -58,17 +36,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser({ email: sessionProfile.email });
     setProfile(sessionProfile);
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionProfile));
   };
 
   const signOut = async () => {
-    localStorage.removeItem(SESSION_STORAGE_KEY);
     setUser(null);
     setProfile(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, setProfileState: setProfile }}>
       {children}
     </AuthContext.Provider>
   );

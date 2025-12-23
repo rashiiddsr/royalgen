@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Auth/Login';
 import Dashboard from './components/Layout/Dashboard';
@@ -11,10 +11,15 @@ import Orders from './components/Pages/Orders';
 import Invoices from './components/Pages/Invoices';
 import Financing from './components/Pages/Financing';
 import Users from './components/Pages/Users';
+import Profile from './components/Pages/Profile';
 
 function App() {
   const { user, profile, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  useEffect(() => {
+    setCurrentPage('dashboard');
+  }, [profile]);
 
   if (loading) {
     return (
@@ -51,6 +56,8 @@ function App() {
         return <Financing />;
       case 'users':
         return <Users />;
+      case 'profile':
+        return <Profile />;
       default:
         return <DashboardHome />;
     }
