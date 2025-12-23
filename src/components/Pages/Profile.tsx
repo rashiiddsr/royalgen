@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Camera, Mail, Save, Shield, User as UserIcon } from 'lucide-react';
+import { Camera, Clock3, Mail, Save, Shield, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRecord, updateRecord, uploadUserPhoto, UserProfile } from '../../lib/api';
+import ActivityLog from './ActivityLog';
 
 const normalizePhoneInput = (value: string) => {
   const digits = value.replace(/\D/g, '');
@@ -25,6 +26,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showActivityLog, setShowActivityLog] = useState(false);
 
   const apiRoot = useMemo(
     () => (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, ''),
@@ -153,6 +155,16 @@ export default function Profile() {
             <Shield className="h-4 w-4 text-emerald-600" />
             {profile?.role}
           </p>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowActivityLog(true)}
+              className="inline-flex items-center px-3 py-1.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
+            >
+              <Clock3 className="h-4 w-4 mr-2" />
+              View Activity Log
+            </button>
+          </div>
         </div>
       </div>
 
@@ -241,6 +253,30 @@ export default function Profile() {
           </button>
         </div>
       </form>
+
+      {showActivityLog && (
+        <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div>
+                <p className="text-sm text-gray-500 font-semibold uppercase">Activity</p>
+                <h2 className="text-xl font-bold text-gray-900">Your Activity Log</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowActivityLog(false)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close activity log"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6">
+              <ActivityLog showHeader={false} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
