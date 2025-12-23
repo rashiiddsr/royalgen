@@ -176,7 +176,7 @@ export default function Quotations() {
   };
 
   const handleRfqChange = (rfqId: string) => {
-    const selectedRfq = rfqs.find((rfq) => rfq.id === rfqId);
+    const selectedRfq = rfqs.find((rfq) => String(rfq.id) === String(rfqId));
     setFormData((prev) => ({
       ...prev,
       rfq_id: rfqId,
@@ -189,7 +189,7 @@ export default function Quotations() {
   };
 
   const handleGoodSelect = (index: number, goodId: string) => {
-    const selectedGood = goods.find((good) => good.id === goodId);
+    const selectedGood = goods.find((good) => String(good.id) === String(goodId));
     setGoodsRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
@@ -490,9 +490,10 @@ export default function Quotations() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Time (days)</label>
                   <input
-                    type="text"
+                    type="number"
+                    min="0"
                     value={formData.delivery_time}
                     onChange={(event) =>
                       setFormData((prev) => ({ ...prev, delivery_time: event.target.value }))
@@ -502,9 +503,10 @@ export default function Quotations() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Time (days)</label>
                   <input
-                    type="text"
+                    type="number"
+                    min="0"
                     value={formData.payment_time}
                     onChange={(event) =>
                       setFormData((prev) => ({ ...prev, payment_time: event.target.value }))
@@ -676,11 +678,15 @@ export default function Quotations() {
                 </div>
                 <div>
                   <p className="text-gray-500">Delivery Time</p>
-                  <p className="font-medium text-gray-900">{detailQuotation.delivery_time || '-'}</p>
+                  <p className="font-medium text-gray-900">
+                    {detailQuotation.delivery_time ? `${detailQuotation.delivery_time} days` : '-'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-500">Payment Time</p>
-                  <p className="font-medium text-gray-900">{detailQuotation.payment_time || '-'}</p>
+                  <p className="font-medium text-gray-900">
+                    {detailQuotation.payment_time ? `${detailQuotation.payment_time} days` : '-'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-500">Status</p>

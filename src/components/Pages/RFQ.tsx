@@ -65,6 +65,8 @@ export default function RFQ() {
   const [otherGoods, setOtherGoods] = useState<string[]>(['']);
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [formData, setFormData] = useState(DEFAULT_FORM);
+  const [goodsError, setGoodsError] = useState('');
+  const [attachmentError, setAttachmentError] = useState('');
   const editableRoles = ['owner', 'admin', 'manager'];
   const canEditRfq = (rfq: RFQType) => {
     if (!profile) return false;
@@ -77,6 +79,18 @@ export default function RFQ() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const getNextRfqNumber = () => {
+    const year = new Date().getFullYear();
+    const prefix = `RGI-RFQ-${year}-`;
+    const maxSequence = rfqs.reduce((max, rfq) => {
+      if (!rfq.rfq_number?.startsWith(prefix)) return max;
+      const sequence = Number(rfq.rfq_number.replace(prefix, ''));
+      if (Number.isNaN(sequence)) return max;
+      return Math.max(max, sequence);
+    }, 0);
+    return `${prefix}${String(maxSequence + 1).padStart(4, '0')}`;
+  };
 
   const fetchData = async () => {
     try {
@@ -119,13 +133,17 @@ export default function RFQ() {
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result?.toString();
-      if (result) setAttachmentData(result);
+      if (result) {
+        setAttachmentData(result);
+        if (attachmentError) setAttachmentError('');
+      }
     };
     reader.readAsDataURL(file);
   };
 
   const updateOtherGood = (index: number, value: string) => {
     setOtherGoods((prev) => prev.map((item, idx) => (idx === index ? value : item)));
+    if (goodsError) setGoodsError('');
   };
 
   const addOtherGood = () => setOtherGoods((prev) => [...prev, '']);
@@ -138,6 +156,8 @@ export default function RFQ() {
     setAttachmentData(null);
     setGoodsSearch('');
     setEditingRfq(null);
+    setGoodsError('');
+    setAttachmentError('');
   };
 
   const openModal = (rfq?: RFQType) => {
@@ -161,6 +181,7 @@ export default function RFQ() {
       setAttachmentData(null);
     } else {
       resetForm();
+      setFormData((prev) => ({ ...prev, rfq_number: getNextRfqNumber() }));
     }
     setGoodsSearch('');
     setShowModal(true);
@@ -174,6 +195,16 @@ export default function RFQ() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      const hasSelectedGoods = selectedGoods.length > 0;
+      const hasOtherGoods = otherGoods.some((name) => name.trim().length > 0);
+      if (!hasSelectedGoods && !hasOtherGoods) {
+        setGoodsError('At least one item is required.');
+        return;
+      }
+      if (!editingRfq && !attachmentData) {
+        setAttachmentError('Document is required.');
+        return;
+      }
       setSaving(true);
       const goodsPayload = [
         ...selectedGoods.map((goodId) => ({ type: 'existing', good_id: goodId })),
@@ -370,13 +401,14 @@ export default function RFQ() {
                   <input
                     type="text"
                     value={formData.rfq_number}
-                    onChange={(e) => setFormData({ ...formData, rfq_number: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">Auto-generated with RGI-RFQ-YYYY-0001 format.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
                   <input
                     type="text"
                     value={formData.company_name}
@@ -386,7 +418,7 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
                   <input
                     type="text"
                     value={formData.project_name}
@@ -396,7 +428,7 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Name *</label>
                   <input
                     type="text"
                     value={formData.pic_name}
@@ -406,7 +438,7 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Email</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Email *</label>
                   <input
                     type="email"
                     value={formData.pic_email}
@@ -416,7 +448,7 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Phone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Phone *</label>
                   <input
                     type="tel"
                     value={formData.pic_phone}
@@ -429,7 +461,7 @@ export default function RFQ() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Goods</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Goods *</label>
                   <div className="space-y-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -477,11 +509,12 @@ export default function RFQ() {
                           <button
                             key={good.id}
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              if (goodsError) setGoodsError('');
                               setSelectedGoods((prev) =>
                                 prev.includes(String(good.id)) ? prev : [...prev, String(good.id)]
-                              )
-                            }
+                              );
+                            }}
                             className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left"
                           >
                             <span className="text-sm text-gray-800">{good.name}</span>
@@ -492,11 +525,12 @@ export default function RFQ() {
                         ))
                       )}
                     </div>
+                    {goodsError && <p className="text-xs text-red-600">{goodsError}</p>}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Other Goods</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Other Goods *</label>
                   <div className="space-y-2">
                     {otherGoods.map((item, index) => (
                       <div key={index} className="flex items-center gap-2">
@@ -531,13 +565,19 @@ export default function RFQ() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Attachment *</label>
                 <div className="flex items-center gap-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <UploadCloud className="h-5 w-5 text-gray-500" />
                   <div>
-                    <p className="text-sm text-gray-800">Upload supporting file (optional)</p>
+                    <p className="text-sm text-gray-800">Upload supporting file (required)</p>
                     <p className="text-xs text-gray-500">PDF or image, max 5MB</p>
-                    <input type="file" accept=".pdf,image/*" className="mt-2" onChange={handleFileChange} />
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      className="mt-2"
+                      onChange={handleFileChange}
+                      required={!editingRfq}
+                    />
                     {attachmentData && <p className="text-xs text-green-600 mt-1">File attached</p>}
                     {editingRfq?.attachment_url && !attachmentData && (
                       <a
@@ -549,6 +589,7 @@ export default function RFQ() {
                         View current attachment
                       </a>
                     )}
+                    {attachmentError && <p className="text-xs text-red-600 mt-1">{attachmentError}</p>}
                   </div>
                 </div>
               </div>
