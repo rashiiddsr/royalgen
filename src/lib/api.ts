@@ -2,6 +2,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000
 
 export type UserRole = 'staff' | 'manager' | 'admin' | 'owner';
 
+export interface ActivityLog {
+  id: number;
+  user_id: number;
+  entity_type: string;
+  entity_id: number;
+  action: string;
+  description?: string;
+  created_at: string;
+}
+
 export interface UserProfile {
   id?: number | string;
   email: string;
@@ -19,7 +29,8 @@ type TableName =
   | 'sales_orders'
   | 'invoices'
   | 'financing'
-  | 'users';
+  | 'users'
+  | 'activity_logs';
 
 type BaseRecord = { id: string | number; created_at?: string } & Record<string, unknown>;
 
@@ -85,4 +96,32 @@ export async function deleteRecord(table: TableName, id: string | number): Promi
     const message = data.error || 'Failed to delete record';
     throw new Error(message);
   }
+}
+
+export async function deleteRecordWithContext(
+  table: TableName,
+  id: string | number,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const message = data.error || 'Failed to delete record';
+    throw new Error(message);
+  }
+}
+
+export async function logActivity(payload: Partial<ActivityLog>) {
+  return addRecord<ActivityLog>('activity_logs', payload as ActivityLog);
+}
+
+export async function getActivityLogs(userId?: number | string) {
+  const query = userId ? `?user_id=${userId}` : '';
+  const response = await fetch(`${API_BASE_URL}/activity_logs${query}`);
+  return handleResponse(response) as Promise<ActivityLog[]>;
 }

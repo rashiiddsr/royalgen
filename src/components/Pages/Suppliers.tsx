@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, deleteRecordWithContext, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, Search, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -89,7 +89,7 @@ export default function Suppliers() {
     if (!confirm('Are you sure you want to delete this supplier?')) return;
 
     try {
-      await deleteRecord('suppliers', id);
+      await deleteRecordWithContext('suppliers', id, { performed_by: profile?.id });
       fetchSuppliers();
     } catch (error) {
       console.error('Error deleting supplier:', error);

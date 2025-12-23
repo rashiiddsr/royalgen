@@ -56,15 +56,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser({ email: sessionProfile.email });
       setProfile(sessionProfile);
       localStorage.setItem(SESSION_KEY, JSON.stringify(sessionProfile));
+
     } finally {
       setLoading(false);
     }
   };
 
   const signOut = async () => {
+    const userId = profile?.id;
     setUser(null);
     setProfile(null);
     localStorage.removeItem(SESSION_KEY);
+
+    if (userId) {
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+        await fetch(`${apiBase}/auth/logout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId }),
+        });
+      } catch (error) {
+        console.error('Logout activity failed', error);
+      }
+    }
   };
 
   return (

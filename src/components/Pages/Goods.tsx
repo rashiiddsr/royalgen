@@ -20,10 +20,12 @@ interface Good {
 
 type GoodFormData = Omit<Good, 'id' | 'created_at' | 'suppliers'> & {
   performed_by?: string | number;
+  suppliers?: (string | number)[];
 };
 
 export default function Goods() {
   const [goods, setGoods] = useState<Good[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingGood, setEditingGood] = useState<Good | null>(null);
@@ -41,6 +43,7 @@ export default function Goods() {
   });
   const [detailGood, setDetailGood] = useState<Good | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const { profile } = useAuth();
 
   const canChangeStatus =
@@ -50,6 +53,7 @@ export default function Goods() {
 
   useEffect(() => {
     fetchGoods();
+    fetchSuppliers();
   }, []);
 
   const generateSku = (category: Good['category']) => {
@@ -91,6 +95,15 @@ export default function Goods() {
     }
   };
 
+  const fetchSuppliers = async () => {
+    try {
+      const data = await getRecords<{ id: string; name: string }>('suppliers');
+      setSuppliers(data.map((supplier) => ({ id: supplier.id, name: supplier.name })));
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -100,6 +113,7 @@ export default function Goods() {
         stock_quantity: Number(formData.stock_quantity),
         minimum_order_quantity: Number(formData.minimum_order_quantity),
         performed_by: profile?.id,
+        suppliers: selectedSuppliers,
       };
 
       if (editingGood) {
@@ -143,9 +157,11 @@ export default function Goods() {
         minimum_order_quantity: good.minimum_order_quantity,
         status: good.status,
       });
+      setSelectedSuppliers((good.suppliers || []).map((supplier) => String(supplier.id)));
     } else {
       setEditingGood(null);
       setFormData(getInitialForm());
+      setSelectedSuppliers([]);
     }
     setShowModal(true);
   };
@@ -153,6 +169,7 @@ export default function Goods() {
   const closeModal = () => {
     setShowModal(false);
     setEditingGood(null);
+    setSelectedSuppliers([]);
   };
 
   const handleCategoryChange = (category: Good['category']) => {
@@ -340,6 +357,35 @@ export default function Goods() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows={3}
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Suppliers</label>
+                  <div className="rounded-lg border border-gray-200 divide-y divide-gray-200 bg-gray-50">
+                    {suppliers.length === 0 ? (
+                      <div className="p-3 text-sm text-gray-600">No suppliers available. Add suppliers first.</div>
+                    ) : (
+                      suppliers.map((supplier) => (
+                        <label key={supplier.id} className="flex items-center justify-between px-3 py-2 bg-white hover:bg-gray-50">
+                          <div className="text-sm text-gray-800">{supplier.name}</div>
+                          <input
+                            type="checkbox"
+                            checked={selectedSuppliers.includes(String(supplier.id))}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSelectedSuppliers((prev) =>
+                                checked
+                                  ? [...prev, String(supplier.id)]
+                                  : prev.filter((id) => id !== String(supplier.id)),
+                              );
+                            }}
+                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                          />
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Link suppliers so they appear on the goods details.</p>
                 </div>
 
                 <div>

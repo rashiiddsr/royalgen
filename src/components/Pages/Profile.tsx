@@ -48,7 +48,7 @@ export default function Profile() {
         setStatus(null);
       } catch (error) {
         console.error('Error loading profile', error);
-        setStatus({ type: 'error', message: 'Gagal memuat profil.' });
+        setStatus({ type: 'error', message: 'Failed to load profile.' });
       } finally {
         setLoading(false);
       }
@@ -100,10 +100,10 @@ export default function Profile() {
 
       setProfileState({ ...profile, ...mergedProfile });
       setFormData((prev) => ({ ...prev, password: '', photo_url: mergedProfile.photo_url || null }));
-      setStatus({ type: 'success', message: 'Profil berhasil diperbarui.' });
+      setStatus({ type: 'success', message: 'Profile updated successfully.' });
     } catch (error) {
       console.error('Error updating profile', error);
-      setStatus({ type: 'error', message: 'Gagal memperbarui profil.' });
+      setStatus({ type: 'error', message: 'Failed to update profile.' });
     } finally {
       setSaving(false);
     }
@@ -131,7 +131,7 @@ export default function Profile() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-72">
-        <div className="text-gray-600">Memuat profil...</div>
+        <div className="text-gray-600">Loading profile...</div>
       </div>
     );
   }
@@ -147,8 +147,8 @@ export default function Profile() {
           </label>
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-500 uppercase">Profil</p>
-          <h1 className="text-2xl font-bold text-gray-900">{formData.full_name || 'Pengguna'}</h1>
+          <p className="text-sm font-semibold text-gray-500 uppercase">Profile</p>
+          <h1 className="text-2xl font-bold text-gray-900">{formData.full_name || 'User'}</h1>
           <p className="text-gray-600 flex items-center gap-2 capitalize mt-1">
             <Shield className="h-4 w-4 text-emerald-600" />
             {profile?.role}
@@ -171,7 +171,7 @@ export default function Profile() {
       <form onSubmit={handleSubmit} className="bg-white shadow-sm border border-gray-200 rounded-2xl p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Lengkap</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
             <div className="flex items-center px-3 py-2 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
               <UserIcon className="h-5 w-5 text-gray-400" />
               <input
@@ -200,7 +200,7 @@ export default function Profile() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Nomor HP</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
             <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
               <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
               <input
@@ -212,10 +212,10 @@ export default function Profile() {
                 placeholder="81234567890"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">Nomor akan disimpan dengan prefix +62.</p>
+            <p className="text-xs text-gray-500 mt-1">Numbers are stored with the +62 prefix.</p>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Kata Sandi</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
             <div className="flex items-center px-3 py-2 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
               <Shield className="h-5 w-5 text-gray-400" />
               <input
@@ -223,21 +223,21 @@ export default function Profile() {
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 className="w-full px-3 py-2 outline-none"
-                placeholder="Biarkan kosong jika tidak diubah"
+                placeholder="Leave blank to keep current password"
               />
             </div>
           </div>
         </div>
 
         <div className="flex items-center justify-between pt-4">
-          <div className="text-sm text-gray-500">Perbarui data profil Anda untuk menjaga informasi tetap akurat.</div>
+          <div className="text-sm text-gray-500">Keep your profile details up to date.</div>
           <button
             type="submit"
             disabled={saving}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>
