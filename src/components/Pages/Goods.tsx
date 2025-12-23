@@ -48,7 +48,7 @@ export default function Goods() {
   const { profile } = useAuth();
 
   const canChangeStatus =
-    !!editingGood && ['admin', 'manager'].includes(profile?.role ?? '');
+    !!editingGood && ['admin', 'manager', 'owner'].includes(profile?.role ?? '');
 
   const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
 
