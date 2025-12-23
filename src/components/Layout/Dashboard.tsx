@@ -15,7 +15,6 @@ import {
   LogOut,
   Menu,
   X,
-  Clock,
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -38,7 +37,6 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
     { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['owner', 'admin', 'manager', 'staff'] },
     { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['owner', 'admin', 'manager', 'staff'] },
     { name: 'Financing', icon: CreditCard, page: 'financing', roles: ['owner', 'admin', 'manager', 'staff'] },
-    { name: 'Activity Log', icon: Clock, page: 'activity_logs', roles: ['owner', 'admin', 'manager', 'staff'] },
     { name: 'Profile', icon: UserCircle, page: 'profile', roles: ['owner', 'admin', 'manager', 'staff'] },
     { name: 'User Management', icon: UserCog, page: 'users', roles: ['owner', 'admin', 'manager'] },
   ];

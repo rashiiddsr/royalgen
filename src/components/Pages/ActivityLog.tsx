@@ -3,7 +3,11 @@ import { Clock3, Filter } from 'lucide-react';
 import { getActivityLogs, ActivityLog } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
-export default function ActivityLog() {
+interface ActivityLogProps {
+  showHeader?: boolean;
+}
+
+export default function ActivityLog({ showHeader = true }: ActivityLogProps) {
   const { profile } = useAuth();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,16 +33,18 @@ export default function ActivityLog() {
 
   return (
     <div>
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Activity Log</h1>
-          <p className="text-gray-600 mt-1">View your recent actions across the platform.</p>
+      {showHeader && (
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Activity Log</h1>
+            <p className="text-gray-600 mt-1">View your recent actions across the platform.</p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm text-sm text-gray-700">
+            <Filter className="h-4 w-4 text-gray-500" />
+            Showing personal activity
+          </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm text-sm text-gray-700">
-          <Filter className="h-4 w-4 text-gray-500" />
-          Showing personal activity
-        </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (

@@ -12,7 +12,6 @@ import Invoices from './components/Pages/Invoices';
 import Financing from './components/Pages/Financing';
 import Users from './components/Pages/Users';
 import Profile from './components/Pages/Profile';
-import ActivityLog from './components/Pages/ActivityLog';
 
 function App() {
   const { user, profile, loading } = useAuth();
@@ -59,8 +58,6 @@ function App() {
         return <Users />;
       case 'profile':
         return <Profile />;
-      case 'activity_logs':
-        return <ActivityLog />;
       default:
         return <DashboardHome />;
     }

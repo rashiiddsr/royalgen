@@ -44,6 +44,7 @@ export default function Goods() {
   const [detailGood, setDetailGood] = useState<Good | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [supplierSearch, setSupplierSearch] = useState('');
   const { profile } = useAuth();
 
   const canChangeStatus =
@@ -184,6 +185,10 @@ export default function Goods() {
     good.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     good.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
     good.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredSuppliers = suppliers.filter((supplier) =>
+    supplier.name.toLowerCase().includes(supplierSearch.toLowerCase())
   );
 
   if (loading) {
@@ -361,31 +366,74 @@ export default function Goods() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Suppliers</label>
-                  <div className="rounded-lg border border-gray-200 divide-y divide-gray-200 bg-gray-50">
-                    {suppliers.length === 0 ? (
-                      <div className="p-3 text-sm text-gray-600">No suppliers available. Add suppliers first.</div>
-                    ) : (
-                      suppliers.map((supplier) => (
-                        <label key={supplier.id} className="flex items-center justify-between px-3 py-2 bg-white hover:bg-gray-50">
-                          <div className="text-sm text-gray-800">{supplier.name}</div>
-                          <input
-                            type="checkbox"
-                            checked={selectedSuppliers.includes(String(supplier.id))}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={supplierSearch}
+                        onChange={(e) => setSupplierSearch(e.target.value)}
+                        placeholder="Search and add suppliers"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSuppliers.length === 0 ? (
+                        <span className="text-sm text-gray-500">No suppliers linked yet.</span>
+                      ) : (
+                        selectedSuppliers.map((supplierId) => {
+                          const supplier = suppliers.find((item) => String(item.id) === supplierId);
+                          if (!supplier) return null;
+                          return (
+                            <span
+                              key={supplierId}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-800 text-sm rounded-full border border-blue-200"
+                            >
+                              {supplier.name}
+                              <button
+                                type="button"
+                                className="text-blue-600 hover:text-blue-800"
+                                onClick={() =>
+                                  setSelectedSuppliers((prev) => prev.filter((id) => id !== supplierId))
+                                }
+                                aria-label={`Remove ${supplier.name}`}
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                      {filteredSuppliers.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-600">{suppliers.length === 0 ? 'No suppliers available. Add suppliers first.' : 'No suppliers match your search.'}</div>
+                      ) : (
+                        filteredSuppliers.map((supplier) => (
+                          <button
+                            key={supplier.id}
+                            type="button"
+                            onClick={() =>
                               setSelectedSuppliers((prev) =>
-                                checked
-                                  ? [...prev, String(supplier.id)]
-                                  : prev.filter((id) => id !== String(supplier.id)),
-                              );
-                            }}
-                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                          />
-                        </label>
-                      ))
-                    )}
+                                prev.includes(String(supplier.id))
+                                  ? prev
+                                  : [...prev, String(supplier.id)]
+                              )
+                            }
+                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left"
+                          >
+                            <span className="text-sm text-gray-800">{supplier.name}</span>
+                            {selectedSuppliers.includes(String(supplier.id)) && (
+                              <span className="text-xs text-blue-600 font-semibold">Linked</span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Search and select multiple suppliers for this good.</p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Link suppliers so they appear on the goods details.</p>
                 </div>
 
                 <div>
