@@ -316,7 +316,7 @@ app.post('/api/:table', async (req, res) => {
     }
 
     if (table === 'rfqs') {
-      const { goods = [], attachment_data: attachmentData, performed_by: performedBy, ...rfqPayload } = payload;
+      const { goods = [], attachment_data: attachmentData, performed_by: performedBy, performer_role: performerRole, ...rfqPayload } = payload;
       let attachmentUrl = null;
 
       if (attachmentData) {
@@ -331,7 +331,15 @@ app.post('/api/:table', async (req, res) => {
           }))
         : [];
 
-      const result = await query('INSERT INTO ?? SET ?', [table, { ...rfqPayload, goods: JSON.stringify(cleanedGoods), attachment_url: attachmentUrl }]);
+      const result = await query('INSERT INTO ?? SET ?', [
+        table,
+        {
+          ...rfqPayload,
+          performed_by: performedBy || null,
+          goods: JSON.stringify(cleanedGoods),
+          attachment_url: attachmentUrl,
+        },
+      ]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
 
       await logActivity({
@@ -399,11 +407,20 @@ app.put('/api/:table/:id', async (req, res) => {
 
   try {
     if (table === 'rfqs') {
-      const { goods = [], attachment_data: attachmentData, performed_by: performedBy, ...rfqUpdates } = req.body || {};
+      const { goods = [], attachment_data: attachmentData, performed_by: performedBy, performer_role: performerRole, ...rfqUpdates } = req.body || {};
       const [existing] = await query('SELECT * FROM `rfqs` WHERE id = ? LIMIT 1', [id]);
 
       if (!existing) {
         return res.status(404).json({ error: 'Record not found' });
+      }
+      const allowedRoles = ['owner', 'admin', 'manager'];
+      const isPrivileged = performerRole && allowedRoles.includes(performerRole);
+      const isRequester =
+        performedBy &&
+        existing.performed_by &&
+        String(existing.performed_by) === String(performedBy);
+      if (!isPrivileged && !isRequester) {
+        return res.status(403).json({ error: 'Not authorized to edit this RFQ' });
       }
 
       let attachmentUrl = existing.attachment_url;

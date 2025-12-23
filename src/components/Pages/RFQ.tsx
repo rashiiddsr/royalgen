@@ -65,6 +65,13 @@ export default function RFQ() {
   const [otherGoods, setOtherGoods] = useState<string[]>(['']);
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [formData, setFormData] = useState(DEFAULT_FORM);
+  const editableRoles = ['owner', 'admin', 'manager'];
+  const canEditRfq = (rfq: RFQType) => {
+    if (!profile) return false;
+    if (editableRoles.includes(profile.role)) return true;
+    if (!rfq.performed_by || !profile.id) return false;
+    return String(rfq.performed_by) === String(profile.id);
+  };
 
   useEffect(() => {
     fetchData();
@@ -90,7 +97,10 @@ export default function RFQ() {
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .map((item) => ({
             ...item,
-            requester_name: item.performed_by ? userMap[String(item.performed_by)] || 'Unknown user' : 'Unknown user',
+            requester_name:
+              item.requester_name ||
+              (item.performed_by ? userMap[String(item.performed_by)] : null) ||
+              'Unknown user',
           })),
       );
       setGoods(goodsData.map((good) => ({ id: good.id, name: (good as any).name || '' })));
@@ -131,6 +141,7 @@ export default function RFQ() {
 
   const openModal = (rfq?: RFQType) => {
     if (rfq) {
+      if (!canEditRfq(rfq)) return;
       setEditingRfq(rfq);
       setFormData({
         rfq_number: rfq.rfq_number,
@@ -175,9 +186,14 @@ export default function RFQ() {
         goods: goodsPayload,
         attachment_data: attachmentData,
         performed_by: profile?.id,
+        performer_role: profile?.role,
       } as any;
 
       if (editingRfq) {
+        if (!canEditRfq(editingRfq)) {
+          setSaving(false);
+          return;
+        }
         await updateRecord<RFQType>('rfqs', editingRfq.id, payload);
       } else {
         await addRecord<RFQType>('rfqs', payload);
@@ -278,14 +294,16 @@ export default function RFQ() {
                   <tr key={rfq.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="font-semibold">{rfq.rfq_number}</div>
-                      <div className="text-xs text-gray-500">{rfq.status}</div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{rfq.project_name}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{rfq.company_name}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={renderGoodsList(rfq)}>
                       {renderGoodsList(rfq)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{rfq.requester_name || 'Unknown user'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <div className="font-medium">{rfq.requester_name || 'Unknown user'}</div>
+                      <div className="text-xs text-gray-500 mt-1">Status: {rfq.status}</div>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {new Date(rfq.created_at).toLocaleString()}
                     </td>
@@ -307,8 +325,13 @@ export default function RFQ() {
                       </button>
                       <button
                         onClick={() => openModal(rfq)}
-                        className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                        className={`inline-flex items-center p-2 rounded-lg transition ${
+                          canEditRfq(rfq)
+                            ? 'text-emerald-600 hover:bg-emerald-50'
+                            : 'text-gray-300 cursor-not-allowed'
+                        }`}
                         aria-label="Edit RFQ"
+                        disabled={!canEditRfq(rfq)}
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
@@ -574,8 +597,8 @@ export default function RFQ() {
                 <p><span className="text-gray-500">PIC:</span> {detailRfq.pic_name}</p>
                 <p><span className="text-gray-500">Email:</span> {detailRfq.pic_email}</p>
                 <p><span className="text-gray-500">Phone:</span> {detailRfq.pic_phone}</p>
-                <p><span className="text-gray-500">Status:</span> {detailRfq.status}</p>
                 <p><span className="text-gray-500">Requested By:</span> {detailRfq.requester_name || 'Unknown user'}</p>
+                <p><span className="text-gray-500">Status:</span> {detailRfq.status}</p>
                 <p><span className="text-gray-500">Created:</span> {new Date(detailRfq.created_at).toLocaleString()}</p>
               </div>
 

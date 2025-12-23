@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Clock3, Filter } from 'lucide-react';
-import { getActivityLogs, ActivityLog } from '../../lib/api';
+import { getActivityLogs, ActivityLog as ActivityLogEntry } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ActivityLogProps {
@@ -9,7 +9,7 @@ interface ActivityLogProps {
 
 export default function ActivityLog({ showHeader = true }: ActivityLogProps) {
   const { profile } = useAuth();
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
