@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Eye } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Supplier {
   id: string;
@@ -23,6 +24,7 @@ export default function Suppliers() {
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     contact_person: '',
@@ -35,6 +37,11 @@ export default function Suppliers() {
     payment_terms: 'Net 30',
     status: 'active',
   });
+  const { profile } = useAuth();
+
+  const canManageStatus =
+    !!editingSupplier && ['admin', 'owner', 'manager'].includes(profile?.role ?? '');
+  const canDeleteSupplier = profile?.role === 'owner';
 
   useEffect(() => {
     fetchSuppliers();
@@ -71,6 +78,10 @@ export default function Suppliers() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canDeleteSupplier) {
+      alert('Only the owner can delete suppliers.');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this supplier?')) return;
 
     try {
@@ -224,17 +235,26 @@ export default function Suppliers() {
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
+                        onClick={() => setDetailSupplier(supplier)}
+                        className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                        aria-label="View details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => openModal(supplier)}
                         className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(supplier.id)}
-                        className="inline-flex items-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canDeleteSupplier && (
+                        <button
+                          onClick={() => handleDelete(supplier.id)}
+                          className="inline-flex items-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -270,13 +290,14 @@ export default function Suppliers() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact Person
+                    Contact Person *
                   </label>
                   <input
                     type="text"
                     value={formData.contact_person}
                     onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
                   />
                 </div>
 
@@ -291,12 +312,13 @@ export default function Suppliers() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
                   />
                 </div>
 
@@ -358,17 +380,19 @@ export default function Suppliers() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
+                {canManageStatus && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
@@ -387,6 +411,77 @@ export default function Suppliers() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {detailSupplier && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-xl w-full overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Supplier Details</h3>
+                <p className="text-sm text-gray-600">Full profile for {detailSupplier.name}</p>
+              </div>
+              <button
+                onClick={() => setDetailSupplier(null)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close details"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-800">
+              <div>
+                <p className="font-semibold text-gray-700">Company Name</p>
+                <p>{detailSupplier.name}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Contact Person</p>
+                <p>{detailSupplier.contact_person}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Email</p>
+                <p>{detailSupplier.email || '-'}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Phone</p>
+                <p>{detailSupplier.phone}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="font-semibold text-gray-700">Address</p>
+                <p>{detailSupplier.address || '-'}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">City</p>
+                <p>{detailSupplier.city || '-'}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Country</p>
+                <p>{detailSupplier.country}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Tax ID</p>
+                <p>{detailSupplier.tax_id || '-'}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Payment Terms</p>
+                <p>{detailSupplier.payment_terms}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Status</p>
+                <span
+                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    detailSupplier.status === 'active'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {detailSupplier.status}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
