@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { query } from './db.js';
 
 dotenv.config();
@@ -8,8 +11,17 @@ dotenv.config();
 const app = express();
 const port = Number(process.env.SERVER_PORT || 4000);
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, 'uploads');
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use('/uploads', express.static(uploadDir));
 
 const TABLES = [
   'suppliers',
@@ -23,6 +35,23 @@ const TABLES = [
 ];
 
 const isValidTable = (name) => TABLES.includes(name);
+
+const saveBase64Image = (photoData, filenamePrefix = 'user') => {
+  const matches = photoData.match(/^data:(.+);base64,(.+)$/);
+  if (!matches || matches.length !== 3) {
+    throw new Error('Invalid image data');
+  }
+
+  const mimeType = matches[1];
+  const extension = mimeType.split('/')[1] || 'png';
+  const buffer = Buffer.from(matches[2], 'base64');
+  const filename = `${filenamePrefix}-${Date.now()}.${extension}`;
+  const filePath = path.join(uploadDir, filename);
+
+  fs.writeFileSync(filePath, buffer);
+
+  return `/uploads/${filename}`;
+};
 
 const normalizePhone = (value) => {
   if (value === undefined || value === null) return value;
@@ -56,7 +85,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     const rows = await query(
-      'SELECT id, email, full_name, role, password FROM users WHERE email = ? LIMIT 1',
+      'SELECT id, email, full_name, role, password, phone, photo_url FROM users WHERE email = ? LIMIT 1',
       [email]
     );
 
@@ -69,6 +98,8 @@ app.post('/api/auth/login', async (req, res) => {
       email: rows[0].email,
       full_name: rows[0].full_name,
       role: rows[0].role,
+      phone: rows[0].phone,
+      photo_url: rows[0].photo_url,
     };
 
     return res.json({ profile });
@@ -91,6 +122,24 @@ app.get('/api/:table', async (req, res) => {
   }
 });
 
+app.get('/api/:table/:id', async (req, res) => {
+  const { table, id } = req.params;
+  if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
+
+  try {
+    const rows = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+
+    return res.json(rows[0]);
+  } catch (error) {
+    console.error('Fetch error', error);
+    return res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
 app.post('/api/:table', async (req, res) => {
   const { table } = req.params;
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
@@ -103,7 +152,7 @@ app.post('/api/:table', async (req, res) => {
         return res.status(403).json({ error: 'Owner account cannot be created' });
       }
 
-      const cleanPayload = sanitizeUserPayload(payload, ['full_name', 'email', 'password', 'role', 'phone']);
+      const cleanPayload = sanitizeUserPayload(payload, ['full_name', 'email', 'password', 'role', 'phone', 'photo_url']);
       const result = await query('INSERT INTO ?? SET ?', [table, cleanPayload]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
       return res.status(201).json(created);
@@ -130,7 +179,7 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       if (existing.role === 'owner') {
-        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone']);
+        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'photo_url']);
         updates.role = existing.role;
 
         if (Object.keys(updates).length === 1 && updates.role) {
@@ -139,7 +188,7 @@ app.put('/api/:table/:id', async (req, res) => {
 
         await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
       } else {
-        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'role']);
+        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'role', 'photo_url']);
 
         if (preventOwnerCreation(updates.role)) {
           return res.status(403).json({ error: 'Cannot promote user to owner' });
@@ -162,6 +211,31 @@ app.put('/api/:table/:id', async (req, res) => {
   } catch (error) {
     console.error('Update error', error);
     return res.status(500).json({ error: 'Failed to update record' });
+  }
+});
+
+app.post('/api/users/:id/photo', async (req, res) => {
+  const { id } = req.params;
+  const { photoData } = req.body || {};
+
+  if (!photoData) {
+    return res.status(400).json({ error: 'Photo data is required' });
+  }
+
+  try {
+    const [existing] = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', ['users', id]);
+
+    if (!existing) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const photoUrl = saveBase64Image(photoData, `user-${id}`);
+
+    await query('UPDATE ?? SET ? WHERE id = ?', ['users', { photo_url: photoUrl }, id]);
+    return res.json({ photo_url: photoUrl });
+  } catch (error) {
+    console.error('Photo upload error', error);
+    return res.status(500).json({ error: 'Failed to upload photo' });
   }
 });
 

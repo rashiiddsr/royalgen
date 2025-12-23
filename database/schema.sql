@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('owner','manager','staff') NOT NULL DEFAULT 'staff',
   `title` VARCHAR(150) DEFAULT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
+  `photo_url` VARCHAR(500) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
