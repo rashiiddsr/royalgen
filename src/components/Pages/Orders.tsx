@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRecords } from '../../lib/supabase';
+import { getRecords } from '../../lib/api';
 import { Plus, Eye, ShoppingCart } from 'lucide-react';
 
 interface OrderType {

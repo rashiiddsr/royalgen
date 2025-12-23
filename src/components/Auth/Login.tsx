@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Building2, ShieldCheck } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('admin@gmail.com');
-  const [password, setPassword] = useState('admin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
@@ -98,11 +98,6 @@ export default function Login() {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm text-gray-700 flex items-center space-x-2">
-            <ShieldCheck className="h-4 w-4 text-blue-600" />
-            <p className="font-medium">Default owner account: admin@gmail.com / admin</p>
-          </div>
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-6 font-medium">

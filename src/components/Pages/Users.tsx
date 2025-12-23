@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/supabase';
+import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
 
 interface ManagedUser {
@@ -8,7 +8,6 @@ interface ManagedUser {
   email: string;
   password?: string;
   role: 'owner' | 'manager' | 'staff';
-  title?: string;
   phone?: string;
   created_at?: string;
 }
@@ -18,8 +17,15 @@ const DEFAULT_FORM: Partial<ManagedUser> = {
   email: '',
   password: '',
   role: 'staff',
-  title: '',
   phone: '',
+};
+
+const normalizePhoneInput = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (!digits || digits === '62') return '';
+  if (digits.startsWith('62')) return `+${digits}`;
+  if (digits.startsWith('0')) return `+62${digits.slice(1)}`;
+  return `+62${digits}`;
 };
 
 export default function Users() {
@@ -47,7 +53,7 @@ export default function Users() {
   const openModal = (user?: ManagedUser) => {
     if (user) {
       setEditingUser(user);
-      setFormData({ ...user, password: '' });
+      setFormData({ ...user, password: '', phone: normalizePhoneInput(user.phone || '') });
     } else {
       setEditingUser(null);
       setFormData(DEFAULT_FORM);
@@ -64,7 +70,7 @@ export default function Users() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      const payload = { ...formData };
+      const payload = { ...formData, phone: formData.phone ? normalizePhoneInput(formData.phone) : undefined };
       if (editingUser) {
         if (!payload.password) {
           delete payload.password;
@@ -81,6 +87,8 @@ export default function Users() {
   };
 
   const handleDelete = async (id: number | string) => {
+    const targetUser = users.find((user) => user.id === id);
+    if (targetUser?.role === 'owner') return;
     if (!confirm('Delete this user?')) return;
     try {
       await deleteRecord('users', id);
@@ -131,9 +139,6 @@ export default function Users() {
                   Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Title
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Phone
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -144,7 +149,7 @@ export default function Users() {
             <tbody className="bg-white divide-y divide-gray-200">
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                     <UserPlus className="h-10 w-10 text-gray-400 mx-auto mb-4" />
                     No users found. Add a team member to begin.
                   </td>
@@ -154,7 +159,6 @@ export default function Users() {
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="font-semibold text-gray-900">{user.full_name}</div>
-                      <div className="text-sm text-gray-500">ID #{user.id}</div>
                     </td>
                     <td className="px-6 py-4 text-gray-700">{user.email}</td>
                     <td className="px-6 py-4">
@@ -162,7 +166,6 @@ export default function Users() {
                         {user.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">{user.title || '-'}</td>
                     <td className="px-6 py-4 text-gray-700">{user.phone || '-'}</td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
@@ -173,7 +176,8 @@ export default function Users() {
                       </button>
                       <button
                         onClick={() => handleDelete(user.id)}
-                        className="inline-flex items-center px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100"
+                        disabled={user.role === 'owner'}
+                        className="inline-flex items-center px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="h-4 w-4 mr-1" /> Delete
                       </button>
@@ -234,37 +238,34 @@ export default function Users() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Role</label>
-                  <select
-                    value={formData.role || 'staff'}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as ManagedUser['role'] })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent capitalize"
-                  >
-                    <option value="owner">Owner</option>
-                    <option value="manager">Manager</option>
-                    <option value="staff">Staff</option>
-                  </select>
+                  {editingUser?.role === 'owner' ? (
+                    <div className="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 capitalize">Owner</div>
+                  ) : (
+                    <select
+                      value={formData.role || 'staff'}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as ManagedUser['role'] })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent capitalize"
+                    >
+                      <option value="manager">Manager</option>
+                      <option value="staff">Staff</option>
+                    </select>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Title</label>
-                  <input
-                    type="text"
-                    value={formData.title || ''}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g. Procurement Manager"
-                  />
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                  <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
+                    <span className="px-3 py-3 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      value={formData.phone?.replace('+62', '') || ''}
+                      onChange={(e) => setFormData({ ...formData, phone: normalizePhoneInput(`+62${e.target.value}`) })}
+                      className="w-full px-3 py-3 outline-none"
+                      placeholder="81234567890"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Number will be saved with the +62 prefix.</p>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
-                <input
-                  type="text"
-                  value={formData.phone || ''}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Contact number"
-                />
               </div>
 
               <div className="flex justify-end space-x-3 pt-2">
