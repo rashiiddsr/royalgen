@@ -80,11 +80,20 @@ CREATE TABLE IF NOT EXISTS `rfqs` (
 -- Quotations
 CREATE TABLE IF NOT EXISTS `quotations` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `rfq_reference` VARCHAR(120) DEFAULT NULL,
-  `supplier` VARCHAR(255) DEFAULT NULL,
-  `valid_until` DATE DEFAULT NULL,
+  `quotation_number` VARCHAR(120) NOT NULL,
+  `rfq_id` INT DEFAULT NULL,
+  `company_name` VARCHAR(255) DEFAULT NULL,
+  `project_name` VARCHAR(255) DEFAULT NULL,
+  `pic_name` VARCHAR(255) DEFAULT NULL,
+  `pic_email` VARCHAR(255) DEFAULT NULL,
+  `pic_phone` VARCHAR(100) DEFAULT NULL,
+  `delivery_time` VARCHAR(120) DEFAULT NULL,
+  `payment_time` VARCHAR(120) DEFAULT NULL,
+  `goods` JSON DEFAULT NULL,
   `total_amount` DECIMAL(12,2) DEFAULT 0,
-  `status` VARCHAR(50) DEFAULT 'draft',
+  `tax_amount` DECIMAL(12,2) DEFAULT 0,
+  `grand_total` DECIMAL(12,2) DEFAULT 0,
+  `status` VARCHAR(50) DEFAULT 'waiting',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

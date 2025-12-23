@@ -215,6 +215,22 @@ app.get('/api/:table', async (req, res) => {
       return res.json(parsed);
     }
 
+    if (table === 'quotations') {
+      const rows = await query('SELECT * FROM `quotations` ORDER BY created_at DESC');
+      const parsed = rows.map((row) => {
+        let goods = [];
+        try {
+          goods = JSON.parse(row.goods || '[]');
+        } catch {
+          goods = [];
+        }
+
+        return { ...row, goods };
+      });
+
+      return res.json(parsed);
+    }
+
     if (table === 'goods') {
       const rows = await attachSuppliersToGoods(await query('SELECT * FROM `goods` ORDER BY created_at DESC'));
       return res.json(rows);
@@ -245,6 +261,22 @@ app.get('/api/:table/:id', async (req, res) => {
 
     if (table === 'rfqs') {
       const rows = await query('SELECT * FROM `rfqs` WHERE id = ? LIMIT 1', [id]);
+      if (!rows.length) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+
+      let goods = [];
+      try {
+        goods = JSON.parse(rows[0].goods || '[]');
+      } catch {
+        goods = [];
+      }
+
+      return res.json({ ...rows[0], goods });
+    }
+
+    if (table === 'quotations') {
+      const rows = await query('SELECT * FROM `quotations` WHERE id = ? LIMIT 1', [id]);
       if (!rows.length) {
         return res.status(404).json({ error: 'Record not found' });
       }
@@ -353,6 +385,38 @@ app.post('/api/:table', async (req, res) => {
       return res.status(201).json({ ...created, goods: cleanedGoods, attachment_url: attachmentUrl });
     }
 
+    if (table === 'quotations') {
+      const { goods = [], rfq_id: rfqId, ...quotationPayload } = payload;
+      const cleanedGoods = Array.isArray(goods)
+        ? goods.map((item) => ({
+            good_id: item.good_id || null,
+            name: item.name || null,
+            description: item.description || null,
+            unit: item.unit || null,
+            qty: item.qty || 0,
+            price: item.price || 0,
+          }))
+        : [];
+      const status = quotationPayload.status || 'waiting';
+
+      const result = await query('INSERT INTO ?? SET ?', [
+        table,
+        {
+          ...quotationPayload,
+          rfq_id: rfqId || null,
+          goods: JSON.stringify(cleanedGoods),
+          status,
+        },
+      ]);
+      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+
+      if (rfqId) {
+        await query('UPDATE `rfqs` SET status = ? WHERE id = ?', ['process', rfqId]);
+      }
+
+      return res.status(201).json({ ...created, goods: cleanedGoods });
+    }
+
     if (table === 'suppliers') {
       const { performed_by: performedBy, ...supplierPayload } = payload;
 
@@ -406,12 +470,42 @@ app.put('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'quotations') {
+      const { goods = [], rfq_id: rfqId, ...quotationUpdates } = req.body || {};
+      const cleanedGoods = Array.isArray(goods)
+        ? goods.map((item) => ({
+            good_id: item.good_id || null,
+            name: item.name || null,
+            description: item.description || null,
+            unit: item.unit || null,
+            qty: item.qty || 0,
+            price: item.price || 0,
+          }))
+        : [];
+
+      await query('UPDATE ?? SET ? WHERE id = ?', [
+        table,
+        {
+          ...quotationUpdates,
+          rfq_id: rfqId || null,
+          goods: JSON.stringify(cleanedGoods),
+        },
+        id,
+      ]);
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+      return res.json({ ...updated, goods: cleanedGoods });
+    }
+
     if (table === 'rfqs') {
       const { goods = [], attachment_data: attachmentData, performed_by: performedBy, performer_role: performerRole, ...rfqUpdates } = req.body || {};
       const [existing] = await query('SELECT * FROM `rfqs` WHERE id = ? LIMIT 1', [id]);
 
       if (!existing) {
         return res.status(404).json({ error: 'Record not found' });
+      }
+
+      if (existing.status === 'process') {
+        return res.status(403).json({ error: 'RFQ is already in process and cannot be edited' });
       }
       const allowedRoles = ['owner', 'admin', 'manager'];
       const isPrivileged = performerRole && allowedRoles.includes(performerRole);
