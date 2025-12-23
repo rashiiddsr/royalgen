@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `full_name` VARCHAR(255) NOT NULL,
   `email` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
-  `role` ENUM('owner','manager','staff') NOT NULL DEFAULT 'staff',
+  `role` ENUM('owner','admin','manager','staff') NOT NULL DEFAULT 'staff',
   `title` VARCHAR(150) DEFAULT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
   `photo_url` VARCHAR(500) DEFAULT NULL,
@@ -23,11 +23,13 @@ ON DUPLICATE KEY UPDATE `role` = VALUES(`role`), `password` = VALUES(`password`)
 CREATE TABLE IF NOT EXISTS `suppliers` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
-  `contact_name` VARCHAR(255) DEFAULT NULL,
+  `contact_person` VARCHAR(255) DEFAULT NULL,
   `email` VARCHAR(255) DEFAULT NULL,
   `phone` VARCHAR(100) DEFAULT NULL,
   `address` TEXT,
-  `category` VARCHAR(150) DEFAULT NULL,
+  `city` VARCHAR(150) DEFAULT NULL,
+  `country` VARCHAR(150) DEFAULT NULL,
+  `tax_id` VARCHAR(150) DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT 'active',
   `payment_terms` VARCHAR(150) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -39,13 +41,24 @@ CREATE TABLE IF NOT EXISTS `goods` (
   `sku` VARCHAR(120) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
   `description` TEXT,
-  `category` VARCHAR(120) DEFAULT NULL,
+  `category` ENUM('consumable','instrument','electrical','piping','other') DEFAULT 'other',
   `unit` VARCHAR(50) DEFAULT 'pcs',
   `price` DECIMAL(12,2) DEFAULT 0,
   `stock_quantity` INT DEFAULT 0,
   `minimum_order_quantity` INT DEFAULT 1,
   `status` VARCHAR(50) DEFAULT 'active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Goods & Suppliers relationship
+CREATE TABLE IF NOT EXISTS `goods_suppliers` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `good_id` INT NOT NULL,
+  `supplier_id` INT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_good_supplier` (`good_id`, `supplier_id`),
+  CONSTRAINT `fk_good` FOREIGN KEY (`good_id`) REFERENCES `goods` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE
 );
 
 -- RFQs
