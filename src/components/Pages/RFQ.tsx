@@ -80,18 +80,6 @@ export default function RFQ() {
     fetchData();
   }, []);
 
-  const getNextRfqNumber = () => {
-    const year = new Date().getFullYear();
-    const prefix = `RGI-RFQ-${year}-`;
-    const maxSequence = rfqs.reduce((max, rfq) => {
-      if (!rfq.rfq_number?.startsWith(prefix)) return max;
-      const sequence = Number(rfq.rfq_number.replace(prefix, ''));
-      if (Number.isNaN(sequence)) return max;
-      return Math.max(max, sequence);
-    }, 0);
-    return `${prefix}${String(maxSequence + 1).padStart(4, '0')}`;
-  };
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -181,7 +169,6 @@ export default function RFQ() {
       setAttachmentData(null);
     } else {
       resetForm();
-      setFormData((prev) => ({ ...prev, rfq_number: getNextRfqNumber() }));
     }
     setGoodsSearch('');
     setShowModal(true);
@@ -401,11 +388,10 @@ export default function RFQ() {
                   <input
                     type="text"
                     value={formData.rfq_number}
-                    readOnly
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    onChange={(e) => setFormData({ ...formData, rfq_number: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Auto-generated with RGI-RFQ-YYYY-0001 format.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>

@@ -349,6 +349,36 @@ const sendSmtpMail = async ({ to, subject, html }) => {
   client.socket.end();
 };
 
+const getRoleEmails = async (roles) => {
+  const rows = await query('SELECT email FROM users WHERE role IN (?)', [roles]);
+  const emails = rows.map((row) => row.email).filter(Boolean);
+  return Array.from(new Set(emails));
+};
+
+const sendQuotationNotification = async ({ quotationNumber, statusLabel }) => {
+  try {
+    const emails = await getRoleEmails(['superadmin', 'manager']);
+    if (!emails.length) return;
+    const subject = `Quotation ${quotationNumber} - ${statusLabel}`;
+    const html = `
+      <p>Halo Superadmin/Manager,</p>
+      <p>Terdapat quotation <strong>${quotationNumber}</strong> dengan status <strong>${statusLabel}</strong>.</p>
+      <p>Silakan segera diproses.</p>
+    `;
+    await Promise.allSettled(
+      emails.map((email) =>
+        sendSmtpMail({
+          to: email,
+          subject,
+          html,
+        })
+      )
+    );
+  } catch (error) {
+    console.error('Quotation notification error', error);
+  }
+};
+
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body || {};
 
@@ -637,7 +667,13 @@ app.post('/api/:table', async (req, res) => {
     }
 
     if (table === 'quotations') {
-      const { goods = [], rfq_id: rfqId, ...quotationPayload } = payload;
+      const {
+        goods = [],
+        rfq_id: rfqId,
+        performed_by: performedBy,
+        performer_role: performerRole,
+        ...quotationPayload
+      } = payload;
       const cleanedGoods = Array.isArray(goods)
         ? goods.map((item) => ({
             good_id: item.good_id || null,
@@ -657,12 +693,28 @@ app.post('/api/:table', async (req, res) => {
           rfq_id: rfqId || null,
           goods: JSON.stringify(cleanedGoods),
           status,
+          performed_by: performedBy || null,
         },
       ]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
 
       if (rfqId) {
         await query('UPDATE `rfqs` SET status = ? WHERE id = ?', ['process', rfqId]);
+      }
+
+      await logActivity({
+        performedBy,
+        entityType: 'quotations',
+        entityId: result.insertId,
+        action: 'create',
+        description: `Created quotation ${quotationPayload.quotation_number || result.insertId}`,
+      });
+
+      if (status === 'waiting') {
+        await sendQuotationNotification({
+          quotationNumber: quotationPayload.quotation_number || `Quotation ${result.insertId}`,
+          statusLabel: 'waiting',
+        });
       }
 
       return res.status(201).json({ ...created, goods: cleanedGoods });
@@ -725,28 +777,104 @@ app.put('/api/:table/:id', async (req, res) => {
 
   try {
     if (table === 'quotations') {
-      const { goods = [], rfq_id: rfqId, ...quotationUpdates } = req.body || {};
-      const cleanedGoods = Array.isArray(goods)
-        ? goods.map((item) => ({
-            good_id: item.good_id || null,
-            name: item.name || null,
-            description: item.description || null,
-            unit: item.unit || null,
-            qty: item.qty || 0,
-            price: item.price || 0,
-          }))
-        : [];
+      const {
+        goods,
+        rfq_id: rfqId,
+        performed_by: performedBy,
+        performer_role: performerRole,
+        ...quotationUpdates
+      } = req.body || {};
+      const [existing] = await query('SELECT * FROM `quotations` WHERE id = ? LIMIT 1', [id]);
 
-      await query('UPDATE ?? SET ? WHERE id = ?', [
-        table,
-        {
-          ...quotationUpdates,
-          rfq_id: rfqId || null,
-          goods: JSON.stringify(cleanedGoods),
-        },
-        id,
-      ]);
+      if (!existing) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+
+      if (existing.status === 'rejected') {
+        return res.status(403).json({ error: 'Rejected quotations cannot be edited' });
+      }
+
+      const isPrivileged = performerRole && ['superadmin', 'manager'].includes(performerRole);
+      const isRequester =
+        performedBy &&
+        existing.performed_by &&
+        String(existing.performed_by) === String(performedBy);
+
+      if (!isPrivileged && !isRequester) {
+        return res.status(403).json({ error: 'Not authorized to edit this quotation' });
+      }
+
+      const hasGoodsUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
+      const hasRfqUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'rfq_id');
+      const cleanedGoods = hasGoodsUpdate
+        ? Array.isArray(goods)
+          ? goods.map((item) => ({
+              good_id: item.good_id || null,
+              name: item.name || null,
+              description: item.description || null,
+              unit: item.unit || null,
+              qty: item.qty || 0,
+              price: item.price || 0,
+            }))
+          : []
+        : JSON.parse(existing.goods || '[]');
+
+      const nextUpdates = { ...quotationUpdates };
+      if (hasRfqUpdate) {
+        nextUpdates.rfq_id = rfqId || null;
+      }
+      if (hasGoodsUpdate) {
+        nextUpdates.goods = JSON.stringify(cleanedGoods);
+      }
+
+      const requestedStatus = quotationUpdates.status;
+      const isStatusChange = requestedStatus && requestedStatus !== existing.status;
+      const { status, ...otherUpdates } = quotationUpdates;
+      const isOtherUpdate =
+        hasGoodsUpdate ||
+        hasRfqUpdate ||
+        Object.keys(otherUpdates).length > 0;
+
+      if (isStatusChange && !isPrivileged) {
+        return res.status(403).json({ error: 'Only managers can update status' });
+      }
+
+      let shouldNotifyRenegotiation = false;
+      if (!isStatusChange && existing.status === 'negotiation' && isOtherUpdate) {
+        nextUpdates.status = 'renegotiation';
+        shouldNotifyRenegotiation = true;
+      }
+
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, nextUpdates, id]);
       const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+
+      if (isOtherUpdate) {
+        await logActivity({
+          performedBy,
+          entityType: 'quotations',
+          entityId: id,
+          action: 'update',
+          description: `Updated quotation ${updated?.quotation_number || id}`,
+        });
+      }
+
+      if (isStatusChange || shouldNotifyRenegotiation) {
+        await logActivity({
+          performedBy,
+          entityType: 'quotations',
+          entityId: id,
+          action: 'status',
+          description: `Updated quotation status to ${updated?.status || requestedStatus}`,
+        });
+      }
+
+      if (shouldNotifyRenegotiation) {
+        await sendQuotationNotification({
+          quotationNumber: updated?.quotation_number || `Quotation ${id}`,
+          statusLabel: 'renegotiation',
+        });
+      }
+
       return res.json({ ...updated, goods: cleanedGoods });
     }
 
