@@ -6,6 +6,8 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
+import net from 'net';
+import tls from 'tls';
 import { query } from './db.js';
 
 dotenv.config();
@@ -222,34 +224,125 @@ app.post('/api/auth/logout', async (req, res) => {
   return res.json({ success: true });
 });
 
-const sendTitanMail = async ({ to, subject, html }) => {
-  const apiUrl = process.env.TITAN_API_URL;
-  const apiKey = process.env.TITAN_API_KEY;
-  const senderEmail = process.env.TITAN_SENDER_EMAIL;
-  const senderName = process.env.TITAN_SENDER_NAME || 'RGI NexaProc';
+const createSmtpClient = async ({ host, port, secure, socket: existingSocket, expectGreeting = true }) => {
+  const socket =
+    existingSocket ||
+    (secure ? tls.connect({ host, port, servername: host }) : net.connect({ host, port }));
 
-  if (!apiUrl || !apiKey || !senderEmail) {
-    throw new Error('Titan Mail configuration missing');
-  }
+  socket.setEncoding('utf8');
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: { email: senderEmail, name: senderName },
-      to: [{ email: to }],
-      subject,
-      html,
-    }),
+  let buffer = '';
+  const pending = [];
+
+  const processLine = (line) => {
+    if (!line) return;
+    const code = Number(line.slice(0, 3));
+    const isFinal = line[3] === ' ';
+
+    if (!pending.length) return;
+    const current = pending[0];
+    current.lines.push(line);
+
+    if (isFinal) {
+      pending.shift();
+      if (current.expectedCodes && !current.expectedCodes.includes(code)) {
+        current.reject(new Error(`SMTP error ${code}: ${line}`));
+      } else {
+        current.resolve({ code, line, lines: current.lines });
+      }
+    }
+  };
+
+  socket.on('data', (chunk) => {
+    buffer += chunk;
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    lines.forEach(processLine);
   });
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`Titan Mail error: ${response.status} ${detail}`);
+  socket.on('error', (error) => {
+    while (pending.length) {
+      pending.shift().reject(error);
+    }
+  });
+
+  const waitForResponse = (expectedCodes) =>
+    new Promise((resolve, reject) => {
+      pending.push({ resolve, reject, expectedCodes, lines: [] });
+    });
+
+  const sendCommand = async (command, expectedCodes) => {
+    if (command) {
+      socket.write(`${command}\r\n`);
+    }
+    return waitForResponse(expectedCodes);
+  };
+
+  if (expectGreeting) {
+    await waitForResponse([220]);
   }
+
+  return { socket, sendCommand, waitForResponse };
+};
+
+const sendSmtpMail = async ({ to, subject, html }) => {
+  const host = process.env.MAIL_HOST;
+  const port = Number(process.env.MAIL_PORT || 0);
+  const encryption = process.env.MAIL_ENCRYPTION;
+  const user = process.env.MAIL_USERNAME;
+  const pass = process.env.MAIL_PASSWORD;
+  const senderEmail = process.env.MAIL_FROM_ADDRESS;
+  const senderName = process.env.MAIL_FROM_NAME || 'RGI NexaProc';
+
+  if (!host || !port || !senderEmail) {
+    throw new Error('SMTP configuration missing');
+  }
+
+  const secure = encryption === 'ssl' || port === 465;
+  let client = await createSmtpClient({ host, port, secure });
+
+  await client.sendCommand(`EHLO ${host}`, [250]);
+
+  if (!secure && encryption === 'tls') {
+    await client.sendCommand('STARTTLS', [220]);
+    client.socket.removeAllListeners('data');
+    client.socket.removeAllListeners('error');
+    const secureSocket = tls.connect({ socket: client.socket, servername: host });
+    secureSocket.setEncoding('utf8');
+    client = await createSmtpClient({
+      host,
+      port,
+      secure: true,
+      socket: secureSocket,
+      expectGreeting: false,
+    });
+    await client.sendCommand(`EHLO ${host}`, [250]);
+  }
+
+  if (user || pass) {
+    await client.sendCommand('AUTH LOGIN', [334]);
+    await client.sendCommand(Buffer.from(user || '').toString('base64'), [334]);
+    await client.sendCommand(Buffer.from(pass || '').toString('base64'), [235]);
+  }
+
+  await client.sendCommand(`MAIL FROM:<${senderEmail}>`, [250]);
+  await client.sendCommand(`RCPT TO:<${to}>`, [250, 251]);
+  await client.sendCommand('DATA', [354]);
+
+  const message = [
+    `From: ${senderName} <${senderEmail}>`,
+    `To: <${to}>`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset="UTF-8"',
+    '',
+    html,
+    '.',
+  ].join('\r\n');
+
+  await client.sendCommand(message, [250]);
+  await client.sendCommand('QUIT', [221]);
+  client.socket.end();
 };
 
 app.post('/api/auth/forgot-password', async (req, res) => {
@@ -276,7 +369,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
       const resetLink = `${appBaseUrl}/?reset_token=${token}`;
 
-      await sendTitanMail({
+      await sendSmtpMail({
         to: user.email,
         subject: 'Reset Password - RGI NexaProc',
         html: `
