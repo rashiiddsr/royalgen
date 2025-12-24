@@ -42,8 +42,8 @@ export default function Suppliers() {
   const { profile } = useAuth();
 
   const canManageStatus =
-    !!editingSupplier && ['admin', 'owner', 'manager'].includes(profile?.role ?? '');
-  const canDeleteSupplier = profile?.role === 'owner';
+    !!editingSupplier && ['admin', 'superadmin', 'manager'].includes(profile?.role ?? '');
+  const canDeleteSupplier = profile?.role === 'superadmin';
 
   useEffect(() => {
     fetchSuppliers();
@@ -83,7 +83,7 @@ export default function Suppliers() {
 
   const handleDelete = async (id: string) => {
     if (!canDeleteSupplier) {
-      alert('Only the owner can delete suppliers.');
+      alert('Only the superadmin can delete suppliers.');
       return;
     }
     if (!confirm('Are you sure you want to delete this supplier?')) return;

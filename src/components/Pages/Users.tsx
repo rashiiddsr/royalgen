@@ -8,7 +8,7 @@ interface ManagedUser {
   full_name: string;
   email: string;
   password?: string;
-  role: 'owner' | 'admin' | 'manager' | 'staff';
+  role: 'superadmin' | 'admin' | 'manager' | 'staff';
   phone?: string;
   photo_url?: string | null;
   created_at?: string;
@@ -93,7 +93,7 @@ export default function Users() {
 
   const handleDelete = async (id: number | string) => {
     const targetUser = users.find((user) => user.id === id);
-    if (targetUser?.role === 'owner') return;
+    if (targetUser?.role === 'superadmin') return;
     if (!confirm('Delete this user?')) return;
     try {
       await deleteRecord('users', id);
@@ -117,7 +117,7 @@ export default function Users() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">
-            Owners, admins, and managers can add, edit, or remove system users with roles.
+            Superadmins, admins, and managers can add, edit, or remove system users with roles.
           </p>
         </div>
         <button
@@ -152,7 +152,7 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.filter((user) => user.role !== 'owner').length === 0 ? (
+              {users.filter((user) => user.role !== 'superadmin').length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                     <UserPlus className="h-10 w-10 text-gray-400 mx-auto mb-4" />
@@ -161,7 +161,7 @@ export default function Users() {
                 </tr>
               ) : (
                 users
-                  .filter((user) => user.role !== 'owner')
+                  .filter((user) => user.role !== 'superadmin')
                   .map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
@@ -197,7 +197,7 @@ export default function Users() {
                       </button>
                       <button
                         onClick={() => handleDelete(user.id)}
-                        disabled={user.role === 'owner'}
+                        disabled={user.role === 'superadmin'}
                         className="inline-flex items-center px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="h-4 w-4 mr-1" /> Delete
@@ -259,8 +259,8 @@ export default function Users() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Role</label>
-                  {editingUser?.role === 'owner' ? (
-                    <div className="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 capitalize">Owner</div>
+                  {editingUser?.role === 'superadmin' ? (
+                    <div className="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 capitalize">Superadmin</div>
                   ) : (
                     <select
                       value={formData.role || 'staff'}

@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { query } from './db.js';
 
@@ -78,7 +80,35 @@ const sanitizeUserPayload = (payload, allowedFields) => {
   return clean;
 };
 
-const preventOwnerCreation = (role) => role === 'owner';
+const scryptAsync = promisify(crypto.scrypt);
+const PASSWORD_HASH_PREFIX = 'scrypt$';
+
+const isPasswordHashed = (value) => typeof value === 'string' && value.startsWith(PASSWORD_HASH_PREFIX);
+
+const hashPassword = async (password) => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = await scryptAsync(password, salt, 64);
+  return `${PASSWORD_HASH_PREFIX}${salt}:${derivedKey.toString('hex')}`;
+};
+
+const verifyPassword = async (password, storedHash) => {
+  if (!storedHash) return false;
+  if (!isPasswordHashed(storedHash)) {
+    return storedHash === password;
+  }
+  const [prefixSalt, storedKey] = storedHash.split(':');
+  if (!prefixSalt || !storedKey) return false;
+  const salt = prefixSalt.replace(PASSWORD_HASH_PREFIX, '');
+  const derivedKey = await scryptAsync(password, salt, 64);
+  try {
+    return crypto.timingSafeEqual(Buffer.from(storedKey, 'hex'), derivedKey);
+  } catch (error) {
+    console.error('Password compare error', error);
+    return false;
+  }
+};
+
+const preventSuperadminCreation = (role) => role === 'superadmin';
 
 const logActivity = async ({ performedBy, entityType, entityId, action, description }) => {
   if (!performedBy || !entityType || !entityId || !action) return;
@@ -132,8 +162,22 @@ app.post('/api/auth/login', async (req, res) => {
       [email]
     );
 
-    if (rows.length === 0 || rows[0].password !== password) {
+    if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const passwordValid = await verifyPassword(password, rows[0].password);
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (!isPasswordHashed(rows[0].password)) {
+      try {
+        const hashed = await hashPassword(password);
+        await query('UPDATE users SET password = ? WHERE id = ?', [hashed, rows[0].id]);
+      } catch (error) {
+        console.error('Password upgrade error', error);
+      }
     }
 
     const profile = {
@@ -176,6 +220,116 @@ app.post('/api/auth/logout', async (req, res) => {
   }
 
   return res.json({ success: true });
+});
+
+const sendTitanMail = async ({ to, subject, html }) => {
+  const apiUrl = process.env.TITAN_API_URL;
+  const apiKey = process.env.TITAN_API_KEY;
+  const senderEmail = process.env.TITAN_SENDER_EMAIL;
+  const senderName = process.env.TITAN_SENDER_NAME || 'RGI NexaProc';
+
+  if (!apiUrl || !apiKey || !senderEmail) {
+    throw new Error('Titan Mail configuration missing');
+  }
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      from: { email: senderEmail, name: senderName },
+      to: [{ email: to }],
+      subject,
+      html,
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Titan Mail error: ${response.status} ${detail}`);
+  }
+};
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body || {};
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    const [user] = await query('SELECT id, email, full_name FROM users WHERE email = ? LIMIT 1', [email]);
+
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
+
+      await query('INSERT INTO password_resets SET ?', {
+        user_id: user.id,
+        token_hash: tokenHash,
+        expires_at: expiresAt,
+      });
+
+      const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
+      const resetLink = `${appBaseUrl}/?reset_token=${token}`;
+
+      await sendTitanMail({
+        to: user.email,
+        subject: 'Reset Password - RGI NexaProc',
+        html: `
+          <p>Halo ${user.full_name || 'User'},</p>
+          <p>Klik tautan berikut untuk mengganti password Anda:</p>
+          <p><a href="${resetLink}">${resetLink}</a></p>
+          <p>Tautan ini berlaku selama 1 jam.</p>
+        `,
+      });
+    }
+
+    return res.json({ success: true, message: 'If the email exists, a reset link has been sent.' });
+  } catch (error) {
+    console.error('Forgot password error', error);
+    return res.status(500).json({ error: 'Failed to process reset request' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, password } = req.body || {};
+
+  if (!token || !password) {
+    return res.status(400).json({ error: 'Token and password are required' });
+  }
+
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const [resetEntry] = await query(
+      'SELECT * FROM password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [tokenHash]
+    );
+
+    if (!resetEntry) {
+      return res.status(400).json({ error: 'Reset token is invalid or expired' });
+    }
+
+    const hashedPassword = await hashPassword(password);
+    await query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, resetEntry.user_id]);
+    await query('UPDATE password_resets SET used_at = NOW() WHERE id = ?', [resetEntry.id]);
+
+    await logActivity({
+      performedBy: resetEntry.user_id,
+      entityType: 'auth',
+      entityId: resetEntry.user_id,
+      action: 'reset_password',
+      description: 'User reset password via email link',
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Reset password error', error);
+    return res.status(500).json({ error: 'Failed to reset password' });
+  }
 });
 
 app.get('/api/:table', async (req, res) => {
@@ -435,15 +589,18 @@ app.post('/api/:table', async (req, res) => {
     }
 
     if (table === 'users') {
-      if (preventOwnerCreation(payload.role)) {
-        return res.status(403).json({ error: 'Owner account cannot be created' });
+      if (preventSuperadminCreation(payload.role)) {
+        return res.status(403).json({ error: 'Superadmin account cannot be created' });
       }
 
       const cleanPayload = sanitizeUserPayload(payload, ['full_name', 'email', 'password', 'role', 'phone', 'photo_url']);
+      if (cleanPayload.password) {
+        cleanPayload.password = await hashPassword(cleanPayload.password);
+      }
       const result = await query('INSERT INTO ?? SET ?', [table, cleanPayload]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
 
-      if (payload.performed_by && ['owner', 'admin', 'manager'].includes(payload.creator_role)) {
+      if (payload.performed_by && ['superadmin', 'admin', 'manager'].includes(payload.creator_role)) {
         await logActivity({
           performedBy: payload.performed_by,
           entityType: 'users',
@@ -507,7 +664,7 @@ app.put('/api/:table/:id', async (req, res) => {
       if (existing.status === 'process') {
         return res.status(403).json({ error: 'RFQ is already in process and cannot be edited' });
       }
-      const allowedRoles = ['owner', 'admin', 'manager'];
+      const allowedRoles = ['superadmin', 'admin', 'manager'];
       const isPrivileged = performerRole && allowedRoles.includes(performerRole);
       const isRequester =
         performedBy &&
@@ -594,7 +751,7 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      if (existing.role === 'owner') {
+      if (existing.role === 'superadmin') {
         const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'photo_url']);
         updates.role = existing.role;
 
@@ -602,16 +759,24 @@ app.put('/api/:table/:id', async (req, res) => {
           return res.status(400).json({ error: 'No valid fields to update' });
         }
 
+        if (updates.password) {
+          updates.password = await hashPassword(updates.password);
+        }
+
         await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
       } else {
         const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'role', 'photo_url']);
 
-        if (preventOwnerCreation(updates.role)) {
-          return res.status(403).json({ error: 'Cannot promote user to owner' });
+        if (preventSuperadminCreation(updates.role)) {
+          return res.status(403).json({ error: 'Cannot promote user to superadmin' });
         }
 
         if (Object.keys(updates).length === 0) {
           return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        if (updates.password) {
+          updates.password = await hashPassword(updates.password);
         }
 
         await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
@@ -668,8 +833,8 @@ app.delete('/api/:table/:id', async (req, res) => {
 
     if (table === 'users') {
       const [target] = await query('SELECT role FROM ?? WHERE id = ? LIMIT 1', [table, id]);
-      if (target?.role === 'owner') {
-        return res.status(403).json({ error: 'Owner account cannot be deleted' });
+      if (target?.role === 'superadmin') {
+        return res.status(403).json({ error: 'Superadmin account cannot be deleted' });
       }
     }
     if (table === 'suppliers') {
