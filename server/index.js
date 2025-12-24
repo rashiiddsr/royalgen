@@ -667,7 +667,13 @@ app.post('/api/:table', async (req, res) => {
     }
 
     if (table === 'quotations') {
-      const { goods = [], rfq_id: rfqId, performed_by: performedBy, ...quotationPayload } = payload;
+      const {
+        goods = [],
+        rfq_id: rfqId,
+        performed_by: performedBy,
+        performer_role: performerRole,
+        ...quotationPayload
+      } = payload;
       const cleanedGoods = Array.isArray(goods)
         ? goods.map((item) => ({
             good_id: item.good_id || null,
