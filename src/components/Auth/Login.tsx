@@ -24,10 +24,10 @@ export default function Login() {
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirm, setResetConfirm] = useState('');
   const [setupUsername, setSetupUsername] = useState('');
+  const [setupCurrentPassword, setSetupCurrentPassword] = useState('');
   const [setupPassword, setSetupPassword] = useState('');
   const [setupConfirm, setSetupConfirm] = useState('');
   const [pendingProfile, setPendingProfile] = useState<{ id?: number | string; email?: string } | null>(null);
-  const [pendingPassword, setPendingPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -38,6 +38,7 @@ export default function Login() {
   const { signIn, signInWithGoogle } = useAuth();
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+  const setupSessionKey = 'rgi_pending_setup';
 
   useEffect(() => {
     const savedCredentials = localStorage.getItem('mysql_saved_credentials');
@@ -55,6 +56,21 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
+    const savedSetup = sessionStorage.getItem(setupSessionKey);
+    if (!savedSetup) return;
+    try {
+      const parsed = JSON.parse(savedSetup) as { id?: number | string; email?: string };
+      if (parsed?.id) {
+        setPendingProfile(parsed);
+        setMode('setup');
+      }
+    } catch (err) {
+      console.error('Failed to restore setup session', err);
+      sessionStorage.removeItem(setupSessionKey);
+    }
+  }, [setupSessionKey]);
+
+  useEffect(() => {
     if (resetToken) {
       setMode('reset');
     }
@@ -66,6 +82,7 @@ export default function Login() {
 
     const initializeGoogle = () => {
       if (!window.google?.accounts?.id || !googleButtonRef.current) return;
+      const buttonWidth = Math.floor(googleButtonRef.current.getBoundingClientRect().width) || 320;
       window.google.accounts.id.initialize({
         client_id: googleClientId,
         callback: async (response) => {
@@ -74,6 +91,15 @@ export default function Login() {
             setMessage('');
             const result = await signInWithGoogle(response.credential);
             if (result.requiresSetup) {
+              setPendingProfile(result.profile || null);
+              setSetupCurrentPassword('');
+              setSetupUsername('');
+              setSetupPassword('');
+              setSetupConfirm('');
+              setMode('setup');
+              if (result.profile?.id) {
+                sessionStorage.setItem(setupSessionKey, JSON.stringify(result.profile));
+              }
               setError('Akun Anda perlu setup username dan password sebelum login dengan Google.');
             }
           } catch (err) {
@@ -85,7 +111,7 @@ export default function Login() {
       window.google.accounts.id.renderButton(googleButtonRef.current, {
         theme: 'outline',
         size: 'large',
-        width: '100%',
+        width: buttonWidth,
       });
     };
 
@@ -120,11 +146,14 @@ export default function Login() {
       const result = await signIn(identifier, password);
       if (result.requiresSetup) {
         setPendingProfile(result.profile || null);
-        setPendingPassword(password);
+        setSetupCurrentPassword(password);
         setSetupUsername('');
         setSetupPassword('');
         setSetupConfirm('');
         setMode('setup');
+        if (result.profile?.id) {
+          sessionStorage.setItem(setupSessionKey, JSON.stringify(result.profile));
+        }
         return;
       }
       if (rememberMe) {
@@ -202,9 +231,10 @@ export default function Login() {
       setError('Password dan konfirmasi tidak sama.');
       return;
     }
-    if (!pendingProfile?.id || !pendingPassword) {
+    if (!pendingProfile?.id || !setupCurrentPassword) {
       setError('Sesi setup tidak valid, silakan login ulang.');
       setMode('login');
+      sessionStorage.removeItem(setupSessionKey);
       return;
     }
     setLoading(true);
@@ -215,7 +245,7 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: pendingProfile.id,
-          current_password: pendingPassword,
+          current_password: setupCurrentPassword,
           username: setupUsername,
           password: setupPassword,
         }),
@@ -228,6 +258,9 @@ export default function Login() {
       const loginResult = await signIn(setupUsername, setupPassword);
       if (!loginResult.requiresSetup) {
         setMode('login');
+        sessionStorage.removeItem(setupSessionKey);
+        setPendingProfile(null);
+        setSetupCurrentPassword('');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to complete setup');
@@ -451,6 +484,20 @@ export default function Login() {
 
           {mode === 'setup' && (
             <form onSubmit={handleSetup} className="space-y-5">
+              <div className="group">
+                <label htmlFor="setup-current-password" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Password Default
+                </label>
+                <input
+                  id="setup-current-password"
+                  type="password"
+                  value={setupCurrentPassword}
+                  onChange={(e) => setSetupCurrentPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  placeholder="Masukkan password default Anda"
+                  required
+                />
+              </div>
               <div className="group">
                 <label htmlFor="setup-username" className="block text-sm font-semibold text-gray-700 mb-2">
                   Username

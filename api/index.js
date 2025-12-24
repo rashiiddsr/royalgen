@@ -13,7 +13,12 @@ import { query } from './db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, '.env') });
+const envCandidates = [path.join(__dirname, '.env'), path.join(__dirname, '../.env')];
+envCandidates.forEach((envPath) => {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  }
+});
 
 const app = express();
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 4000);
