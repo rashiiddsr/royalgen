@@ -67,7 +67,7 @@ export default function RFQ() {
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [goodsError, setGoodsError] = useState('');
   const [attachmentError, setAttachmentError] = useState('');
-  const editableRoles = ['owner', 'admin', 'manager'];
+  const editableRoles = ['superadmin', 'admin', 'manager'];
   const canEditRfq = (rfq: RFQType) => {
     if (!profile) return false;
     if (rfq.status === 'process') return false;

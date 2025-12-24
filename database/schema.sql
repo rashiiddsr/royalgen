@@ -8,16 +8,28 @@ CREATE TABLE IF NOT EXISTS `users` (
   `full_name` VARCHAR(255) NOT NULL,
   `email` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
-  `role` ENUM('owner','admin','manager','staff') NOT NULL DEFAULT 'staff',
+  `role` ENUM('superadmin','admin','manager','staff') NOT NULL DEFAULT 'staff',
   `title` VARCHAR(150) DEFAULT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
   `photo_url` VARCHAR(500) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO `users` (`full_name`, `email`, `password`, `role`, `title`)
-VALUES ('System Owner', 'admin@gmail.com', 'admin', 'owner', 'Owner')
-ON DUPLICATE KEY UPDATE `role` = VALUES(`role`), `password` = VALUES(`password`);
+INSERT INTO `users` (`full_name`, `email`, `password`, `role`, `title`, `phone`)
+VALUES ('Mhd Zidane Alparizi', 'zidane@royalgen.co.id', 'scrypt$55bfb64956e76e8a298867897d5d47d6:5067c8b96e780777ddff0dc873790293c1725ecd460e1facb4d708d7a419d1587a87c9be8a62465eb67f09eefd124b9e54e2d69458f90052f862883f1f219adf', 'superadmin', 'Superadmin', '82170179410')
+ON DUPLICATE KEY UPDATE `role` = VALUES(`role`), `password` = VALUES(`password`), `phone` = VALUES(`phone`), `full_name` = VALUES(`full_name`);
+
+CREATE TABLE IF NOT EXISTS `password_resets` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `token_hash` VARCHAR(255) NOT NULL,
+  `expires_at` TIMESTAMP NOT NULL,
+  `used_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_password_resets_user` (`user_id`),
+  INDEX `idx_password_resets_token` (`token_hash`),
+  CONSTRAINT `fk_password_resets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
 
 -- Suppliers
 CREATE TABLE IF NOT EXISTS `suppliers` (
