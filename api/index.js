@@ -10,13 +10,13 @@ import net from 'net';
 import tls from 'tls';
 import { query } from './db.js';
 
-dotenv.config();
-
-const app = express();
-const port = Number(process.env.SERVER_PORT || 4000);
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const app = express();
+const port = Number(process.env.PORT || process.env.SERVER_PORT || 4000);
 const uploadDir = path.join(__dirname, 'uploads');
 
 if (!fs.existsSync(uploadDir)) {
@@ -1452,6 +1452,6 @@ app.delete('/api/:table/:id', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`RGI NexaProc API listening on port ${port}`);
 });
