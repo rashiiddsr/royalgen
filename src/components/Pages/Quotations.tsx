@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Eye, FileCheck, X, Pencil } from 'lucide-react';
+import { Plus, Eye, FileCheck, X, Pencil, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface QuotationGood {
@@ -28,6 +28,7 @@ interface QuotationType {
   tax_amount: number;
   grand_total: number;
   status: string;
+  negotiation_round?: number;
   created_at: string;
   performed_by?: number | null;
   rfqs?: RFQTypeLite;
@@ -69,6 +70,7 @@ export default function Quotations() {
   const [showModal, setShowModal] = useState(false);
   const [detailQuotation, setDetailQuotation] = useState<QuotationType | null>(null);
   const [editingQuotation, setEditingQuotation] = useState<QuotationType | null>(null);
+  const [statusQuotation, setStatusQuotation] = useState<QuotationType | null>(null);
   const [rfqs, setRfqs] = useState<RFQTypeLite[]>([]);
   const [goods, setGoods] = useState<GoodOption[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -280,9 +282,7 @@ export default function Quotations() {
     const taxAmount = 0;
     const grandTotal = totalAmount + taxAmount;
 
-    const payload = {
-      ...formData,
-      rfq_id: formData.rfq_id,
+    const commonPayload = {
       goods: goodsRows.map((row) => ({
         ...row,
         qty: Number(row.qty) || 0,
@@ -291,10 +291,20 @@ export default function Quotations() {
       total_amount: totalAmount,
       tax_amount: taxAmount,
       grand_total: grandTotal,
-      status: editingQuotation ? editingQuotation.status : 'waiting',
+      delivery_time: formData.delivery_time,
+      payment_time: formData.payment_time,
       performed_by: profile?.id,
       performer_role: profile?.role,
-    } as QuotationType;
+    };
+
+    const payload = editingQuotation
+      ? commonPayload
+      : ({
+          ...formData,
+          rfq_id: formData.rfq_id,
+          status: 'waiting',
+          ...commonPayload,
+        } as QuotationType);
 
     try {
       if (editingQuotation) {
@@ -315,7 +325,8 @@ export default function Quotations() {
     const colors = {
       waiting: 'bg-yellow-100 text-yellow-800',
       negotiation: 'bg-blue-100 text-blue-800',
-      renegotiation: 'bg-indigo-100 text-indigo-800',
+      renegotiation: 'bg-purple-100 text-purple-800',
+      process: 'bg-emerald-100 text-emerald-800',
       active: 'bg-green-100 text-green-800',
       draft: 'bg-gray-100 text-gray-800',
       submitted: 'bg-blue-100 text-blue-800',
@@ -323,6 +334,12 @@ export default function Quotations() {
       rejected: 'bg-red-100 text-red-800',
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getStatusLabel = (status: string, round?: number) => {
+    if (status === 'renegotiation') return 're-negotiating';
+    if (status === 'negotiation' && round) return `negotiation (${round})`;
+    return status;
   };
 
   const renderGoodsSummary = (quotation: QuotationType) => {
@@ -352,19 +369,37 @@ export default function Quotations() {
       if (!confirmed) return;
     }
     try {
-      await updateRecord<QuotationType>('quotations', quotation.id, {
+      const updated = await updateRecord<QuotationType>('quotations', quotation.id, {
         status: nextStatus,
         performed_by: profile.id,
         performer_role: profile.role,
       });
       await fetchQuotations();
-      setDetailQuotation((prev) =>
-        prev && prev.id === quotation.id ? { ...prev, status: nextStatus } : prev
-      );
+      if (updated) {
+        setDetailQuotation((prev) => (prev && prev.id === quotation.id ? { ...prev, ...updated } : prev));
+        setStatusQuotation((prev) => (prev && prev.id === quotation.id ? { ...prev, ...updated } : prev));
+      }
+      setStatusQuotation(null);
     } catch (error) {
       console.error('Failed to update quotation status', error);
       alert('Failed to update status. Please try again.');
     }
+  };
+
+  const getStatusActions = (quotation: QuotationType) => {
+    if (quotation.status === 'waiting' || quotation.status === 'renegotiation') {
+      return [
+        { label: 'Set Negotiation', status: 'negotiation', style: 'bg-blue-600 hover:bg-blue-700' },
+        { label: 'Reject', status: 'rejected', style: 'bg-red-600 hover:bg-red-700' },
+      ];
+    }
+    if (quotation.status === 'negotiation') {
+      return [
+        { label: 'Set Process', status: 'process', style: 'bg-emerald-600 hover:bg-emerald-700' },
+        { label: 'Reject', status: 'rejected', style: 'bg-red-600 hover:bg-red-700' },
+      ];
+    }
+    return [];
   };
 
   const activeGoods = goods.filter((good) => good.status === 'active');
@@ -477,7 +512,7 @@ export default function Quotations() {
                           quotation.status
                         )}`}
                       >
-                        {quotation.status}
+                        {getStatusLabel(quotation.status, quotation.negotiation_round)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -487,6 +522,16 @@ export default function Quotations() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+                      {canUpdateStatus &&
+                        ['waiting', 'renegotiation', 'negotiation'].includes(quotation.status) && (
+                          <button
+                            onClick={() => setStatusQuotation(quotation)}
+                            className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                            title="Update status"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </button>
+                        )}
                       <button
                         onClick={() => openEditModal(quotation)}
                         className={`inline-flex items-center p-2 rounded-lg transition ${
@@ -542,8 +587,11 @@ export default function Quotations() {
                   <select
                     value={formData.rfq_id}
                     onChange={(event) => handleRfqChange(event.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    required
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+                      editingQuotation ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
+                    required={!editingQuotation}
+                    disabled={!!editingQuotation}
                   >
                     <option value="">Select RFQ</option>
                     {availableRfqs.map((rfq) => (
@@ -749,6 +797,53 @@ export default function Quotations() {
         </div>
       )}
 
+      {statusQuotation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <p className="text-sm text-gray-500 font-semibold uppercase">Quotation Status</p>
+                <h2 className="text-xl font-bold text-gray-900">Update Status</h2>
+              </div>
+              <button
+                onClick={() => setStatusQuotation(null)}
+                className="p-2 rounded-full hover:bg-gray-100 transition"
+                aria-label="Close status modal"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="text-sm text-gray-600">
+                <p className="font-semibold text-gray-900">{statusQuotation.quotation_number}</p>
+                <p className="mt-1">
+                  Current status:{' '}
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                      statusQuotation.status
+                    )}`}
+                  >
+                    {getStatusLabel(statusQuotation.status, statusQuotation.negotiation_round)}
+                  </span>
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {getStatusActions(statusQuotation).map((action) => (
+                  <button
+                    key={action.status}
+                    type="button"
+                    onClick={() => handleStatusUpdate(statusQuotation, action.status)}
+                    className={`px-3 py-2 text-sm text-white rounded-lg ${action.style}`}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {detailQuotation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
@@ -810,7 +905,7 @@ export default function Quotations() {
                       detailQuotation.status
                     )}`}
                   >
-                    {detailQuotation.status}
+                    {getStatusLabel(detailQuotation.status, detailQuotation.negotiation_round)}
                   </span>
                 </div>
                 <div>
@@ -818,36 +913,6 @@ export default function Quotations() {
                   <p className="font-medium text-gray-900">{detailQuotation.creator_name || '-'}</p>
                 </div>
               </div>
-
-              {canUpdateStatus &&
-                (detailQuotation.status === 'waiting' || detailQuotation.status === 'renegotiation') && (
-                  <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-900">Update Status</h3>
-                        <p className="text-xs text-gray-500">
-                          Managers and superadmins can move this quotation forward.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleStatusUpdate(detailQuotation, 'negotiation')}
-                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        >
-                          Set Negotiation
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleStatusUpdate(detailQuotation, 'rejected')}
-                          className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Goods</h3>

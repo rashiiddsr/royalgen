@@ -696,6 +696,7 @@ app.post('/api/:table', async (req, res) => {
           rfq_id: rfqId || null,
           goods: JSON.stringify(cleanedGoods),
           status,
+          negotiation_round: 0,
           performed_by: performedBy || null,
         },
       ]);
@@ -808,7 +809,6 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       const hasGoodsUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
-      const hasRfqUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'rfq_id');
       const cleanedGoods = hasGoodsUpdate
         ? Array.isArray(goods)
           ? goods.map((item) => ({
@@ -822,30 +822,42 @@ app.put('/api/:table/:id', async (req, res) => {
           : []
         : JSON.parse(existing.goods || '[]');
 
-      const nextUpdates = { ...quotationUpdates };
-      if (hasRfqUpdate) {
-        nextUpdates.rfq_id = rfqId || null;
-      }
+      const editableFields = ['delivery_time', 'payment_time', 'total_amount', 'tax_amount', 'grand_total'];
+      const sanitizedUpdates = Object.fromEntries(
+        Object.entries(quotationUpdates || {}).filter(([key]) => editableFields.includes(key))
+      );
+      const nextUpdates = { ...sanitizedUpdates };
       if (hasGoodsUpdate) {
         nextUpdates.goods = JSON.stringify(cleanedGoods);
       }
 
       const requestedStatus = quotationUpdates.status;
       const isStatusChange = requestedStatus && requestedStatus !== existing.status;
-      const { status, ...otherUpdates } = quotationUpdates;
       const isOtherUpdate =
         hasGoodsUpdate ||
-        hasRfqUpdate ||
-        Object.keys(otherUpdates).length > 0;
+        Object.keys(sanitizedUpdates).length > 0;
 
       if (isStatusChange && !isPrivileged) {
         return res.status(403).json({ error: 'Only managers can update status' });
       }
 
       let shouldNotifyRenegotiation = false;
+      let shouldNotifyWaitingOrRenegotiation = false;
       if (!isStatusChange && existing.status === 'negotiation' && isOtherUpdate) {
         nextUpdates.status = 'renegotiation';
         shouldNotifyRenegotiation = true;
+      }
+      if (
+        !isStatusChange &&
+        isOtherUpdate &&
+        ['waiting', 'renegotiation'].includes(existing.status)
+      ) {
+        shouldNotifyWaitingOrRenegotiation = true;
+      }
+
+      if (isStatusChange && requestedStatus === 'negotiation') {
+        const currentRound = Number(existing.negotiation_round || 0);
+        nextUpdates.negotiation_round = currentRound + 1;
       }
 
       await query('UPDATE ?? SET ? WHERE id = ?', [table, nextUpdates, id]);
@@ -871,10 +883,10 @@ app.put('/api/:table/:id', async (req, res) => {
         });
       }
 
-      if (shouldNotifyRenegotiation) {
+      if (shouldNotifyRenegotiation || shouldNotifyWaitingOrRenegotiation) {
         await sendQuotationNotification({
           quotationNumber: updated?.quotation_number || `Quotation ${id}`,
-          statusLabel: 'renegotiation',
+          statusLabel: shouldNotifyRenegotiation ? 'renegotiation' : existing.status,
         });
       }
 
