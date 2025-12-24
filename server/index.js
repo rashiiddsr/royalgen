@@ -285,6 +285,24 @@ const createSmtpClient = async ({ host, port, secure, socket: existingSocket, ex
   return { socket, sendCommand, waitForResponse };
 };
 
+const wrapSmtpLines = (content, maxLength = 998) => {
+  if (!content) return '';
+  return content
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      if (line.length <= maxLength) return [line];
+      const chunks = [];
+      let remaining = line;
+      while (remaining.length > maxLength) {
+        chunks.push(remaining.slice(0, maxLength));
+        remaining = remaining.slice(maxLength);
+      }
+      if (remaining.length) chunks.push(remaining);
+      return chunks;
+    })
+    .join('\r\n');
+};
+
 const sendSmtpMail = async ({ to, subject, html }) => {
   const host = process.env.MAIL_HOST;
   const port = Number(process.env.MAIL_PORT || 0);
@@ -331,6 +349,7 @@ const sendSmtpMail = async ({ to, subject, html }) => {
 
   const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : host;
   const messageId = `<${Date.now()}.${crypto.randomBytes(16).toString('hex')}@${senderDomain || 'localhost'}>`;
+  const safeHtml = wrapSmtpLines(html);
   const message = [
     `From: ${senderName} <${senderEmail}>`,
     `To: <${to}>`,
@@ -340,7 +359,7 @@ const sendSmtpMail = async ({ to, subject, html }) => {
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset="UTF-8"',
     '',
-    html,
+    safeHtml,
     '.',
   ].join('\r\n');
 
@@ -937,18 +956,16 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       let shouldNotifyRenegotiation = false;
-      let shouldNotifyWaitingOrRenegotiation = false;
+      const shouldNotifyWaiting =
+        isStatusChange && requestedStatus === 'waiting';
+      const shouldNotifyRenegotiationStatusChange =
+        isStatusChange && requestedStatus === 'renegotiation';
       if (!isStatusChange && existing.status === 'negotiation' && isOtherUpdate) {
         nextUpdates.status = 'renegotiation';
         shouldNotifyRenegotiation = true;
       }
-      if (
-        !isStatusChange &&
-        isOtherUpdate &&
-        ['waiting', 'renegotiation'].includes(existing.status)
-      ) {
-        shouldNotifyWaitingOrRenegotiation = true;
-      }
+      const shouldNotifyWaitingOrRenegotiation =
+        shouldNotifyWaiting || shouldNotifyRenegotiation || shouldNotifyRenegotiationStatusChange;
 
       if (isStatusChange && requestedStatus === 'negotiation') {
         const currentRound = Number(existing.negotiation_round || 0);
@@ -995,7 +1012,7 @@ app.put('/api/:table/:id', async (req, res) => {
           ? [requester.email]
           : [];
 
-      if (shouldNotifyRenegotiation || shouldNotifyWaitingOrRenegotiation) {
+      if (shouldNotifyWaitingOrRenegotiation) {
         await sendQuotationNotification({
           quotation: updated,
           goods: cleanedGoods,
