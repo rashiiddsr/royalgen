@@ -329,10 +329,14 @@ const sendSmtpMail = async ({ to, subject, html }) => {
   await client.sendCommand(`RCPT TO:<${to}>`, [250, 251]);
   await client.sendCommand('DATA', [354]);
 
+  const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : host;
+  const messageId = `<${Date.now()}.${crypto.randomBytes(16).toString('hex')}@${senderDomain || 'localhost'}>`;
   const message = [
     `From: ${senderName} <${senderEmail}>`,
     `To: <${to}>`,
     `Subject: ${subject}`,
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: ${messageId}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset="UTF-8"',
     '',
