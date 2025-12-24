@@ -6,7 +6,8 @@ interface AuthContextType {
   user: { email: string } | null;
   profile: UserProfile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (identifier: string, password: string) => Promise<{ requiresSetup: boolean; profile?: UserProfile }>;
+  signInWithGoogle: (credential: string) => Promise<{ requiresSetup: boolean; profile?: UserProfile }>;
   signOut: () => Promise<void>;
   setProfileState: (profile: UserProfile | null) => void;
 }
@@ -35,14 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (identifier: string, password: string) => {
     setLoading(true);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
       const response = await fetch(`${apiBase}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       const data = await response.json();
@@ -52,11 +53,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const sessionProfile: UserProfile = data.profile;
+      const requiresSetup = Boolean(data?.requires_setup);
+
+      if (requiresSetup) {
+        return { requiresSetup, profile: sessionProfile };
+      }
 
       setUser({ email: sessionProfile.email });
       setProfile(sessionProfile);
       localStorage.setItem(SESSION_KEY, JSON.stringify(sessionProfile));
+      return { requiresSetup: false, profile: sessionProfile };
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const signInWithGoogle = async (credential: string) => {
+    setLoading(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+      const response = await fetch(`${apiBase}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to sign in with Google');
+      }
+
+      const sessionProfile: UserProfile = data.profile;
+      const requiresSetup = Boolean(data?.requires_setup);
+
+      if (requiresSetup) {
+        return { requiresSetup, profile: sessionProfile };
+      }
+
+      setUser({ email: sessionProfile.email });
+      setProfile(sessionProfile);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionProfile));
+      return { requiresSetup: false, profile: sessionProfile };
     } finally {
       setLoading(false);
     }
@@ -83,7 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, setProfileState: setProfile }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, signIn, signInWithGoogle, signOut, setProfileState: setProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,28 +1,51 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Building2 } from 'lucide-react';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (options: { client_id: string; callback: (response: { credential: string }) => void }) => void;
+          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
+        };
+      };
+    };
+  }
+}
 
 export default function Login() {
   const searchParams = new URLSearchParams(window.location.search);
   const resetToken = searchParams.get('reset_token');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirm, setResetConfirm] = useState('');
+  const [setupUsername, setSetupUsername] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupConfirm, setSetupConfirm] = useState('');
+  const [pendingProfile, setPendingProfile] = useState<{ id?: number | string; email?: string } | null>(null);
+  const [pendingPassword, setPendingPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'login' | 'forgot' | 'reset'>(resetToken ? 'reset' : 'login');
-  const { signIn } = useAuth();
+  const [mode, setMode] = useState<'login' | 'forgot' | 'reset' | 'setup'>(
+    resetToken ? 'reset' : 'login'
+  );
+  const { signIn, signInWithGoogle } = useAuth();
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   useEffect(() => {
     const savedCredentials = localStorage.getItem('mysql_saved_credentials');
     if (savedCredentials) {
       try {
-        const parsed = JSON.parse(savedCredentials) as { email?: string; password?: string };
-        if (parsed.email) setEmail(parsed.email);
+        const parsed = JSON.parse(savedCredentials) as { identifier?: string; email?: string; password?: string };
+        const storedIdentifier = parsed.identifier || parsed.email;
+        if (storedIdentifier) setIdentifier(storedIdentifier);
         if (parsed.password) setPassword(parsed.password);
         setRememberMe(true);
       } catch (err) {
@@ -37,6 +60,56 @@ export default function Login() {
     }
   }, [resetToken]);
 
+  useEffect(() => {
+    if (!googleClientId || mode !== 'login') return;
+    let script = document.querySelector<HTMLScriptElement>('script[data-google-identity]');
+
+    const initializeGoogle = () => {
+      if (!window.google?.accounts?.id || !googleButtonRef.current) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async (response) => {
+          try {
+            setError('');
+            setMessage('');
+            const result = await signInWithGoogle(response.credential);
+            if (result.requiresSetup) {
+              setError('Akun Anda perlu setup username dan password sebelum login dengan Google.');
+            }
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to sign in with Google');
+          }
+        },
+      });
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: '100%',
+      });
+    };
+
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.dataset.googleIdentity = 'true';
+      script.onload = () => {
+        script?.setAttribute('data-loaded', 'true');
+        initializeGoogle();
+      };
+      document.body.appendChild(script);
+    } else if (script.hasAttribute('data-loaded')) {
+      initializeGoogle();
+    } else {
+      script.onload = () => {
+        script?.setAttribute('data-loaded', 'true');
+        initializeGoogle();
+      };
+    }
+  }, [googleClientId, mode, signInWithGoogle]);
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
@@ -44,9 +117,18 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await signIn(email, password);
+      const result = await signIn(identifier, password);
+      if (result.requiresSetup) {
+        setPendingProfile(result.profile || null);
+        setPendingPassword(password);
+        setSetupUsername('');
+        setSetupPassword('');
+        setSetupConfirm('');
+        setMode('setup');
+        return;
+      }
       if (rememberMe) {
-        localStorage.setItem('mysql_saved_credentials', JSON.stringify({ email, password }));
+        localStorage.setItem('mysql_saved_credentials', JSON.stringify({ identifier, password }));
       } else {
         localStorage.removeItem('mysql_saved_credentials');
       }
@@ -112,6 +194,48 @@ export default function Login() {
     }
   };
 
+  const handleSetup = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    if (setupPassword !== setupConfirm) {
+      setError('Password dan konfirmasi tidak sama.');
+      return;
+    }
+    if (!pendingProfile?.id || !pendingPassword) {
+      setError('Sesi setup tidak valid, silakan login ulang.');
+      setMode('login');
+      return;
+    }
+    setLoading(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+      const response = await fetch(`${apiBase}/auth/complete-setup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: pendingProfile.id,
+          current_password: pendingPassword,
+          username: setupUsername,
+          password: setupPassword,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to complete setup');
+      }
+
+      const loginResult = await signIn(setupUsername, setupPassword);
+      if (!loginResult.requiresSetup) {
+        setMode('login');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to complete setup');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-emerald-50 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
@@ -141,11 +265,13 @@ export default function Login() {
             {mode === 'login' && 'Sign In'}
             {mode === 'forgot' && 'Forgot Password'}
             {mode === 'reset' && 'Reset Password'}
+            {mode === 'setup' && 'Setup Account'}
           </h2>
           <p className="text-gray-600 text-center mb-6">
             {mode === 'login' && 'Sign in with your system account'}
             {mode === 'forgot' && 'Enter your email to receive reset instructions'}
             {mode === 'reset' && 'Set a new password for your account'}
+            {mode === 'setup' && 'Buat username dan password baru untuk akun Anda'}
           </p>
 
           {error && (
@@ -163,16 +289,16 @@ export default function Login() {
           {mode === 'login' && (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="group">
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
+                <label htmlFor="identifier" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email atau Username
                 </label>
                 <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="identifier"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
-                  placeholder="you@company.com"
+                  placeholder="email@company.com atau username"
                   required
                 />
               </div>
@@ -222,6 +348,11 @@ export default function Login() {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
+              {googleClientId && (
+                <div className="pt-2">
+                  <div ref={googleButtonRef} className="w-full" />
+                </div>
+              )}
             </form>
           )}
 
@@ -314,6 +445,63 @@ export default function Login() {
                 className="w-full text-sm text-gray-600 hover:text-gray-700 font-semibold"
               >
                 Back to sign in
+              </button>
+            </form>
+          )}
+
+          {mode === 'setup' && (
+            <form onSubmit={handleSetup} className="space-y-5">
+              <div className="group">
+                <label htmlFor="setup-username" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Username
+                </label>
+                <input
+                  id="setup-username"
+                  type="text"
+                  value={setupUsername}
+                  onChange={(e) => setSetupUsername(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  placeholder="username"
+                  required
+                />
+              </div>
+
+              <div className="group">
+                <label htmlFor="setup-password" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Password Baru
+                </label>
+                <input
+                  id="setup-password"
+                  type="password"
+                  value={setupPassword}
+                  onChange={(e) => setSetupPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <div className="group">
+                <label htmlFor="setup-confirm" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Konfirmasi Password
+                </label>
+                <input
+                  id="setup-confirm"
+                  type="password"
+                  value={setupConfirm}
+                  onChange={(e) => setSetupConfirm(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold py-3.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                {loading ? 'Saving...' : 'Simpan Username & Password'}
               </button>
             </form>
           )}

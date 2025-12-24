@@ -6,8 +6,10 @@ USE `rgi_nexaproc`;
 CREATE TABLE IF NOT EXISTS `users` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `full_name` VARCHAR(255) NOT NULL,
+  `username` VARCHAR(120) DEFAULT NULL UNIQUE,
   `email` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
+  `password_reset_required` TINYINT(1) NOT NULL DEFAULT 0,
   `role` ENUM('superadmin','admin','manager','staff') NOT NULL DEFAULT 'staff',
   `title` VARCHAR(150) DEFAULT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
@@ -15,9 +17,9 @@ CREATE TABLE IF NOT EXISTS `users` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO `users` (`full_name`, `email`, `password`, `role`, `title`, `phone`)
-VALUES ('Mhd Zidane Alparizi', 'zidanalfarizi321@gmail.com', 'scrypt$55bfb64956e76e8a298867897d5d47d6:5067c8b96e780777ddff0dc873790293c1725ecd460e1facb4d708d7a419d1587a87c9be8a62465eb67f09eefd124b9e54e2d69458f90052f862883f1f219adf', 'superadmin', 'Superadmin', '82170179410')
-ON DUPLICATE KEY UPDATE `role` = VALUES(`role`), `password` = VALUES(`password`), `phone` = VALUES(`phone`), `full_name` = VALUES(`full_name`);
+INSERT INTO `users` (`full_name`, `username`, `email`, `password`, `password_reset_required`, `role`, `title`, `phone`)
+VALUES ('Mhd Zidane Alparizi', 'zidanist', 'zidanalfarizi321@gmail.com', 'scrypt$55bfb64956e76e8a298867897d5d47d6:5067c8b96e780777ddff0dc873790293c1725ecd460e1facb4d708d7a419d1587a87c9be8a62465eb67f09eefd124b9e54e2d69458f90052f862883f1f219adf', 0, 'superadmin', 'Superadmin', '82170179410')
+ON DUPLICATE KEY UPDATE `role` = VALUES(`role`), `password` = VALUES(`password`), `phone` = VALUES(`phone`), `full_name` = VALUES(`full_name`), `username` = VALUES(`username`), `password_reset_required` = VALUES(`password_reset_required`);
 
 CREATE TABLE IF NOT EXISTS `password_resets` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,

@@ -179,7 +179,7 @@ export default function Quotations() {
 
   const canEditQuotation = (quotation: QuotationType) => {
     if (!profile) return false;
-    if (quotation.status === 'rejected') return false;
+    if (quotation.status === 'rejected' || quotation.status === 'process') return false;
     if (['superadmin', 'manager'].includes(profile.role)) return true;
     if (!quotation.performed_by || !profile.id) return false;
     return String(quotation.performed_by) === String(profile.id);
