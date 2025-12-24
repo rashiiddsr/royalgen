@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Eye, FileCheck, X, Pencil } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface QuotationGood {
   good_id: string;
@@ -28,7 +29,9 @@ interface QuotationType {
   grand_total: number;
   status: string;
   created_at: string;
+  performed_by?: number | null;
   rfqs?: RFQTypeLite;
+  creator_name?: string;
 }
 
 interface RFQTypeLite {
@@ -60,6 +63,7 @@ const EMPTY_GOOD_ROW: QuotationGood = {
 };
 
 export default function Quotations() {
+  const { profile } = useAuth();
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -67,6 +71,7 @@ export default function Quotations() {
   const [editingQuotation, setEditingQuotation] = useState<QuotationType | null>(null);
   const [rfqs, setRfqs] = useState<RFQTypeLite[]>([]);
   const [goods, setGoods] = useState<GoodOption[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     quotation_number: '',
     rfq_id: '',
@@ -87,13 +92,19 @@ export default function Quotations() {
 
   const fetchQuotations = async () => {
     try {
-      const [quotationData, rfqData, goodsData] = await Promise.all([
+      const [quotationData, rfqData, goodsData, userData] = await Promise.all([
         getRecords<QuotationType>('quotations'),
         getRecords<RFQTypeLite>('rfqs'),
         getRecords<GoodOption>('goods'),
+        getRecords<{ id: string; full_name?: string; email?: string }>('users'),
       ]);
 
       const rfqsById = new Map(rfqData.map((rfq) => [rfq.id, rfq]));
+      const userMap = userData.reduce<Record<string, string>>((acc, user) => {
+        const name = user.full_name || user.email || 'User';
+        acc[String(user.id)] = name;
+        return acc;
+      }, {});
       const mappedQuotations = quotationData
         .map((quotation) => {
           let parsedGoods: QuotationGood[] = [];
@@ -111,6 +122,10 @@ export default function Quotations() {
             ...quotation,
             goods: parsedGoods,
             rfqs: rfqsById.get(quotation.rfq_id),
+            creator_name:
+              quotation.creator_name ||
+              (quotation.performed_by ? userMap[String(quotation.performed_by)] : null) ||
+              'Unknown user',
           };
         })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -127,16 +142,48 @@ export default function Quotations() {
 
   const getNextQuotationNumber = () => {
     const year = new Date().getFullYear();
-    const prefix = `RGI-QTN-${year}-`;
+    const romanMonths = [
+      'I',
+      'II',
+      'III',
+      'IV',
+      'V',
+      'VI',
+      'VII',
+      'VIII',
+      'IX',
+      'X',
+      'XI',
+      'XII',
+    ];
+    const romanMonth = romanMonths[new Date().getMonth()];
+    const legacyPrefix = `RGI-QTN-${year}-`;
     const maxSequence = quotations.reduce((max, quotation) => {
-      if (!quotation.quotation_number?.startsWith(prefix)) return max;
-      const sequence = Number(quotation.quotation_number.replace(prefix, ''));
-      if (Number.isNaN(sequence)) return max;
+      const number = quotation.quotation_number || '';
+      const legacyMatch = number.startsWith(legacyPrefix)
+        ? Number(number.replace(legacyPrefix, ''))
+        : null;
+      const newMatch = number.match(/^(\d{4})\/RGI\/QTN\/[IVXLCDM]+\/(\d{4})$/);
+      const legacySequence = legacyMatch && !Number.isNaN(legacyMatch) ? legacyMatch : null;
+      const newSequence =
+        newMatch && Number(newMatch[2]) === year ? Number(newMatch[1]) : null;
+      const sequence = newSequence ?? legacySequence;
+      if (!sequence || Number.isNaN(sequence)) return max;
       return Math.max(max, sequence);
     }, 0);
     const nextSequence = String(maxSequence + 1).padStart(4, '0');
-    return `${prefix}${nextSequence}`;
+    return `${nextSequence}/RGI/QTN/${romanMonth}/${year}`;
   };
+
+  const canEditQuotation = (quotation: QuotationType) => {
+    if (!profile) return false;
+    if (quotation.status === 'rejected') return false;
+    if (['superadmin', 'manager'].includes(profile.role)) return true;
+    if (!quotation.performed_by || !profile.id) return false;
+    return String(quotation.performed_by) === String(profile.id);
+  };
+
+  const canUpdateStatus = profile && ['superadmin', 'manager'].includes(profile.role);
 
   const openCreateModal = () => {
     setEditingQuotation(null);
@@ -157,6 +204,7 @@ export default function Quotations() {
   };
 
   const openEditModal = (quotation: QuotationType) => {
+    if (!canEditQuotation(quotation)) return;
     const parsedGoods = Array.isArray(quotation.goods) ? quotation.goods : [];
     setEditingQuotation(quotation);
     setFormData({
@@ -243,7 +291,9 @@ export default function Quotations() {
       total_amount: totalAmount,
       tax_amount: taxAmount,
       grand_total: grandTotal,
-      status: editingQuotation ? formData.status : 'waiting',
+      status: editingQuotation ? editingQuotation.status : 'waiting',
+      performed_by: profile?.id,
+      performer_role: profile?.role,
     } as QuotationType;
 
     try {
@@ -264,6 +314,8 @@ export default function Quotations() {
   const getStatusColor = (status: string) => {
     const colors = {
       waiting: 'bg-yellow-100 text-yellow-800',
+      negotiation: 'bg-blue-100 text-blue-800',
+      renegotiation: 'bg-indigo-100 text-indigo-800',
       active: 'bg-green-100 text-green-800',
       draft: 'bg-gray-100 text-gray-800',
       submitted: 'bg-blue-100 text-blue-800',
@@ -271,6 +323,48 @@ export default function Quotations() {
       rejected: 'bg-red-100 text-red-800',
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
+  const renderGoodsSummary = (quotation: QuotationType) => {
+    const goodsList = Array.isArray(quotation.goods) ? quotation.goods : [];
+    if (!goodsList.length) return 'No goods';
+    return goodsList.map((row) => row.name || 'Item').join(', ');
+  };
+
+  const filteredQuotations = quotations.filter((quotation) => {
+    const query = searchTerm.toLowerCase();
+    if (!query) return true;
+    return (
+      quotation.quotation_number?.toLowerCase().includes(query) ||
+      quotation.rfqs?.rfq_number?.toLowerCase().includes(query) ||
+      quotation.project_name?.toLowerCase().includes(query) ||
+      quotation.company_name?.toLowerCase().includes(query) ||
+      quotation.status?.toLowerCase().includes(query) ||
+      quotation.creator_name?.toLowerCase().includes(query) ||
+      renderGoodsSummary(quotation).toLowerCase().includes(query)
+    );
+  });
+
+  const handleStatusUpdate = async (quotation: QuotationType, nextStatus: string) => {
+    if (!canUpdateStatus || !profile) return;
+    if (nextStatus === 'rejected') {
+      const confirmed = window.confirm('Are you sure you want to reject this quotation? This will lock edits.');
+      if (!confirmed) return;
+    }
+    try {
+      await updateRecord<QuotationType>('quotations', quotation.id, {
+        status: nextStatus,
+        performed_by: profile.id,
+        performer_role: profile.role,
+      });
+      await fetchQuotations();
+      setDetailQuotation((prev) =>
+        prev && prev.id === quotation.id ? { ...prev, status: nextStatus } : prev
+      );
+    } catch (error) {
+      console.error('Failed to update quotation status', error);
+      alert('Failed to update status. Please try again.');
+    }
   };
 
   const activeGoods = goods.filter((good) => good.status === 'active');
@@ -302,6 +396,16 @@ export default function Quotations() {
         </button>
       </div>
 
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search quotations by number, RFQ, company, goods, or creator..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="w-full md:max-w-lg px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -317,6 +421,9 @@ export default function Quotations() {
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created By
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created At
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -328,15 +435,15 @@ export default function Quotations() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {quotations.length === 0 ? (
+              {filteredQuotations.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <FileCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No quotations found.</p>
                   </td>
                 </tr>
               ) : (
-                quotations.map((quotation) => (
+                filteredQuotations.map((quotation) => (
                   <tr key={quotation.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
@@ -359,6 +466,9 @@ export default function Quotations() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
+                      {quotation.creator_name || 'Unknown user'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
                       {new Date(quotation.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">
@@ -379,7 +489,12 @@ export default function Quotations() {
                       </button>
                       <button
                         onClick={() => openEditModal(quotation)}
-                        className="inline-flex items-center p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                        className={`inline-flex items-center p-2 rounded-lg transition ${
+                          canEditQuotation(quotation)
+                            ? 'text-gray-600 hover:bg-gray-100'
+                            : 'text-gray-300 cursor-not-allowed'
+                        }`}
+                        disabled={!canEditQuotation(quotation)}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -698,7 +813,41 @@ export default function Quotations() {
                     {detailQuotation.status}
                   </span>
                 </div>
+                <div>
+                  <p className="text-gray-500">Created By</p>
+                  <p className="font-medium text-gray-900">{detailQuotation.creator_name || '-'}</p>
+                </div>
               </div>
+
+              {canUpdateStatus &&
+                (detailQuotation.status === 'waiting' || detailQuotation.status === 'renegotiation') && (
+                  <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Update Status</h3>
+                        <p className="text-xs text-gray-500">
+                          Managers and superadmins can move this quotation forward.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleStatusUpdate(detailQuotation, 'negotiation')}
+                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                          Set Negotiation
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusUpdate(detailQuotation, 'rejected')}
+                          className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Goods</h3>

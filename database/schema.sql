@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 );
 
 INSERT INTO `users` (`full_name`, `email`, `password`, `role`, `title`, `phone`)
-VALUES ('Mhd Zidane Alparizi', 'zidane@royalgen.co.id', 'scrypt$55bfb64956e76e8a298867897d5d47d6:5067c8b96e780777ddff0dc873790293c1725ecd460e1facb4d708d7a419d1587a87c9be8a62465eb67f09eefd124b9e54e2d69458f90052f862883f1f219adf', 'superadmin', 'Superadmin', '82170179410')
+VALUES ('Mhd Zidane Alparizi', 'zidanalfarizi321@gmail.com', 'scrypt$55bfb64956e76e8a298867897d5d47d6:5067c8b96e780777ddff0dc873790293c1725ecd460e1facb4d708d7a419d1587a87c9be8a62465eb67f09eefd124b9e54e2d69458f90052f862883f1f219adf', 'superadmin', 'Superadmin', '82170179410')
 ON DUPLICATE KEY UPDATE `role` = VALUES(`role`), `password` = VALUES(`password`), `phone` = VALUES(`phone`), `full_name` = VALUES(`full_name`);
 
 CREATE TABLE IF NOT EXISTS `password_resets` (
@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
   `status` VARCHAR(50) DEFAULT 'waiting',
+  `performed_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
