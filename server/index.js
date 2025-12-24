@@ -70,12 +70,26 @@ const normalizePhone = (value) => {
   return `+62${digits}`;
 };
 
+const normalizeUsername = (value) => {
+  if (value === undefined || value === null) return value;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+};
+
 const sanitizeUserPayload = (payload, allowedFields) => {
   const clean = {};
 
   allowedFields.forEach((field) => {
     if (payload[field] !== undefined) {
-      clean[field] = field === 'phone' ? normalizePhone(payload[field]) : payload[field];
+      if (field === 'phone') {
+        clean[field] = normalizePhone(payload[field]);
+        return;
+      }
+      if (field === 'username') {
+        clean[field] = normalizeUsername(payload[field]);
+        return;
+      }
+      clean[field] = payload[field];
     }
   });
 
@@ -92,6 +106,8 @@ const hashPassword = async (password) => {
   const derivedKey = await scryptAsync(password, salt, 64);
   return `${PASSWORD_HASH_PREFIX}${salt}:${derivedKey.toString('hex')}`;
 };
+
+const generateDefaultPassword = () => crypto.randomBytes(6).toString('base64url');
 
 const verifyPassword = async (password, storedHash) => {
   if (!storedHash) return false;
@@ -152,16 +168,17 @@ const attachSuppliersToGoods = async (goodsRows) => {
 };
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, email, password } = req.body;
+  const loginIdentifier = identifier || email;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+  if (!loginIdentifier || !password) {
+    return res.status(400).json({ error: 'Email/username and password are required' });
   }
 
   try {
     const rows = await query(
-      'SELECT id, email, full_name, role, password, phone, photo_url FROM users WHERE email = ? LIMIT 1',
-      [email]
+      'SELECT id, email, full_name, role, password, phone, photo_url, username, password_reset_required FROM users WHERE email = ? OR username = ? LIMIT 1',
+      [loginIdentifier, normalizeUsername(loginIdentifier)]
     );
 
     if (rows.length === 0) {
@@ -185,6 +202,7 @@ app.post('/api/auth/login', async (req, res) => {
     const profile = {
       id: rows[0].id,
       email: rows[0].email,
+      username: rows[0].username,
       full_name: rows[0].full_name,
       role: rows[0].role,
       phone: rows[0].phone,
@@ -198,8 +216,8 @@ app.post('/api/auth/login', async (req, res) => {
       action: 'login',
       description: 'User logged in',
     });
-
-    return res.json({ profile });
+    const requiresSetup = !rows[0].username || rows[0].password_reset_required === 1;
+    return res.json({ profile, requires_setup: requiresSetup });
   } catch (error) {
     console.error('Login error', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -222,6 +240,121 @@ app.post('/api/auth/logout', async (req, res) => {
   }
 
   return res.json({ success: true });
+});
+
+app.post('/api/auth/complete-setup', async (req, res) => {
+  const { user_id: userId, current_password: currentPassword, username, password } = req.body || {};
+
+  if (!userId || !currentPassword || !username || !password) {
+    return res.status(400).json({ error: 'User, current password, username, and new password are required' });
+  }
+
+  try {
+    const normalizedUsername = normalizeUsername(username);
+    if (!normalizedUsername) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    const [user] = await query('SELECT id, password, username FROM users WHERE id = ? LIMIT 1', [userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const passwordValid = await verifyPassword(currentPassword, user.password);
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const [existingUsername] = await query(
+      'SELECT id FROM users WHERE username = ? AND id <> ? LIMIT 1',
+      [normalizedUsername, userId]
+    );
+    if (existingUsername) {
+      return res.status(409).json({ error: 'Username is already taken' });
+    }
+
+    const hashedPassword = await hashPassword(password);
+    await query(
+      'UPDATE users SET username = ?, password = ?, password_reset_required = 0 WHERE id = ?',
+      [normalizedUsername, hashedPassword, userId]
+    );
+
+    await logActivity({
+      performedBy: userId,
+      entityType: 'auth',
+      entityId: userId,
+      action: 'complete_setup',
+      description: 'User completed initial setup',
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Complete setup error', error);
+    return res.status(500).json({ error: 'Failed to complete setup' });
+  }
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  const { credential } = req.body || {};
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+
+  if (!credential) {
+    return res.status(400).json({ error: 'Google credential is required' });
+  }
+  if (!googleClientId) {
+    return res.status(500).json({ error: 'Google client ID is not configured' });
+  }
+
+  try {
+    const tokenInfoResponse = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+    );
+    const tokenInfo = await tokenInfoResponse.json();
+    if (!tokenInfoResponse.ok) {
+      return res.status(401).json({ error: tokenInfo?.error_description || 'Invalid Google token' });
+    }
+    if (tokenInfo.aud !== googleClientId) {
+      return res.status(401).json({ error: 'Invalid Google token audience' });
+    }
+
+    const email = tokenInfo.email?.toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: 'Google account has no email' });
+    }
+
+    const rows = await query(
+      'SELECT id, email, full_name, role, phone, photo_url, username, password_reset_required FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+
+    if (!rows.length) {
+      return res.status(401).json({ error: 'No user found for this Google account' });
+    }
+
+    const profile = {
+      id: rows[0].id,
+      email: rows[0].email,
+      username: rows[0].username,
+      full_name: rows[0].full_name,
+      role: rows[0].role,
+      phone: rows[0].phone,
+      photo_url: rows[0].photo_url,
+    };
+
+    await logActivity({
+      performedBy: rows[0].id,
+      entityType: 'auth',
+      entityId: rows[0].id,
+      action: 'login_google',
+      description: 'User logged in with Google',
+    });
+
+    const requiresSetup = !rows[0].username || rows[0].password_reset_required === 1;
+    return res.json({ profile, requires_setup: requiresSetup });
+  } catch (error) {
+    console.error('Google login error', error);
+    return res.status(500).json({ error: 'Failed to login with Google' });
+  }
 });
 
 const createSmtpClient = async ({ host, port, secure, socket: existingSocket, expectGreeting = true }) => {
@@ -398,6 +531,7 @@ const formatStatusLabel = (status) => {
     negotiation: 'Negotiation',
     renegotiation: 'Renegotiation',
     rejected: 'Rejected',
+    process: 'Processed',
     approved: 'Approved',
   };
   return map[status] || status || '-';
@@ -860,11 +994,17 @@ app.post('/api/:table', async (req, res) => {
         return res.status(403).json({ error: 'Superadmin account cannot be created' });
       }
 
-      const cleanPayload = sanitizeUserPayload(payload, ['full_name', 'email', 'password', 'role', 'phone', 'photo_url']);
-      if (cleanPayload.password) {
-        cleanPayload.password = await hashPassword(cleanPayload.password);
-      }
-      const result = await query('INSERT INTO ?? SET ?', [table, cleanPayload]);
+      const cleanPayload = sanitizeUserPayload(payload, ['full_name', 'email', 'role', 'phone', 'photo_url']);
+      const defaultPassword = generateDefaultPassword();
+      const hashedPassword = await hashPassword(defaultPassword);
+      const userPayload = {
+        ...cleanPayload,
+        role: cleanPayload.role || 'staff',
+        username: null,
+        password: hashedPassword,
+        password_reset_required: 1,
+      };
+      const result = await query('INSERT INTO ?? SET ?', [table, userPayload]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
 
       if (payload.performed_by && ['superadmin', 'admin', 'manager'].includes(payload.creator_role)) {
@@ -875,6 +1015,25 @@ app.post('/api/:table', async (req, res) => {
           action: 'create',
           description: `Created user ${cleanPayload.full_name}`,
         });
+      }
+
+      if (created?.email) {
+        const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
+        try {
+          await sendSmtpMail({
+            to: created.email,
+            subject: 'Akun Baru RGI NexaProc',
+            html: `
+              <p>Halo ${created.full_name || 'User'},</p>
+              <p>Akun RGI NexaProc Anda sudah dibuat.</p>
+              <p><strong>Email:</strong> ${created.email}<br />
+              <strong>Password default:</strong> ${defaultPassword}</p>
+              <p>Silakan login di <a href="${appBaseUrl}">${appBaseUrl}</a> dan lengkapi username serta password baru Anda.</p>
+            `,
+          });
+        } catch (error) {
+          console.error('New user email error', error);
+        }
       }
 
       return res.status(201).json(created);
@@ -906,6 +1065,10 @@ app.put('/api/:table/:id', async (req, res) => {
 
       if (!existing) {
         return res.status(404).json({ error: 'Record not found' });
+      }
+
+      if (existing.status === 'process') {
+        return res.status(403).json({ error: 'Processed quotations cannot be edited' });
       }
 
       if (existing.status === 'rejected') {
@@ -960,6 +1123,7 @@ app.put('/api/:table/:id', async (req, res) => {
         isStatusChange && requestedStatus === 'waiting';
       const shouldNotifyRenegotiationStatusChange =
         isStatusChange && requestedStatus === 'renegotiation';
+      const shouldNotifyProcess = isStatusChange && requestedStatus === 'process';
       if (!isStatusChange && existing.status === 'negotiation' && isOtherUpdate) {
         nextUpdates.status = 'renegotiation';
         shouldNotifyRenegotiation = true;
@@ -1029,6 +1193,20 @@ app.put('/api/:table/:id', async (req, res) => {
           goods: cleanedGoods,
           statusLabel: statusForNotification,
           recipients: requesterRecipients,
+          requester,
+          rfq,
+        });
+      }
+
+      if (shouldNotifyProcess) {
+        const processRecipients = Array.from(
+          new Set([...roleRecipients, ...(requester?.email ? [requester.email] : [])])
+        );
+        await sendQuotationNotification({
+          quotation: updated,
+          goods: cleanedGoods,
+          statusLabel: 'process',
+          recipients: processRecipients,
           requester,
           rfq,
         });
@@ -1136,11 +1314,28 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       if (existing.role === 'superadmin') {
-        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'photo_url']);
+        const updates = sanitizeUserPayload(req.body || {}, [
+          'full_name',
+          'email',
+          'password',
+          'phone',
+          'photo_url',
+          'username',
+        ]);
         updates.role = existing.role;
 
         if (Object.keys(updates).length === 1 && updates.role) {
           return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        if (updates.username && updates.username !== existing.username) {
+          const [usernameConflict] = await query(
+            'SELECT id FROM users WHERE username = ? AND id <> ? LIMIT 1',
+            [updates.username, id]
+          );
+          if (usernameConflict) {
+            return res.status(409).json({ error: 'Username is already taken' });
+          }
         }
 
         if (updates.password) {
@@ -1149,7 +1344,15 @@ app.put('/api/:table/:id', async (req, res) => {
 
         await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
       } else {
-        const updates = sanitizeUserPayload(req.body || {}, ['full_name', 'email', 'password', 'phone', 'role', 'photo_url']);
+        const updates = sanitizeUserPayload(req.body || {}, [
+          'full_name',
+          'email',
+          'password',
+          'phone',
+          'role',
+          'photo_url',
+          'username',
+        ]);
 
         if (preventSuperadminCreation(updates.role)) {
           return res.status(403).json({ error: 'Cannot promote user to superadmin' });
@@ -1157,6 +1360,16 @@ app.put('/api/:table/:id', async (req, res) => {
 
         if (Object.keys(updates).length === 0) {
           return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        if (updates.username && updates.username !== existing.username) {
+          const [usernameConflict] = await query(
+            'SELECT id FROM users WHERE username = ? AND id <> ? LIMIT 1',
+            [updates.username, id]
+          );
+          if (usernameConflict) {
+            return res.status(409).json({ error: 'Username is already taken' });
+          }
         }
 
         if (updates.password) {

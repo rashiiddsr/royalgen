@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 interface ManagedUser {
   id: number | string;
   full_name: string;
+  username?: string | null;
   email: string;
   password?: string;
   role: 'superadmin' | 'admin' | 'manager' | 'staff';
@@ -16,6 +17,7 @@ interface ManagedUser {
 
 const DEFAULT_FORM: Partial<ManagedUser> = {
   full_name: '',
+  username: '',
   email: '',
   password: '',
   role: 'staff',
@@ -57,7 +59,12 @@ export default function Users() {
   const openModal = (user?: ManagedUser) => {
     if (user) {
       setEditingUser(user);
-      setFormData({ ...user, password: '', phone: normalizePhoneInput(user.phone || '') });
+      setFormData({
+        ...user,
+        password: '',
+        phone: normalizePhoneInput(user.phone || ''),
+        username: user.username || '',
+      });
     } else {
       setEditingUser(null);
       setFormData(DEFAULT_FORM);
@@ -179,6 +186,9 @@ export default function Users() {
                           )}
                         </div>
                         <div className="font-semibold text-gray-900">{user.full_name}</div>
+                        {user.username && (
+                          <div className="text-xs text-gray-500">@{user.username}</div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-700">{user.email}</td>
@@ -244,35 +254,42 @@ export default function Users() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-                <input
-                  type="password"
-                  value={formData.password || ''}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder={editingUser ? 'Leave blank to keep current password' : ''}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required={!editingUser}
-                />
-              </div>
+              {!editingUser && (
+                <p className="text-sm text-gray-500">
+                  Password default akan dikirim ke email user untuk setup awal.
+                </p>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Role</label>
-                  {editingUser?.role === 'superadmin' ? (
-                    <div className="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 capitalize">Superadmin</div>
-                  ) : (
-                    <select
-                      value={formData.role || 'staff'}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as ManagedUser['role'] })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent capitalize"
-                    >
-                      <option value="manager">Manager</option>
-                      <option value="admin">Admin</option>
-                      <option value="staff">Staff</option>
-                    </select>
-                  )}
-                </div>
+                {editingUser && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Username</label>
+                    <input
+                      type="text"
+                      value={formData.username || ''}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
+                {editingUser && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Role</label>
+                    {editingUser?.role === 'superadmin' ? (
+                      <div className="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 capitalize">Superadmin</div>
+                    ) : (
+                      <select
+                        value={formData.role || 'staff'}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value as ManagedUser['role'] })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent capitalize"
+                      >
+                        <option value="manager">Manager</option>
+                        <option value="admin">Admin</option>
+                        <option value="staff">Staff</option>
+                      </select>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
                   <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
@@ -289,6 +306,19 @@ export default function Users() {
                   <p className="text-xs text-gray-500 mt-1">Number will be saved with the +62 prefix.</p>
                 </div>
               </div>
+
+              {editingUser && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                  <input
+                    type="password"
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Leave blank to keep current password"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              )}
 
               <div className="flex justify-end space-x-3 pt-2">
                 <button

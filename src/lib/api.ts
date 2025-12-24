@@ -15,6 +15,7 @@ export interface ActivityLog {
 export interface UserProfile {
   id?: number | string;
   email: string;
+  username?: string | null;
   full_name: string;
   role: UserRole;
   phone?: string | null;
