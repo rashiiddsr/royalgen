@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
   `status` VARCHAR(50) DEFAULT 'waiting',
+  `negotiation_round` INT DEFAULT 0,
   `performed_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
