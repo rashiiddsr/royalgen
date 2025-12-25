@@ -82,6 +82,25 @@ const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') 
     .filter(Boolean);
 };
 
+const formatDateOnly = (value) => {
+  if (!value) return value;
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return value;
+};
+
 const normalizePhone = (value) => {
   if (value === undefined || value === null) return value;
   const digits = String(value).replace(/\D/g, '');
@@ -777,6 +796,15 @@ app.get('/api/:table', async (req, res) => {
       return res.json(rows);
     }
 
+    if (table === 'sales_orders') {
+      const rows = await query('SELECT * FROM `sales_orders` ORDER BY created_at DESC');
+      const formatted = rows.map((row) => ({
+        ...row,
+        order_date: formatDateOnly(row.order_date),
+      }));
+      return res.json(formatted);
+    }
+
     const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
 
     return res.json(rows);
@@ -830,6 +858,14 @@ app.get('/api/:table/:id', async (req, res) => {
       }
 
       return res.json({ ...rows[0], goods });
+    }
+
+    if (table === 'sales_orders') {
+      const rows = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [id]);
+      if (!rows.length) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      return res.json({ ...rows[0], order_date: formatDateOnly(rows[0].order_date) });
     }
 
     const rows = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
@@ -995,6 +1031,9 @@ app.post('/api/:table', async (req, res) => {
 
     if (table === 'sales_orders') {
       const { goods = [], documents = [], status, ...orderPayload } = payload;
+      if (orderPayload.order_date) {
+        orderPayload.order_date = formatDateOnly(orderPayload.order_date);
+      }
       const cleanedGoods = Array.isArray(goods) ? goods : [];
       const cleanedDocuments = normalizeDocumentsPayload(documents, 'sales-order');
       const result = await query('INSERT INTO ?? SET ?', [
@@ -1006,8 +1045,13 @@ app.post('/api/:table', async (req, res) => {
           status: status || 'ongoing',
         },
       ]);
-      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
-      return res.status(201).json({ ...created, goods: cleanedGoods, documents: cleanedDocuments });
+      const [created] = await query('SELECT * FROM `sales_orders` WHERE id = ?', [result.insertId]);
+      return res.status(201).json({
+        ...created,
+        order_date: formatDateOnly(created?.order_date),
+        goods: cleanedGoods,
+        documents: cleanedDocuments,
+      });
     }
 
     if (table === 'suppliers') {
@@ -1100,6 +1144,9 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       const nextUpdates = { ...orderUpdates };
+      if (nextUpdates.order_date) {
+        nextUpdates.order_date = formatDateOnly(nextUpdates.order_date);
+      }
       let cleanedGoods;
       let cleanedDocuments;
 
@@ -1114,7 +1161,7 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       await query('UPDATE ?? SET ? WHERE id = ?', [table, nextUpdates, id]);
-      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+      const [updated] = await query('SELECT * FROM `sales_orders` WHERE id = ?', [id]);
 
       let responseGoods = cleanedGoods;
       if (!responseGoods) {
@@ -1134,7 +1181,12 @@ app.put('/api/:table/:id', async (req, res) => {
         }
       }
 
-      return res.json({ ...updated, goods: responseGoods, documents: responseDocuments });
+      return res.json({
+        ...updated,
+        order_date: formatDateOnly(updated?.order_date),
+        goods: responseGoods,
+        documents: responseDocuments,
+      });
     }
 
     if (table === 'quotations') {

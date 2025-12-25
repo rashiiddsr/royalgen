@@ -137,7 +137,12 @@ export default function Orders() {
   };
 
   const resolveDocumentUrl = (doc: OrderDocument) => {
-    if (doc.url) return `${apiRoot}${doc.url}`;
+    if (doc.url) {
+      if (doc.url.startsWith('http') || doc.url.startsWith('data:')) {
+        return doc.url;
+      }
+      return `${apiRoot}${doc.url}`;
+    }
     return doc.data;
   };
 
