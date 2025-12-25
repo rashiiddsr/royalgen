@@ -63,7 +63,6 @@ const EMPTY_FORM = {
   pic_phone: '',
   delivery_time: '',
   payment_time: '',
-  status: 'ongoing',
 };
 
 export default function Orders() {
@@ -110,6 +109,24 @@ export default function Orders() {
     return [];
   };
 
+  const normalizePoNumber = (value?: string | null) => {
+    if (!value) return '';
+    return value.split('\n')[0].trim();
+  };
+
+  const formatDateInput = (value?: string | null) => {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toISOString().split('T')[0];
+  };
+
+  const formatDateDisplay = (value?: string | null) => {
+    if (!value) return '-';
+    return formatDateInput(value);
+  };
+
   const fetchOrders = async () => {
     try {
       const [orderData, quotationData] = await Promise.all([
@@ -123,7 +140,7 @@ export default function Orders() {
           ...order,
           goods: parseGoods(order.goods),
           documents: parseDocuments(order.documents),
-          po_number: order.po_number || order.order_number,
+          po_number: normalizePoNumber(order.po_number || order.order_number),
           quotations: quotationMap.get(order.quotation_id),
         }))
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -155,8 +172,8 @@ export default function Orders() {
     setEditingOrder(order);
     setFormData({
       project_name: order.project_name || '',
-      po_number: order.po_number || order.order_number || '',
-      order_date: order.order_date || '',
+      po_number: normalizePoNumber(order.po_number || order.order_number || ''),
+      order_date: formatDateInput(order.order_date),
       quotation_id: order.quotation_id || '',
       company_name: order.company_name || '',
       pic_name: order.pic_name || '',
@@ -164,7 +181,6 @@ export default function Orders() {
       pic_phone: order.pic_phone || '',
       delivery_time: order.delivery_time || '',
       payment_time: order.payment_time || '',
-      status: order.status || 'ongoing',
     });
     setGoodsRows(parseGoods(order.goods));
     setDocuments(parseDocuments(order.documents));
@@ -310,8 +326,15 @@ export default function Orders() {
     });
   }, [orders, searchTerm]);
 
+  const usedQuotationIds = useMemo(
+    () => new Set(orders.map((order) => String(order.quotation_id))),
+    [orders]
+  );
   const availableQuotations = quotations.filter(
-    (quotation) => quotation.status === 'process' || quotation.id === formData.quotation_id
+    (quotation) =>
+      quotation.status === 'process' &&
+      (!usedQuotationIds.has(String(quotation.id)) ||
+        String(quotation.id) === String(formData.quotation_id))
   );
 
   if (loading) {
@@ -392,7 +415,9 @@ export default function Orders() {
                       <div className="text-sm font-medium text-gray-900">
                         {order.po_number || order.order_number}
                       </div>
-                      <div className="text-xs text-gray-500">{order.order_date || '-'}</div>
+                      <div className="text-xs text-gray-500">
+                        {formatDateDisplay(order.order_date)}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.project_name || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">
@@ -408,7 +433,9 @@ export default function Orders() {
                         {order.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{order.order_date || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {formatDateDisplay(order.order_date)}
+                    </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => setDetailOrder(order)}
@@ -574,15 +601,6 @@ export default function Orders() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <input
-                    type="text"
-                    value={formData.status || 'ongoing'}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                  />
-                </div>
               </div>
 
               <div>
@@ -712,7 +730,9 @@ export default function Orders() {
                 </div>
                 <div>
                   <p className="text-gray-500">Date</p>
-                  <p className="font-medium text-gray-900">{detailOrder.order_date || '-'}</p>
+                  <p className="font-medium text-gray-900">
+                    {formatDateDisplay(detailOrder.order_date)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-500">Company</p>
@@ -795,7 +815,20 @@ export default function Orders() {
                 ) : (
                   <ul className="list-disc list-inside text-gray-700 space-y-1">
                     {parseDocuments(detailOrder.documents).map((doc, index) => (
-                      <li key={`${doc.name}-${index}`}>{doc.name}</li>
+                      <li key={`${doc.name}-${index}`}>
+                        {doc.data ? (
+                          <a
+                            href={doc.data}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:text-blue-700 underline"
+                          >
+                            {doc.name}
+                          </a>
+                        ) : (
+                          doc.name
+                        )}
+                      </li>
                     ))}
                   </ul>
                 )}
