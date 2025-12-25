@@ -359,7 +359,7 @@ export default function Suppliers() {
                       if (contactError) setContactError('');
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="email@company.com atau -"
+                    placeholder="email@company.com or -"
                     required
                   />
                 </div>

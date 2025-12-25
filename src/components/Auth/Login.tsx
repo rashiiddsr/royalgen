@@ -323,7 +323,7 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="group">
                 <label htmlFor="identifier" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email atau Username
+                  Email or Username
                 </label>
                 <input
                   id="identifier"
@@ -331,7 +331,7 @@ export default function Login() {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
-                  placeholder="email@company.com atau username"
+                  placeholder="email@company.com or username"
                   required
                 />
               </div>
