@@ -51,6 +51,7 @@ interface GoodOption {
   name: string;
   description: string;
   unit: string;
+  minimum_order_quantity?: number;
   status: string;
 }
 
@@ -243,12 +244,14 @@ export default function Quotations() {
     setGoodsRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
+        const minimumQty = Number(selectedGood?.minimum_order_quantity) || 0;
         return {
           ...row,
           good_id: goodId,
           name: selectedGood?.name || '',
           description: selectedGood?.description || '',
           unit: selectedGood?.unit || '',
+          qty: minimumQty > 0 ? minimumQty : row.qty,
         };
       })
     );
@@ -274,6 +277,16 @@ export default function Quotations() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    const invalidMoq = goodsRows.find((row) => {
+      const selectedGood = goods.find((good) => String(good.id) === String(row.good_id));
+      const minimumQty = Number(selectedGood?.minimum_order_quantity) || 0;
+      return minimumQty > 0 && Number(row.qty) < minimumQty;
+    });
+    if (invalidMoq) {
+      alert('Quantity must meet the minimum order quantity (MOQ) for the selected goods.');
+      return;
+    }
 
     const totalAmount = goodsRows.reduce(
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
@@ -437,7 +450,7 @@ export default function Quotations() {
           placeholder="Search quotations by number, RFQ, company, goods, or creator..."
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          className="w-full md:max-w-lg px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
 
@@ -740,7 +753,12 @@ export default function Quotations() {
                           <td className="px-3 py-2">
                             <input
                               type="number"
-                              min="0"
+                              min={
+                                Number(
+                                  goods.find((good) => String(good.id) === String(row.good_id))
+                                    ?.minimum_order_quantity
+                                ) || 0
+                              }
                               value={row.qty}
                               onChange={(event) =>
                                 handleGoodsRowChange(index, 'qty', event.target.value)

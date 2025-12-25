@@ -27,6 +27,7 @@ export default function Suppliers() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
+  const [contactError, setContactError] = useState('');
   const [formData, setFormData] = useState<SupplierFormData>({
     name: '',
     contact_person: '',
@@ -40,6 +41,19 @@ export default function Suppliers() {
     status: 'active',
   });
   const { profile } = useAuth();
+
+  const normalizePhoneInput = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === '-') return '-';
+    const digits = trimmed.replace(/\D/g, '');
+    if (!digits || digits === '62') return '';
+    if (digits.startsWith('62')) return `+${digits}`;
+    if (digits.startsWith('0')) return `+62${digits.slice(1)}`;
+    return `+62${digits}`;
+  };
+
+  const isValidEmail = (value: string) => value === '-' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const isValidPhone = (value: string) => value === '-' || /^\+62\d{6,}$/.test(value);
 
   const canManageStatus =
     !!editingSupplier && ['admin', 'superadmin', 'manager'].includes(profile?.role ?? '');
@@ -66,7 +80,35 @@ export default function Suppliers() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload: SupplierFormData = { ...formData, performed_by: profile?.id };
+      const emailValue = formData.email.trim();
+      const phoneValue = normalizePhoneInput(formData.phone);
+      if (emailValue === '-' && phoneValue === '-') {
+        setContactError('Provide at least one contact (email or phone).');
+        return;
+      }
+      if (!emailValue) {
+        setContactError('Email is required. Use "-" if unavailable.');
+        return;
+      }
+      if (!phoneValue) {
+        setContactError('Phone is required. Use "-" if unavailable.');
+        return;
+      }
+      if (!isValidEmail(emailValue)) {
+        setContactError('Invalid email format or use "-" if unavailable.');
+        return;
+      }
+      if (!isValidPhone(phoneValue)) {
+        setContactError('Phone must use +62 format or "-" if unavailable.');
+        return;
+      }
+
+      const payload: SupplierFormData = {
+        ...formData,
+        email: emailValue,
+        phone: phoneValue,
+        performed_by: profile?.id,
+      };
 
       if (editingSupplier) {
         await updateRecord<Supplier>('suppliers', editingSupplier.id, payload as Supplier);
@@ -103,7 +145,7 @@ export default function Suppliers() {
         name: supplier.name,
         contact_person: supplier.contact_person,
         email: supplier.email,
-        phone: supplier.phone,
+        phone: supplier.phone === '-' ? '-' : normalizePhoneInput(supplier.phone),
         address: supplier.address,
         city: supplier.city,
         country: supplier.country,
@@ -126,12 +168,14 @@ export default function Suppliers() {
         status: 'active',
       });
     }
+    setContactError('');
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditingSupplier(null);
+    setContactError('');
   };
 
   const filteredSuppliers = suppliers.filter(supplier =>
@@ -306,12 +350,17 @@ export default function Suppliers() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                   <input
-                    type="email"
+                    type="text"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      if (contactError) setContactError('');
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="email@company.com atau -"
+                    required
                   />
                 </div>
 
@@ -320,11 +369,19 @@ export default function Suppliers() {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, phone: value === '-' ? '-' : normalizePhoneInput(value) });
+                      if (contactError) setContactError('');
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="+62xxxxxxxxxx atau -"
                     required
                   />
                 </div>
+                {contactError && (
+                  <div className="md:col-span-2 text-sm text-red-600">{contactError}</div>
+                )}
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>

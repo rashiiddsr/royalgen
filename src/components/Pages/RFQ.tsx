@@ -67,7 +67,19 @@ export default function RFQ() {
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [goodsError, setGoodsError] = useState('');
   const [attachmentError, setAttachmentError] = useState('');
+  const [contactError, setContactError] = useState('');
   const editableRoles = ['superadmin', 'admin', 'manager'];
+  const normalizePhoneInput = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === '-') return '-';
+    const digits = trimmed.replace(/\D/g, '');
+    if (!digits || digits === '62') return '';
+    if (digits.startsWith('62')) return `+${digits}`;
+    if (digits.startsWith('0')) return `+62${digits.slice(1)}`;
+    return `+62${digits}`;
+  };
+  const isValidEmail = (value: string) => value === '-' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const isValidPhone = (value: string) => value === '-' || /^\+62\d{6,}$/.test(value);
   const canEditRfq = (rfq: RFQType) => {
     if (!profile) return false;
     if (rfq.status === 'process') return false;
@@ -146,6 +158,7 @@ export default function RFQ() {
     setEditingRfq(null);
     setGoodsError('');
     setAttachmentError('');
+    setContactError('');
   };
 
   const openModal = (rfq?: RFQType) => {
@@ -158,7 +171,7 @@ export default function RFQ() {
         project_name: rfq.project_name,
         pic_name: rfq.pic_name,
         pic_email: rfq.pic_email,
-        pic_phone: rfq.pic_phone,
+        pic_phone: rfq.pic_phone === '-' ? '-' : normalizePhoneInput(rfq.pic_phone),
       });
       setSelectedGoods(
         rfq.goods
@@ -171,6 +184,7 @@ export default function RFQ() {
       resetForm();
     }
     setGoodsSearch('');
+    setContactError('');
     setShowModal(true);
   };
 
@@ -182,6 +196,29 @@ export default function RFQ() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      const emailValue = formData.pic_email.trim();
+      const phoneValue = normalizePhoneInput(formData.pic_phone);
+      if (emailValue === '-' && phoneValue === '-') {
+        setContactError('Provide at least one PIC contact (email or phone).');
+        return;
+      }
+      if (!emailValue) {
+        setContactError('PIC email is required. Use "-" if unavailable.');
+        return;
+      }
+      if (!phoneValue) {
+        setContactError('PIC phone is required. Use "-" if unavailable.');
+        return;
+      }
+      if (!isValidEmail(emailValue)) {
+        setContactError('Invalid PIC email format or use "-" if unavailable.');
+        return;
+      }
+      if (!isValidPhone(phoneValue)) {
+        setContactError('PIC phone must use +62 format or "-" if unavailable.');
+        return;
+      }
+
       const hasSelectedGoods = selectedGoods.length > 0;
       const hasOtherGoods = otherGoods.some((name) => name.trim().length > 0);
       if (!hasSelectedGoods && !hasOtherGoods) {
@@ -202,6 +239,8 @@ export default function RFQ() {
 
       const payload = {
         ...formData,
+        pic_email: emailValue,
+        pic_phone: phoneValue,
         goods: goodsPayload,
         attachment_data: attachmentData,
         performed_by: profile?.id,
@@ -248,6 +287,7 @@ export default function RFQ() {
   const filteredGoods = goods.filter((good) =>
     good.name.toLowerCase().includes(goodsSearch.toLowerCase())
   );
+  const shouldShowGoodsList = goodsSearch.trim().length > 0;
 
   if (loading) {
     return (
@@ -294,6 +334,7 @@ export default function RFQ() {
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Company</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Goods</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Requested By</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -301,7 +342,7 @@ export default function RFQ() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {filteredRfqs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
                     <div className="flex flex-col items-center">
                       <FileText className="h-10 w-10 text-gray-300 mb-3" />
                       <p>No RFQs found. Create your first RFQ to get started.</p>
@@ -321,8 +362,8 @@ export default function RFQ() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="font-medium">{rfq.requester_name || 'Unknown user'}</div>
-                      <div className="text-xs text-gray-500 mt-1">Status: {rfq.status}</div>
                     </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{rfq.status}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {new Date(rfq.created_at).toLocaleString()}
                     </td>
@@ -426,10 +467,14 @@ export default function RFQ() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Email *</label>
                   <input
-                    type="email"
+                    type="text"
                     value={formData.pic_email}
-                    onChange={(e) => setFormData({ ...formData, pic_email: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, pic_email: e.target.value });
+                      if (contactError) setContactError('');
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="email@company.com atau -"
                     required
                   />
                 </div>
@@ -438,11 +483,17 @@ export default function RFQ() {
                   <input
                     type="tel"
                     value={formData.pic_phone}
-                    onChange={(e) => setFormData({ ...formData, pic_phone: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, pic_phone: value === '-' ? '-' : normalizePhoneInput(value) });
+                      if (contactError) setContactError('');
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="+62xxxxxxxxxx atau -"
                     required
                   />
                 </div>
+                {contactError && <p className="text-sm text-red-600 md:col-span-2">{contactError}</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -488,8 +539,12 @@ export default function RFQ() {
                     </div>
 
                     <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
-                      {filteredGoods.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-600">{goods.length === 0 ? 'No goods available.' : 'No goods match your search.'}</div>
+                      {!shouldShowGoodsList ? (
+                        <div className="p-3 text-sm text-gray-600">Type to search goods.</div>
+                      ) : filteredGoods.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-600">
+                          {goods.length === 0 ? 'No goods available.' : 'No goods match your search.'}
+                        </div>
                       ) : (
                         filteredGoods.map((good) => (
                           <button
