@@ -4,7 +4,8 @@ import { Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-
 
 interface OrderDocument {
   name: string;
-  data: string;
+  data?: string;
+  url?: string;
 }
 
 interface OrderGood {
@@ -78,6 +79,7 @@ export default function Orders() {
   const [documentsError, setDocumentsError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const isEditing = Boolean(editingOrder);
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
   useEffect(() => {
     fetchOrders();
@@ -114,17 +116,34 @@ export default function Orders() {
     return value.split('\n')[0].trim();
   };
 
+  const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const formatDateInput = (value?: string | null) => {
     if (!value) return '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toISOString().split('T')[0];
+    return formatLocalDate(date);
   };
 
   const formatDateDisplay = (value?: string | null) => {
     if (!value) return '-';
     return formatDateInput(value);
+  };
+
+  const resolveDocumentUrl = (doc: OrderDocument) => {
+    if (doc.url) {
+      if (doc.url.startsWith('http') || doc.url.startsWith('data:')) {
+        return doc.url;
+      }
+      return `${apiRoot}${doc.url}`;
+    }
+    return doc.data;
   };
 
   const fetchOrders = async () => {
@@ -414,9 +433,6 @@ export default function Orders() {
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
                         {order.po_number || order.order_number}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatDateDisplay(order.order_date)}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.project_name || '-'}</td>
@@ -816,12 +832,13 @@ export default function Orders() {
                   <ul className="list-disc list-inside text-gray-700 space-y-1">
                     {parseDocuments(detailOrder.documents).map((doc, index) => (
                       <li key={`${doc.name}-${index}`}>
-                        {doc.data ? (
+                        {resolveDocumentUrl(doc) ? (
                           <a
-                            href={doc.data}
+                            href={resolveDocumentUrl(doc)}
                             target="_blank"
                             rel="noreferrer"
                             className="text-blue-600 hover:text-blue-700 underline"
+                            download={doc.name}
                           >
                             {doc.name}
                           </a>
