@@ -239,15 +239,29 @@ export default function Quotations() {
     }));
   };
 
-  const handleGoodSelect = (index: number, goodId: string) => {
-    const selectedGood = goods.find((good) => String(good.id) === String(goodId));
+  const handleGoodSelect = (index: number, goodInput: string) => {
+    const normalizedInput = goodInput.trim().toLowerCase();
+    const selectedGood = goods.find(
+      (good) =>
+        String(good.id) === goodInput ||
+        good.name.trim().toLowerCase() === normalizedInput
+    );
     setGoodsRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
+        if (!selectedGood) {
+          return {
+            ...row,
+            good_id: '',
+            name: goodInput,
+            description: '',
+            unit: '',
+          };
+        }
         const minimumQty = Number(selectedGood?.minimum_order_quantity) || 0;
         return {
           ...row,
-          good_id: goodId,
+          good_id: String(selectedGood.id),
           name: selectedGood?.name || '',
           description: selectedGood?.description || '',
           unit: selectedGood?.unit || '',
@@ -277,6 +291,12 @@ export default function Quotations() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    const invalidGoods = goodsRows.find((row) => !row.good_id);
+    if (invalidGoods) {
+      alert('Please select goods from the list.');
+      return;
+    }
 
     const invalidMoq = goodsRows.find((row) => {
       const selectedGood = goods.find((good) => String(good.id) === String(row.good_id));
@@ -594,7 +614,9 @@ export default function Quotations() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quotation Number</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quotation Number <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.quotation_number}
@@ -603,7 +625,9 @@ export default function Quotations() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">RFQ Number</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    RFQ Number <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={formData.rfq_id}
                     onChange={(event) => handleRfqChange(event.target.value)}
@@ -664,7 +688,9 @@ export default function Quotations() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Time (days)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Delivery Time (days) <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -677,7 +703,9 @@ export default function Quotations() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Time (days)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Payment Time (days) <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -706,11 +734,17 @@ export default function Quotations() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-600">
                       <tr>
-                        <th className="px-3 py-2 text-left">Goods</th>
+                        <th className="px-3 py-2 text-left">
+                          Goods <span className="text-red-500">*</span>
+                        </th>
                         <th className="px-3 py-2 text-left">Description</th>
                         <th className="px-3 py-2 text-left">Unit</th>
-                        <th className="px-3 py-2 text-left">Qty</th>
-                        <th className="px-3 py-2 text-left">Price</th>
+                        <th className="px-3 py-2 text-left">
+                          Qty <span className="text-red-500">*</span>
+                        </th>
+                        <th className="px-3 py-2 text-left">
+                          Price <span className="text-red-500">*</span>
+                        </th>
                         <th className="px-3 py-2 text-left">Action</th>
                       </tr>
                     </thead>
@@ -718,19 +752,20 @@ export default function Quotations() {
                       {goodsRows.map((row, index) => (
                         <tr key={`${row.good_id}-${index}`}>
                           <td className="px-3 py-2">
-                            <select
-                              value={row.good_id}
+                            <input
+                              type="search"
+                              list={`goods-options-${index}`}
+                              value={row.name}
                               onChange={(event) => handleGoodSelect(index, event.target.value)}
                               className="w-full px-2 py-1 border border-gray-300 rounded-lg"
+                              placeholder="Search goods"
                               required
-                            >
-                              <option value="">Select goods</option>
+                            />
+                            <datalist id={`goods-options-${index}`}>
                               {activeGoods.map((good) => (
-                                <option key={good.id} value={good.id}>
-                                  {good.name}
-                                </option>
+                                <option key={good.id} value={good.name} />
                               ))}
-                            </select>
+                            </datalist>
                           </td>
                           <td className="px-3 py-2">
                             <input
