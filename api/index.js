@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -8,17 +7,12 @@ import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import net from 'net';
 import tls from 'tls';
-import { query } from './db.js';
+import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const envCandidates = [path.join(__dirname, '.env'), path.join(__dirname, '../.env')];
-envCandidates.forEach((envPath) => {
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-  }
-});
+loadEnv();
 
 const app = express();
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 4000);
