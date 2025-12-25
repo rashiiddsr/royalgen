@@ -60,6 +60,28 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
 
+const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') => {
+  if (!Array.isArray(documents)) return [];
+  return documents
+    .map((doc) => {
+      if (!doc) return null;
+      if (doc.url) {
+        return { name: doc.name || 'document', url: doc.url };
+      }
+      if (doc.data && typeof doc.data === 'string') {
+        try {
+          const url = saveBase64File(doc.data, filenamePrefix);
+          return { name: doc.name || 'document', url };
+        } catch (error) {
+          console.error('Failed to save document', error);
+          return null;
+        }
+      }
+      return null;
+    })
+    .filter(Boolean);
+};
+
 const normalizePhone = (value) => {
   if (value === undefined || value === null) return value;
   const digits = String(value).replace(/\D/g, '');
@@ -971,6 +993,23 @@ app.post('/api/:table', async (req, res) => {
       return res.status(201).json({ ...created, goods: cleanedGoods });
     }
 
+    if (table === 'sales_orders') {
+      const { goods = [], documents = [], status, ...orderPayload } = payload;
+      const cleanedGoods = Array.isArray(goods) ? goods : [];
+      const cleanedDocuments = normalizeDocumentsPayload(documents, 'sales-order');
+      const result = await query('INSERT INTO ?? SET ?', [
+        table,
+        {
+          ...orderPayload,
+          goods: JSON.stringify(cleanedGoods),
+          documents: cleanedDocuments.length ? JSON.stringify(cleanedDocuments) : null,
+          status: status || 'ongoing',
+        },
+      ]);
+      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+      return res.status(201).json({ ...created, goods: cleanedGoods, documents: cleanedDocuments });
+    }
+
     if (table === 'suppliers') {
       const { performed_by: performedBy, ...supplierPayload } = payload;
 
@@ -1052,6 +1091,52 @@ app.put('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'sales_orders') {
+      const { goods, documents, ...orderUpdates } = req.body || {};
+      const [existing] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [id]);
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+
+      const nextUpdates = { ...orderUpdates };
+      let cleanedGoods;
+      let cleanedDocuments;
+
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'goods')) {
+        cleanedGoods = Array.isArray(goods) ? goods : [];
+        nextUpdates.goods = JSON.stringify(cleanedGoods);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'documents')) {
+        cleanedDocuments = normalizeDocumentsPayload(documents, 'sales-order');
+        nextUpdates.documents = cleanedDocuments.length ? JSON.stringify(cleanedDocuments) : null;
+      }
+
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, nextUpdates, id]);
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+
+      let responseGoods = cleanedGoods;
+      if (!responseGoods) {
+        try {
+          responseGoods = JSON.parse(updated?.goods || '[]');
+        } catch {
+          responseGoods = [];
+        }
+      }
+
+      let responseDocuments = cleanedDocuments;
+      if (!responseDocuments) {
+        try {
+          responseDocuments = JSON.parse(updated?.documents || '[]');
+        } catch {
+          responseDocuments = [];
+        }
+      }
+
+      return res.json({ ...updated, goods: responseGoods, documents: responseDocuments });
+    }
+
     if (table === 'quotations') {
       const {
         goods,
