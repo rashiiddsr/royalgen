@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
-import { Eye, Pencil, Plus, Search, ShoppingCart, X } from 'lucide-react';
+import { Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 
 interface OrderDocument {
   name: string;
@@ -77,6 +77,7 @@ export default function Orders() {
   const [goodsRows, setGoodsRows] = useState<OrderGood[]>([]);
   const [documents, setDocuments] = useState<OrderDocument[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const isEditing = Boolean(editingOrder);
 
   useEffect(() => {
     fetchOrders();
@@ -219,25 +220,30 @@ export default function Orders() {
     const taxAmount = 0;
     const grandTotal = totalAmount + taxAmount;
 
-    const payload = {
+    const basePayload = {
       order_number: formData.po_number,
       po_number: formData.po_number,
       project_name: formData.project_name,
       order_date: formData.order_date,
-      quotation_id: formData.quotation_id,
-      company_name: formData.company_name,
-      pic_name: formData.pic_name,
-      pic_email: formData.pic_email,
-      pic_phone: formData.pic_phone,
-      delivery_time: formData.delivery_time,
-      payment_time: formData.payment_time,
-      goods: goodsRows,
       documents,
-      total_amount: totalAmount,
-      tax_amount: taxAmount,
-      grand_total: grandTotal,
-      status: formData.status,
-    } as OrderType;
+    };
+    const payload = editingOrder
+      ? basePayload
+      : ({
+          ...basePayload,
+          quotation_id: formData.quotation_id,
+          company_name: formData.company_name,
+          pic_name: formData.pic_name,
+          pic_email: formData.pic_email,
+          pic_phone: formData.pic_phone,
+          delivery_time: formData.delivery_time,
+          payment_time: formData.payment_time,
+          goods: goodsRows,
+          total_amount: totalAmount,
+          tax_amount: taxAmount,
+          grand_total: grandTotal,
+          status: formData.status || 'ongoing',
+        } as OrderType);
 
     try {
       if (editingOrder) {
@@ -430,43 +436,51 @@ export default function Orders() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Project Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.project_name}
                     onChange={(event) => setFormData((prev) => ({ ...prev, project_name: event.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
-                    disabled={!!editingOrder && editingOrder.status !== 'ongoing'}
+                    disabled={isEditing && editingOrder?.status !== 'ongoing'}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    PO Number <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.po_number}
                     onChange={(event) => setFormData((prev) => ({ ...prev, po_number: event.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
-                    disabled={!!editingOrder && editingOrder.status !== 'ongoing'}
+                    disabled={isEditing && editingOrder?.status !== 'ongoing'}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     value={formData.order_date}
                     onChange={(event) => setFormData((prev) => ({ ...prev, order_date: event.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
-                    disabled={!!editingOrder && editingOrder.status !== 'ongoing'}
+                    disabled={isEditing && editingOrder?.status !== 'ongoing'}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quotation Number</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quotation Number <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={formData.quotation_id}
                     onChange={(event) => handleQuotationChange(event.target.value)}
@@ -474,7 +488,7 @@ export default function Orders() {
                       editingOrder ? 'bg-gray-50 cursor-not-allowed' : ''
                     }`}
                     required
-                    disabled={!!editingOrder}
+                    disabled={isEditing}
                   >
                     <option value="">Select quotation</option>
                     {availableQuotations.map((quotation) => (
@@ -549,8 +563,10 @@ export default function Orders() {
                   <select
                     value={formData.status}
                     onChange={(event) => setFormData((prev) => ({ ...prev, status: event.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    disabled={!!editingOrder && editingOrder.status !== 'ongoing'}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+                      isEditing ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isEditing}
                   >
                     <option value="ongoing">ongoing</option>
                     <option value="delivery">delivery</option>
@@ -600,13 +616,20 @@ export default function Orders() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleDocumentsChange}
-                  className="block w-full text-sm"
-                  disabled={!!editingOrder && editingOrder.status !== 'ongoing'}
-                />
+                <div className="flex items-center gap-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <UploadCloud className="h-5 w-5 text-gray-500" />
+                  <div>
+                    <p className="text-sm text-gray-800">Upload supporting documents</p>
+                    <p className="text-xs text-gray-500">PDF or image, max 5MB each</p>
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleDocumentsChange}
+                      className="mt-2"
+                      disabled={isEditing && editingOrder?.status !== 'ongoing'}
+                    />
+                  </div>
+                </div>
                 {documents.length > 0 && (
                   <ul className="mt-3 space-y-1 text-sm text-gray-600">
                     {documents.map((doc, index) => (
