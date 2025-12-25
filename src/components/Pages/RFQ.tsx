@@ -80,6 +80,17 @@ export default function RFQ() {
   };
   const isValidEmail = (value: string) => value === '-' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   const isValidPhone = (value: string) => value === '-' || /^\+62\d{6,}$/.test(value);
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      draft: 'bg-amber-100 text-amber-800',
+      process: 'bg-blue-100 text-blue-800',
+      approved: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800',
+      canceled: 'bg-gray-100 text-gray-800',
+      cancelled: 'bg-gray-100 text-gray-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
   const canEditRfq = (rfq: RFQType) => {
     if (!profile) return false;
     if (rfq.status === 'process') return false;
@@ -363,7 +374,15 @@ export default function RFQ() {
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="font-medium">{rfq.requester_name || 'Unknown user'}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{rfq.status}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                          rfq.status,
+                        )}`}
+                      >
+                        {rfq.status}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {new Date(rfq.created_at).toLocaleString()}
                     </td>
@@ -480,18 +499,24 @@ export default function RFQ() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Phone *</label>
-                  <input
-                    type="tel"
-                    value={formData.pic_phone}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, pic_phone: value === '-' ? '-' : normalizePhoneInput(value) });
-                      if (contactError) setContactError('');
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="+62xxxxxxxxxx atau -"
-                    required
-                  />
+                  <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
+                    <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
+                    <input
+                      type="tel"
+                      value={formData.pic_phone === '-' ? '-' : formData.pic_phone.replace('+62', '')}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData({
+                          ...formData,
+                          pic_phone: value === '-' ? '-' : normalizePhoneInput(`+62${value}`),
+                        });
+                        if (contactError) setContactError('');
+                      }}
+                      className="w-full px-3 py-2 outline-none"
+                      placeholder="81234567890"
+                      required
+                    />
+                  </div>
                 </div>
                 {contactError && <p className="text-sm text-red-600 md:col-span-2">{contactError}</p>}
               </div>
@@ -681,7 +706,16 @@ export default function RFQ() {
                 <p><span className="text-gray-500">Email:</span> {detailRfq.pic_email}</p>
                 <p><span className="text-gray-500">Phone:</span> {detailRfq.pic_phone}</p>
                 <p><span className="text-gray-500">Requested By:</span> {detailRfq.requester_name || 'Unknown user'}</p>
-                <p><span className="text-gray-500">Status:</span> {detailRfq.status}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Status:</span>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                      detailRfq.status,
+                    )}`}
+                  >
+                    {detailRfq.status}
+                  </span>
+                </div>
                 <p><span className="text-gray-500">Created:</span> {new Date(detailRfq.created_at).toLocaleString()}</p>
               </div>
 

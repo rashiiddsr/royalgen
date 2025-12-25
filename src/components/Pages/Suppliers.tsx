@@ -366,18 +366,21 @@ export default function Suppliers() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, phone: value === '-' ? '-' : normalizePhoneInput(value) });
-                      if (contactError) setContactError('');
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="+62xxxxxxxxxx atau -"
-                    required
-                  />
+                  <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
+                    <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
+                    <input
+                      type="tel"
+                      value={formData.phone === '-' ? '-' : formData.phone.replace('+62', '')}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData({ ...formData, phone: value === '-' ? '-' : normalizePhoneInput(`+62${value}`) });
+                        if (contactError) setContactError('');
+                      }}
+                      className="w-full px-3 py-2 outline-none"
+                      placeholder="81234567890"
+                      required
+                    />
+                  </div>
                 </div>
                 {contactError && (
                   <div className="md:col-span-2 text-sm text-red-600">{contactError}</div>

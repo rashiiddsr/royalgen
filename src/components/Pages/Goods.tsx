@@ -51,6 +51,16 @@ export default function Goods() {
     !!editingGood && ['admin', 'manager', 'superadmin'].includes(profile?.role ?? '');
 
   const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
+  const getCategoryBadge = (category: Good['category']) => {
+    const styles: Record<Good['category'], string> = {
+      consumable: 'bg-sky-100 text-sky-800',
+      instrument: 'bg-purple-100 text-purple-800',
+      electrical: 'bg-amber-100 text-amber-800',
+      piping: 'bg-emerald-100 text-emerald-800',
+      other: 'bg-gray-100 text-gray-800',
+    };
+    return styles[category] || 'bg-gray-100 text-gray-800';
+  };
 
   useEffect(() => {
     fetchGoods();
@@ -274,7 +284,15 @@ export default function Goods() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{good.category}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full capitalize ${getCategoryBadge(
+                          good.category,
+                        )}`}
+                      >
+                        {good.category}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       Rp {good.price.toLocaleString()} / {good.unit}
                     </td>
@@ -291,7 +309,7 @@ export default function Goods() {
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           good.status === 'active'
                             ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            : 'bg-red-100 text-red-800'
                         }`}
                       >
                         {good.status}
@@ -539,7 +557,7 @@ export default function Goods() {
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           formData.status === 'active'
                             ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            : 'bg-red-100 text-red-800'
                         }`}
                       >
                         {formData.status}
@@ -597,7 +615,13 @@ export default function Goods() {
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Category</p>
-                <p className="capitalize">{detailGood.category}</p>
+                <span
+                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full capitalize ${getCategoryBadge(
+                    detailGood.category,
+                  )}`}
+                >
+                  {detailGood.category}
+                </span>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Unit</p>
@@ -623,7 +647,7 @@ export default function Goods() {
                   className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                     detailGood.status === 'active'
                       ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
+                      : 'bg-red-100 text-red-800'
                   }`}
                 >
                   {detailGood.status}
