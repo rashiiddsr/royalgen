@@ -138,6 +138,11 @@ export default function RFQ() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      event.target.value = '';
+      setAttachmentData(null);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -438,7 +443,9 @@ export default function RFQ() {
             <form className="p-6 space-y-4" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">RFQ Number</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    RFQ Number <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.rfq_number}
@@ -448,7 +455,9 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.company_name}
@@ -458,7 +467,9 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    PIC Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.pic_name}
@@ -468,7 +479,9 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Email *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    PIC Email <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.pic_email}
@@ -482,7 +495,9 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PIC Phone *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    PIC Phone <span className="text-red-500">*</span>
+                  </label>
                   <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
                     <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
                     <input
@@ -507,7 +522,9 @@ export default function RFQ() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Goods *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Goods <span className="text-red-500">*</span>
+                  </label>
                   <div className="space-y-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -619,7 +636,9 @@ export default function RFQ() {
                 <div className="flex items-center gap-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <UploadCloud className="h-5 w-5 text-gray-500" />
                   <div>
-                    <p className="text-sm text-gray-800">Upload supporting file (required)</p>
+                    <p className="text-sm text-gray-800">
+                      Upload supporting file <span className="text-red-500">*</span>
+                    </p>
                     <p className="text-xs text-gray-500">PDF or image, max 5MB</p>
                     <input
                       type="file"

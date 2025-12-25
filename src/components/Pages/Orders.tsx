@@ -76,6 +76,7 @@ export default function Orders() {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [goodsRows, setGoodsRows] = useState<OrderGood[]>([]);
   const [documents, setDocuments] = useState<OrderDocument[]>([]);
+  const [documentsError, setDocumentsError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const isEditing = Boolean(editingOrder);
 
@@ -146,11 +147,11 @@ export default function Orders() {
     setFormData(EMPTY_FORM);
     setGoodsRows([]);
     setDocuments([]);
+    setDocumentsError('');
     setShowModal(true);
   };
 
   const openEditModal = (order: OrderType) => {
-    if (order.status !== 'ongoing') return;
     setEditingOrder(order);
     setFormData({
       project_name: order.project_name || '',
@@ -167,6 +168,7 @@ export default function Orders() {
     });
     setGoodsRows(parseGoods(order.goods));
     setDocuments(parseDocuments(order.documents));
+    setDocumentsError('');
     setShowModal(true);
   };
 
@@ -205,14 +207,30 @@ export default function Orders() {
 
     try {
       const uploadedFiles = await Promise.all(filePromises);
-      setDocuments((prev) => [...prev, ...uploadedFiles]);
+      setDocuments((prev) => {
+        const filtered = prev.filter(
+          (doc) => !uploadedFiles.some((uploaded) => uploaded.name === doc.name)
+        );
+        return [...filtered, ...uploadedFiles];
+      });
+      setDocumentsError('');
     } catch (error) {
       console.error('Failed to upload documents', error);
+    } finally {
+      event.target.value = '';
     }
+  };
+
+  const removeDocument = (index: number) => {
+    setDocuments((prev) => prev.filter((_, docIndex) => docIndex !== index));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (documents.length === 0) {
+      setDocumentsError('Documents are required.');
+      return;
+    }
     const totalAmount = goodsRows.reduce(
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
@@ -242,7 +260,7 @@ export default function Orders() {
           total_amount: totalAmount,
           tax_amount: taxAmount,
           grand_total: grandTotal,
-          status: formData.status || 'ongoing',
+          status: 'ongoing',
         } as OrderType);
 
     try {
@@ -395,12 +413,7 @@ export default function Orders() {
                       </button>
                       <button
                         onClick={() => openEditModal(order)}
-                        className={`inline-flex items-center p-2 rounded-lg transition ${
-                          order.status === 'ongoing'
-                            ? 'text-gray-600 hover:bg-gray-100'
-                            : 'text-gray-300 cursor-not-allowed'
-                        }`}
-                        disabled={order.status !== 'ongoing'}
+                        className="inline-flex items-center p-2 rounded-lg transition text-gray-600 hover:bg-gray-100"
                         aria-label="Edit order"
                       >
                         <Pencil className="h-4 w-4" />
@@ -445,7 +458,6 @@ export default function Orders() {
                     onChange={(event) => setFormData((prev) => ({ ...prev, project_name: event.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
-                    disabled={isEditing && editingOrder?.status !== 'ongoing'}
                   />
                 </div>
                 <div>
@@ -458,7 +470,6 @@ export default function Orders() {
                     onChange={(event) => setFormData((prev) => ({ ...prev, po_number: event.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
-                    disabled={isEditing && editingOrder?.status !== 'ongoing'}
                   />
                 </div>
                 <div>
@@ -471,7 +482,6 @@ export default function Orders() {
                     onChange={(event) => setFormData((prev) => ({ ...prev, order_date: event.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
-                    disabled={isEditing && editingOrder?.status !== 'ongoing'}
                   />
                 </div>
               </div>
@@ -560,19 +570,12 @@ export default function Orders() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, status: event.target.value }))}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                      isEditing ? 'bg-gray-50 cursor-not-allowed' : ''
-                    }`}
-                    disabled={isEditing}
-                  >
-                    <option value="ongoing">ongoing</option>
-                    <option value="delivery">delivery</option>
-                    <option value="payment">payment</option>
-                    <option value="done">done</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={formData.status || 'ongoing'}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                  />
                 </div>
               </div>
 
@@ -615,7 +618,9 @@ export default function Orders() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Documents <span className="text-red-500">*</span>
+                </label>
                 <div className="flex items-center gap-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <UploadCloud className="h-5 w-5 text-gray-500" />
                   <div>
@@ -626,14 +631,24 @@ export default function Orders() {
                       multiple
                       onChange={handleDocumentsChange}
                       className="mt-2"
-                      disabled={isEditing && editingOrder?.status !== 'ongoing'}
+                      required={documents.length === 0}
                     />
                   </div>
                 </div>
+                {documentsError && <p className="text-xs text-red-600 mt-2">{documentsError}</p>}
                 {documents.length > 0 && (
                   <ul className="mt-3 space-y-1 text-sm text-gray-600">
                     {documents.map((doc, index) => (
-                      <li key={`${doc.name}-${index}`}>{doc.name}</li>
+                      <li key={`${doc.name}-${index}`} className="flex items-center justify-between gap-2">
+                        <span>{doc.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeDocument(index)}
+                          className="text-xs text-red-600 hover:text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </li>
                     ))}
                   </ul>
                 )}
