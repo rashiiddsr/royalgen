@@ -60,6 +60,28 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
 
+const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') => {
+  if (!Array.isArray(documents)) return [];
+  return documents
+    .map((doc) => {
+      if (!doc) return null;
+      if (doc.url) {
+        return { name: doc.name || 'document', url: doc.url };
+      }
+      if (doc.data && typeof doc.data === 'string') {
+        try {
+          const url = saveBase64File(doc.data, filenamePrefix);
+          return { name: doc.name || 'document', url };
+        } catch (error) {
+          console.error('Failed to save document', error);
+          return null;
+        }
+      }
+      return null;
+    })
+    .filter(Boolean);
+};
+
 const normalizePhone = (value) => {
   if (value === undefined || value === null) return value;
   const digits = String(value).replace(/\D/g, '');
@@ -974,7 +996,7 @@ app.post('/api/:table', async (req, res) => {
     if (table === 'sales_orders') {
       const { goods = [], documents = [], status, ...orderPayload } = payload;
       const cleanedGoods = Array.isArray(goods) ? goods : [];
-      const cleanedDocuments = Array.isArray(documents) ? documents : [];
+      const cleanedDocuments = normalizeDocumentsPayload(documents, 'sales-order');
       const result = await query('INSERT INTO ?? SET ?', [
         table,
         {
@@ -1087,7 +1109,7 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       if (Object.prototype.hasOwnProperty.call(req.body || {}, 'documents')) {
-        cleanedDocuments = Array.isArray(documents) ? documents : [];
+        cleanedDocuments = normalizeDocumentsPayload(documents, 'sales-order');
         nextUpdates.documents = cleanedDocuments.length ? JSON.stringify(cleanedDocuments) : null;
       }
 

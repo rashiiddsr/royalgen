@@ -190,6 +190,12 @@ export default function Orders() {
   const handleDocumentsChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files ? Array.from(event.target.files) : [];
     if (!files.length) return;
+    const oversizedFile = files.find((file) => file.size > 5 * 1024 * 1024);
+    if (oversizedFile) {
+      event.target.value = '';
+      setDocumentsError('File too large. Maximum size is 5MB per file.');
+      return;
+    }
 
     const filePromises = files.map(
       (file) =>
