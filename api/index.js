@@ -23,7 +23,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '15mb' }));
 app.use('/uploads', express.static(uploadDir));
 
 const TABLES = [
@@ -515,7 +515,7 @@ const getUserById = async (id) => {
 const getRfqById = async (id) => {
   if (!id) return null;
   const [rfq] = await query(
-    'SELECT id, rfq_number, company_name, project_name, pic_name, pic_email, pic_phone FROM rfqs WHERE id = ? LIMIT 1',
+    'SELECT id, rfq_number, company_name, pic_name, pic_email, pic_phone FROM rfqs WHERE id = ? LIMIT 1',
     [id]
   );
   return rfq || null;
