@@ -14,7 +14,6 @@ interface RFQType {
   id: string;
   rfq_number: string;
   company_name: string;
-  project_name: string;
   pic_name: string;
   pic_email: string;
   pic_phone: string;
@@ -40,7 +39,6 @@ interface UserOption {
 const DEFAULT_FORM = {
   rfq_number: '',
   company_name: '',
-  project_name: '',
   pic_name: '',
   pic_email: '',
   pic_phone: '',
@@ -179,7 +177,6 @@ export default function RFQ() {
       setFormData({
         rfq_number: rfq.rfq_number,
         company_name: rfq.company_name,
-        project_name: rfq.project_name,
         pic_name: rfq.pic_name,
         pic_email: rfq.pic_email,
         pic_phone: rfq.pic_phone === '-' ? '-' : normalizePhoneInput(rfq.pic_phone),
@@ -288,7 +285,6 @@ export default function RFQ() {
     const query = searchTerm.toLowerCase();
     return (
       rfq.rfq_number.toLowerCase().includes(query) ||
-      rfq.project_name.toLowerCase().includes(query) ||
       rfq.company_name.toLowerCase().includes(query) ||
       renderGoodsList(rfq).toLowerCase().includes(query) ||
       (rfq.requester_name || '').toLowerCase().includes(query)
@@ -328,7 +324,7 @@ export default function RFQ() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
           type="text"
-          placeholder="Search RFQs by number, project, company, goods, or requester..."
+          placeholder="Search RFQs by number, company, goods, or requester..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -341,7 +337,6 @@ export default function RFQ() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">RFQ</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Company</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Goods</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Requested By</th>
@@ -353,7 +348,7 @@ export default function RFQ() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {filteredRfqs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
                     <div className="flex flex-col items-center">
                       <FileText className="h-10 w-10 text-gray-300 mb-3" />
                       <p>No RFQs found. Create your first RFQ to get started.</p>
@@ -366,7 +361,6 @@ export default function RFQ() {
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="font-semibold">{rfq.rfq_number}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{rfq.project_name}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{rfq.company_name}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={renderGoodsList(rfq)}>
                       {renderGoodsList(rfq)}
@@ -464,16 +458,6 @@ export default function RFQ() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
-                  <input
-                    type="text"
-                    value={formData.project_name}
-                    onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Name *</label>
                   <input
                     type="text"
@@ -493,7 +477,7 @@ export default function RFQ() {
                       if (contactError) setContactError('');
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="email@company.com atau -"
+                    placeholder="email@company.com or -"
                     required
                   />
                 </div>
@@ -700,7 +684,6 @@ export default function RFQ() {
 
             <div className="p-6 space-y-3 text-sm text-gray-800">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <p><span className="text-gray-500">Project:</span> {detailRfq.project_name}</p>
                 <p><span className="text-gray-500">Company:</span> {detailRfq.company_name}</p>
                 <p><span className="text-gray-500">PIC:</span> {detailRfq.pic_name}</p>
                 <p><span className="text-gray-500">Email:</span> {detailRfq.pic_email}</p>

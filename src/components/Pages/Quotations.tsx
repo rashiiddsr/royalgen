@@ -17,7 +17,6 @@ interface QuotationType {
   quotation_number: string;
   rfq_id: string;
   company_name: string;
-  project_name: string;
   pic_name: string;
   pic_email: string;
   pic_phone: string;
@@ -39,11 +38,15 @@ interface RFQTypeLite {
   id: string;
   rfq_number: string;
   company_name: string;
-  project_name: string;
   pic_name: string;
   pic_email: string;
   pic_phone: string;
   status: string;
+  goods?: Array<{
+    good_id?: string | number | null;
+    name?: string | null;
+    display_name?: string;
+  }>;
 }
 
 interface GoodOption {
@@ -72,6 +75,7 @@ export default function Quotations() {
   const [detailQuotation, setDetailQuotation] = useState<QuotationType | null>(null);
   const [editingQuotation, setEditingQuotation] = useState<QuotationType | null>(null);
   const [statusQuotation, setStatusQuotation] = useState<QuotationType | null>(null);
+  const [linkedRfq, setLinkedRfq] = useState<RFQTypeLite | null>(null);
   const [rfqs, setRfqs] = useState<RFQTypeLite[]>([]);
   const [goods, setGoods] = useState<GoodOption[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,7 +83,6 @@ export default function Quotations() {
     quotation_number: '',
     rfq_id: '',
     company_name: '',
-    project_name: '',
     pic_name: '',
     pic_email: '',
     pic_phone: '',
@@ -194,7 +197,6 @@ export default function Quotations() {
       quotation_number: getNextQuotationNumber(),
       rfq_id: '',
       company_name: '',
-      project_name: '',
       pic_name: '',
       pic_email: '',
       pic_phone: '',
@@ -214,7 +216,6 @@ export default function Quotations() {
       quotation_number: quotation.quotation_number,
       rfq_id: quotation.rfq_id,
       company_name: quotation.company_name,
-      project_name: quotation.project_name,
       pic_name: quotation.pic_name,
       pic_email: quotation.pic_email,
       pic_phone: quotation.pic_phone,
@@ -232,7 +233,6 @@ export default function Quotations() {
       ...prev,
       rfq_id: rfqId,
       company_name: selectedRfq?.company_name || '',
-      project_name: selectedRfq?.project_name || '',
       pic_name: selectedRfq?.pic_name || '',
       pic_email: selectedRfq?.pic_email || '',
       pic_phone: selectedRfq?.pic_phone || '',
@@ -367,7 +367,6 @@ export default function Quotations() {
     return (
       quotation.quotation_number?.toLowerCase().includes(query) ||
       quotation.rfqs?.rfq_number?.toLowerCase().includes(query) ||
-      quotation.project_name?.toLowerCase().includes(query) ||
       quotation.company_name?.toLowerCase().includes(query) ||
       quotation.status?.toLowerCase().includes(query) ||
       quotation.creator_name?.toLowerCase().includes(query) ||
@@ -420,6 +419,12 @@ export default function Quotations() {
     (rfq) => rfq.status === 'draft' || rfq.id === formData.rfq_id
   );
 
+  const handleViewLinkedRfq = (quotation: QuotationType) => {
+    const rfq = rfqs.find((item) => String(item.id) === String(quotation.rfq_id));
+    if (!rfq) return;
+    setLinkedRfq(rfq);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -466,7 +471,7 @@ export default function Quotations() {
                   Quotation
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  RFQ / Project
+                  RFQ
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
@@ -506,7 +511,6 @@ export default function Quotations() {
                       <div className="text-sm text-gray-900">
                         {quotation.rfqs?.rfq_number || 'N/A'}
                       </div>
-                      <div className="text-sm text-gray-500">{quotation.project_name || 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
@@ -588,7 +592,7 @@ export default function Quotations() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Quotation Number</label>
                   <input
@@ -612,19 +616,10 @@ export default function Quotations() {
                     <option value="">Select RFQ</option>
                     {availableRfqs.map((rfq) => (
                       <option key={rfq.id} value={rfq.id}>
-                        {rfq.rfq_number} - {rfq.project_name}
+                        {rfq.rfq_number}
                       </option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-                  <input
-                    type="text"
-                    value={formData.project_name}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                  />
                 </div>
               </div>
 
@@ -886,14 +881,18 @@ export default function Quotations() {
                 <div>
                   <p className="text-gray-500">RFQ</p>
                   <p className="font-medium text-gray-900">{detailQuotation.rfqs?.rfq_number || '-'}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleViewLinkedRfq(detailQuotation)}
+                    className="mt-2 inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    disabled={!detailQuotation.rfq_id}
+                  >
+                    View linked RFQ
+                  </button>
                 </div>
                 <div>
                   <p className="text-gray-500">Company</p>
                   <p className="font-medium text-gray-900">{detailQuotation.company_name || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Project</p>
-                  <p className="font-medium text-gray-900">{detailQuotation.project_name || '-'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">PIC</p>
@@ -941,6 +940,7 @@ export default function Quotations() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-600">
                       <tr>
+                        <th className="px-3 py-2 text-left">No</th>
                         <th className="px-3 py-2 text-left">Goods</th>
                         <th className="px-3 py-2 text-left">Description</th>
                         <th className="px-3 py-2 text-left">Unit</th>
@@ -952,6 +952,7 @@ export default function Quotations() {
                     <tbody className="divide-y">
                       {(Array.isArray(detailQuotation.goods) ? detailQuotation.goods : []).map((row, index) => (
                         <tr key={`${row.good_id}-${index}`}>
+                          <td className="px-3 py-2">{index + 1}</td>
                           <td className="px-3 py-2">{row.name || '-'}</td>
                           <td className="px-3 py-2">{row.description || '-'}</td>
                           <td className="px-3 py-2">{row.unit || '-'}</td>
@@ -983,6 +984,69 @@ export default function Quotations() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {linkedRfq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <p className="text-sm text-gray-500 font-semibold uppercase">RFQ Details</p>
+                <h2 className="text-xl font-bold text-gray-900">{linkedRfq.rfq_number}</h2>
+              </div>
+              <button
+                onClick={() => setLinkedRfq(null)}
+                className="p-2 rounded-full hover:bg-gray-100 transition"
+                aria-label="Close RFQ details"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-500">Company</p>
+                  <p className="font-medium text-gray-900">{linkedRfq.company_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">PIC</p>
+                  <p className="font-medium text-gray-900">{linkedRfq.pic_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Email</p>
+                  <p className="font-medium text-gray-900">{linkedRfq.pic_email || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Phone</p>
+                  <p className="font-medium text-gray-900">{linkedRfq.pic_phone || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Status</p>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                      linkedRfq.status
+                    )}`}
+                  >
+                    {linkedRfq.status}
+                  </span>
+                </div>
+              </div>
+
+              {linkedRfq.goods && linkedRfq.goods.length > 0 && (
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-3">Goods</h3>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700">
+                    {linkedRfq.goods.map((item, index) => (
+                      <li key={`${item.good_id || item.name}-${index}`}>
+                        {item.display_name || item.name || 'Item'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>
