@@ -15,11 +15,15 @@ import Profile from './components/Pages/Profile';
 
 function App() {
   const { user, profile, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    return localStorage.getItem('currentPage') || 'dashboard';
+  });
 
   useEffect(() => {
-    setCurrentPage('dashboard');
-  }, [profile]);
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('currentPage', currentPage);
+  }, [currentPage]);
 
   if (loading) {
     return (
