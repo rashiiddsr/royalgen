@@ -18,7 +18,6 @@ interface QuotationType {
   id: string;
   quotation_number: string;
   rfq_id: string;
-  client_id?: string | null;
   company_name: string;
   pic_name: string;
   pic_email: string;
@@ -40,7 +39,6 @@ interface QuotationType {
 interface RFQTypeLite {
   id: string;
   rfq_number: string;
-  client_id?: string | null;
   company_name: string;
   pic_name: string;
   pic_email: string;
@@ -95,7 +93,6 @@ export default function Quotations() {
   const [formData, setFormData] = useState({
     quotation_number: '',
     rfq_id: '',
-    client_id: '',
     company_name: '',
     pic_name: '',
     pic_email: '',
@@ -213,7 +210,6 @@ export default function Quotations() {
     setFormData({
       quotation_number: getNextQuotationNumber(),
       rfq_id: '',
-      client_id: '',
       company_name: '',
       pic_name: '',
       pic_email: '',
@@ -234,7 +230,6 @@ export default function Quotations() {
     setFormData({
       quotation_number: quotation.quotation_number,
       rfq_id: quotation.rfq_id,
-      client_id: quotation.client_id || '',
       company_name: quotation.company_name,
       pic_name: quotation.pic_name,
       pic_email: quotation.pic_email,
@@ -253,7 +248,6 @@ export default function Quotations() {
     setFormData((prev) => ({
       ...prev,
       rfq_id: rfqId,
-      client_id: selectedRfq?.client_id || '',
       company_name: selectedRfq?.company_name || '',
       pic_name: selectedRfq?.pic_name || '',
       pic_email: selectedRfq?.pic_email || '',

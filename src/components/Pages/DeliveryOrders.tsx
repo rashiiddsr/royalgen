@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { Eye, Plus, Search, Truck, X } from 'lucide-react';
+import { addRecord, getRecords } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface DeliveryGood {
@@ -17,9 +17,7 @@ interface DeliveryOrder {
   delivery_number: string;
   delivery_date: string;
   sales_order_id: string;
-  client_id?: string | null;
   company_name?: string;
-  ship_address?: string | null;
   goods?: DeliveryGood[] | string | null;
   created_by?: number | null;
   created_at: string;
@@ -37,42 +35,27 @@ interface SalesOrder {
   id: string;
   order_number: string;
   po_number?: string;
-  client_id?: string | null;
   company_name?: string;
   goods?: SalesOrderGood[] | string | null;
   status: string;
-}
-
-interface ClientOption {
-  id: string;
-  company_name: string;
-  address: string;
-  phone: string;
-  email: string;
-  tax_id?: string | null;
-  ship_addresses?: string[] | string | null;
 }
 
 const EMPTY_FORM = {
   delivery_number: '',
   delivery_date: '',
   sales_order_id: '',
-  client_id: '',
   company_name: '',
-  ship_address: '',
 };
 
 export default function DeliveryOrders() {
   const { profile } = useAuth();
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
-  const [clients, setClients] = useState<ClientOption[]>([]);
   const [goodsRows, setGoodsRows] = useState<DeliveryGood[]>([]);
   const [usersById, setUsersById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [detailDelivery, setDetailDelivery] = useState<DeliveryOrder | null>(null);
-  const [editingDelivery, setEditingDelivery] = useState<DeliveryOrder | null>(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -93,38 +76,12 @@ export default function DeliveryOrders() {
     return [];
   };
 
-  const parseShipAddresses = (value?: string[] | string | null) => {
-    if (!value) return [];
-    if (Array.isArray(value)) return value;
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  };
-
-  const formatDateInput = (value?: string | null) => {
-    if (!value) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const fetchData = async () => {
     try {
-      const [deliveryData, orderData, userData, clientData] = await Promise.all([
+      const [deliveryData, orderData, userData] = await Promise.all([
         getRecords<DeliveryOrder>('delivery_orders'),
         getRecords<SalesOrder>('sales_orders'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
-        getRecords<ClientOption>('clients'),
       ]);
 
       const userMap = userData.reduce<Record<string, string>>((acc, user) => {
@@ -148,7 +105,6 @@ export default function DeliveryOrders() {
       setDeliveries(mappedDeliveries);
       setSalesOrders(mappedOrders);
       setUsersById(userMap);
-      setClients(clientData);
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
     } finally {
@@ -184,7 +140,6 @@ export default function DeliveryOrders() {
   };
 
   const openCreateModal = () => {
-    setEditingDelivery(null);
     setFormData({
       ...EMPTY_FORM,
       delivery_number: getNextDeliveryNumber(),
@@ -193,18 +148,10 @@ export default function DeliveryOrders() {
     setShowModal(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-    setEditingDelivery(null);
-    setFormData(EMPTY_FORM);
-    setGoodsRows([]);
-  };
-
-  const buildShippedMap = (orderId: string, excludeDeliveryId?: string) => {
+  const buildShippedMap = (orderId: string) => {
     const shippedMap: Record<string, number> = {};
     deliveries
       .filter((delivery) => String(delivery.sales_order_id) === String(orderId))
-      .filter((delivery) => (excludeDeliveryId ? String(delivery.id) !== String(excludeDeliveryId) : true))
       .forEach((delivery) => {
         parseGoods(delivery.goods).forEach((item) => {
           const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
@@ -216,14 +163,6 @@ export default function DeliveryOrders() {
 
   const handleSalesOrderChange = (salesOrderId: string) => {
     const order = salesOrders.find((item) => String(item.id) === String(salesOrderId));
-    const client = clients.find((item) => String(item.id) === String(order?.client_id));
-    const clientShipAddresses = client ? parseShipAddresses(client.ship_addresses) : [];
-    const resolvedShipAddresses =
-      clientShipAddresses.length > 0
-        ? clientShipAddresses
-        : client?.address
-          ? [client.address]
-          : [];
     const shippedMap = salesOrderId ? buildShippedMap(salesOrderId) : {};
     const remainingGoods = parseGoods(order?.goods).map((item) => {
       const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
@@ -241,9 +180,7 @@ export default function DeliveryOrders() {
     setFormData((prev) => ({
       ...prev,
       sales_order_id: salesOrderId,
-      client_id: order?.client_id || '',
-      company_name: order?.company_name || client?.company_name || '',
-      ship_address: resolvedShipAddresses[0] || '',
+      company_name: order?.company_name || '',
     }));
     setGoodsRows(filteredRemaining);
   };
@@ -260,6 +197,10 @@ export default function DeliveryOrders() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const confirmed = window.confirm(
+      'Delivery orders cannot be edited after saving. Do you want to continue?'
+    );
+    if (!confirmed) return;
 
     if (!formData.delivery_date) {
       alert('Tanggal delivery wajib diisi.');
@@ -268,11 +209,6 @@ export default function DeliveryOrders() {
 
     if (!formData.sales_order_id) {
       alert('Pilih sales order terlebih dahulu.');
-      return;
-    }
-
-    if (!formData.ship_address) {
-      alert('Pilih alamat pengiriman terlebih dahulu.');
       return;
     }
 
@@ -302,32 +238,20 @@ export default function DeliveryOrders() {
     }
 
     try {
-      if (editingDelivery) {
-        await updateRecord<DeliveryOrder>('delivery_orders', editingDelivery.id, {
-          delivery_date: formData.delivery_date,
-          goods: payloadGoods,
-          ship_address: formData.ship_address,
-          performed_by: profile?.id,
-        } as DeliveryOrder);
-      } else {
-        await addRecord<DeliveryOrder>('delivery_orders', {
-          delivery_number: formData.delivery_number,
-          delivery_date: formData.delivery_date,
-          sales_order_id: formData.sales_order_id,
-          client_id: formData.client_id,
-          company_name: formData.company_name,
-          ship_address: formData.ship_address,
-          goods: payloadGoods,
-          created_by: profile?.id,
-        });
-      }
+      await addRecord<DeliveryOrder>('delivery_orders', {
+        delivery_number: formData.delivery_number,
+        delivery_date: formData.delivery_date,
+        sales_order_id: formData.sales_order_id,
+        company_name: formData.company_name,
+        goods: payloadGoods,
+        created_by: profile?.id,
+      });
       setShowModal(false);
       setFormData(EMPTY_FORM);
-      setEditingDelivery(null);
       await fetchData();
     } catch (error) {
-      console.error('Failed to save delivery order', error);
-      alert('Failed to save delivery order. Please try again.');
+      console.error('Failed to create delivery order', error);
+      alert('Failed to create delivery order. Please try again.');
     }
   };
 
@@ -339,59 +263,6 @@ export default function DeliveryOrders() {
     () => new Map(salesOrders.map((order) => [String(order.id), order])),
     [salesOrders]
   );
-
-  const canEditDelivery = (delivery: DeliveryOrder) => {
-    const order = orderMap.get(String(delivery.sales_order_id));
-    if (!order) return false;
-    return !['waiting payment', 'done'].includes(order.status);
-  };
-
-  const openEditModal = (delivery: DeliveryOrder) => {
-    if (!canEditDelivery(delivery)) {
-      alert('Delivery order cannot be edited once the sales order is approved or done.');
-      return;
-    }
-    const order = orderMap.get(String(delivery.sales_order_id));
-    const client = clients.find((item) => String(item.id) === String(order?.client_id));
-    const clientShipAddresses = client ? parseShipAddresses(client.ship_addresses) : [];
-    const resolvedAddresses =
-      clientShipAddresses.length > 0
-        ? clientShipAddresses
-        : client?.address
-          ? [client.address]
-          : [];
-    const shippedMap = buildShippedMap(delivery.sales_order_id, delivery.id);
-    const orderGoods = parseGoods(order?.goods) as SalesOrderGood[];
-    const orderedMap = orderGoods.reduce<Record<string, number>>((acc, item) => {
-      const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
-      acc[key] = (acc[key] || 0) + (Number(item.qty) || 0);
-      return acc;
-    }, {});
-    const maxMap = Object.keys(orderedMap).reduce<Record<string, number>>((acc, key) => {
-      acc[key] = Math.max((orderedMap[key] || 0) - (shippedMap[key] || 0), 0);
-      return acc;
-    }, {});
-    const deliveryGoods = parseGoods(delivery.goods).map((row) => {
-      const key = row.good_id ? `id:${row.good_id}` : `name:${row.name}`;
-      return {
-        ...row,
-        remaining_qty: maxMap[key] ?? 0,
-        qty: row.qty ?? '',
-      };
-    });
-
-    setEditingDelivery(delivery);
-    setFormData({
-      delivery_number: delivery.delivery_number,
-      delivery_date: formatDateInput(delivery.delivery_date),
-      sales_order_id: delivery.sales_order_id,
-      client_id: order?.client_id || delivery.client_id || '',
-      company_name: delivery.company_name || order?.company_name || '',
-      ship_address: delivery.ship_address || resolvedAddresses[0] || '',
-    });
-    setGoodsRows(deliveryGoods);
-    setShowModal(true);
-  };
 
   const filteredOrders = salesOrders.filter(
     (order) => order.status === 'ongoing' || order.status === 'on-delivery'
@@ -411,13 +282,6 @@ export default function DeliveryOrders() {
       );
     });
   }, [deliveries, orderMap, searchTerm, usersById]);
-
-  const selectedOrder = salesOrders.find((order) => String(order.id) === String(formData.sales_order_id));
-  const selectedClient = clients.find((client) => String(client.id) === String(formData.client_id));
-  const shipAddresses = selectedClient ? parseShipAddresses(selectedClient.ship_addresses) : [];
-  const resolvedShipAddresses =
-    shipAddresses.length > 0 ? shipAddresses : selectedClient?.address ? [selectedClient.address] : [];
-  const isEditing = Boolean(editingDelivery);
 
   if (loading) {
     return (
@@ -515,18 +379,6 @@ export default function DeliveryOrders() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => openEditModal(delivery)}
-                          className={`inline-flex items-center p-2 rounded-lg transition ${
-                            canEditDelivery(delivery)
-                              ? 'text-emerald-600 hover:bg-emerald-50'
-                              : 'text-gray-300 cursor-not-allowed'
-                          }`}
-                          aria-label="Edit delivery order"
-                          disabled={!canEditDelivery(delivery)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
                       </td>
                     </tr>
                   );
@@ -543,12 +395,10 @@ export default function DeliveryOrders() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div>
                 <p className="text-sm text-gray-500 font-semibold uppercase">Delivery Order</p>
-                <h2 className="text-xl font-bold text-gray-900">
-                  {isEditing ? 'Edit Delivery Order' : 'Create Delivery Order'}
-                </h2>
+                <h2 className="text-xl font-bold text-gray-900">Create Delivery Order</h2>
               </div>
               <button
-                onClick={closeModal}
+                onClick={() => setShowModal(false)}
                 className="p-2 rounded-full hover:bg-gray-100 transition"
                 aria-label="Close delivery order modal"
               >
@@ -590,11 +440,8 @@ export default function DeliveryOrders() {
                   <select
                     value={formData.sales_order_id}
                     onChange={(event) => handleSalesOrderChange(event.target.value)}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                      isEditing ? 'bg-gray-50 cursor-not-allowed' : ''
-                    }`}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
-                    disabled={isEditing}
                   >
                     <option value="">Select sales order</option>
                     {filteredOrders.map((order) => (
@@ -615,44 +462,6 @@ export default function DeliveryOrders() {
                     readOnly
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ship Address <span className="text-red-500">*</span>
-                  </label>
-                  {isEditing || resolvedShipAddresses.length <= 1 ? (
-                    <input
-                      type="text"
-                      value={formData.ship_address}
-                      readOnly={isEditing || resolvedShipAddresses.length <= 1}
-                      onChange={(event) =>
-                        setFormData((prev) => ({ ...prev, ship_address: event.target.value }))
-                      }
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                        isEditing || resolvedShipAddresses.length <= 1 ? 'bg-gray-50' : ''
-                      }`}
-                      required
-                    />
-                  ) : (
-                    <select
-                      value={formData.ship_address}
-                      onChange={(event) =>
-                        setFormData((prev) => ({ ...prev, ship_address: event.target.value }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      required
-                    >
-                      <option value="">Select ship address</option>
-                      {resolvedShipAddresses.map((address, index) => (
-                        <option key={`${address}-${index}`} value={address}>
-                          {address}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {!selectedOrder && (
-                    <p className="text-xs text-gray-500 mt-1">Select a sales order to load ship address.</p>
-                  )}
                 </div>
               </div>
 
@@ -705,7 +514,7 @@ export default function DeliveryOrders() {
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={() => setShowModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
                   Cancel
@@ -714,7 +523,7 @@ export default function DeliveryOrders() {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  {isEditing ? 'Update Delivery Order' : 'Save Delivery Order'}
+                  Save Delivery Order
                 </button>
               </div>
             </form>
@@ -757,14 +566,6 @@ export default function DeliveryOrders() {
                   <p className="font-medium text-gray-900">
                     {detailDelivery.company_name ||
                       orderMap.get(String(detailDelivery.sales_order_id))?.company_name ||
-                      '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Ship Address</p>
-                  <p className="font-medium text-gray-900">
-                    {detailDelivery.ship_address ||
-                      clients.find((client) => String(client.id) === String(detailDelivery.client_id))?.address ||
                       '-'}
                   </p>
                 </div>
