@@ -199,7 +199,7 @@ export default function Quotations() {
 
   const canEditQuotation = (quotation: QuotationType) => {
     if (!profile) return false;
-    if (['rejected', 'reject', 'process', 'success'].includes(quotation.status)) return false;
+    if (quotation.status === 'rejected' || quotation.status === 'process') return false;
     if (['superadmin', 'manager'].includes(profile.role)) return true;
     if (!quotation.performed_by || !profile.id) return false;
     return String(quotation.performed_by) === String(profile.id);
@@ -408,22 +408,18 @@ export default function Quotations() {
       waiting: 'bg-yellow-100 text-yellow-800 dark:bg-amber-500/20 dark:text-amber-200',
       negotiation: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
       renegotiation: 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
-      're-negotiating': 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
       process: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
-      success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
       active: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
       draft: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
       submitted: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
       approved: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
       rejected: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
-      reject: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
 
   const getStatusLabel = (status: string, round?: number) => {
-    if (status === 'renegotiation' || status === 're-negotiating') return 're-negotiating';
-    if (status === 'rejected') return 'reject';
+    if (status === 'renegotiation') return 're-negotiating';
     if (status === 'negotiation' && round) return `negotiation (${round})`;
     return status;
   };
@@ -449,7 +445,7 @@ export default function Quotations() {
 
   const handleStatusUpdate = async (quotation: QuotationType, nextStatus: string) => {
     if (!canUpdateStatus || !profile) return;
-    if (nextStatus === 'reject' || nextStatus === 'rejected') {
+    if (nextStatus === 'rejected') {
       const confirmed = window.confirm('Are you sure you want to reject this quotation? This will lock edits.');
       if (!confirmed) return;
     }
@@ -472,17 +468,16 @@ export default function Quotations() {
   };
 
   const getStatusActions = (quotation: QuotationType) => {
-    if (quotation.status === 'waiting' || quotation.status === 'renegotiation' || quotation.status === 're-negotiating') {
+    if (quotation.status === 'waiting' || quotation.status === 'renegotiation') {
       return [
         { label: 'Set Negotiation', status: 'negotiation', style: 'bg-blue-600 hover:bg-blue-700' },
-        { label: 'Reject', status: 'reject', style: 'bg-red-600 hover:bg-red-700' },
+        { label: 'Reject', status: 'rejected', style: 'bg-red-600 hover:bg-red-700' },
       ];
     }
     if (quotation.status === 'negotiation') {
       return [
         { label: 'Set Process', status: 'process', style: 'bg-emerald-600 hover:bg-emerald-700' },
-        { label: 'Set Success', status: 'success', style: 'bg-emerald-600 hover:bg-emerald-700' },
-        { label: 'Reject', status: 'reject', style: 'bg-red-600 hover:bg-red-700' },
+        { label: 'Reject', status: 'rejected', style: 'bg-red-600 hover:bg-red-700' },
       ];
     }
     return [];
@@ -617,7 +612,7 @@ export default function Quotations() {
                         <Eye className="h-4 w-4" />
                       </button>
                       {canUpdateStatus &&
-                        ['waiting', 'renegotiation', 're-negotiating', 'negotiation'].includes(quotation.status) && (
+                        ['waiting', 'renegotiation', 'negotiation'].includes(quotation.status) && (
                           <button
                             onClick={() => setStatusQuotation(quotation)}
                             className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition dark:text-emerald-300 dark:hover:bg-emerald-500/10"
@@ -837,8 +832,12 @@ export default function Quotations() {
                                 />
                                 <datalist id={`goods-options-${index}`}>
                                   {activeGoods.map((good) => (
-                                    <option key={good.id} value={good.name}>
-                                      {good.name}
+                                    <option
+                                      key={good.id}
+                                      value={good.name}
+                                    >
+                                      {good.sku ? `SKU ${good.sku} · ` : ''}
+                                      {good.unit || '-'} · MOQ {good.minimum_order_quantity || 0}
                                     </option>
                                   ))}
                                 </datalist>
