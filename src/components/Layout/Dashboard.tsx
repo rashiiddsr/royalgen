@@ -254,7 +254,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                     <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (
                         <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">
-                          Notifications are temporarily disabled.
+                          No notifications yet.
                         </div>
                       ) : (
                         notifications.map((item) => (

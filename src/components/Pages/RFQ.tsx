@@ -20,6 +20,7 @@ interface RFQType {
   pic_phone: string;
   goods: RFQGoodItem[];
   attachment_url?: string | null;
+  deadline_days?: number | null;
   status: string;
   performed_by?: number | null;
   created_at: string;
@@ -59,6 +60,7 @@ const DEFAULT_FORM = {
   pic_name: '',
   pic_email: '',
   pic_phone: '',
+  deadline_days: '' as number | '',
 };
 
 export default function RFQ() {
@@ -118,8 +120,17 @@ export default function RFQ() {
     fetchData();
     const interval = window.setInterval(() => {
       fetchData();
-    }, 60000);
-    return () => window.clearInterval(interval);
+    }, 15000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -137,13 +148,16 @@ export default function RFQ() {
         if (item.status !== 'draft') return false;
         const createdAt = new Date(item.created_at).getTime();
         const daysSince = (now - createdAt) / (1000 * 60 * 60 * 24);
-        return daysSince > 30;
+        const deadline = Number(item.deadline_days) || 30;
+        return daysSince > deadline;
       });
       if (expiredDrafts.length > 0) {
         await Promise.all(
           expiredDrafts.map((item) =>
             updateRecord<RFQType>('rfqs', item.id, {
               status: 'expired',
+              performed_by: profile?.id,
+              performer_role: profile?.role,
             })
           )
         );
@@ -162,7 +176,8 @@ export default function RFQ() {
             ...item,
             status:
               item.status === 'draft' &&
-              (now - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24) > 30
+              (now - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24) >
+                (Number(item.deadline_days) || 30)
                 ? 'expired'
                 : item.status,
             requester_name:
@@ -256,6 +271,7 @@ export default function RFQ() {
         pic_name: rfq.pic_name,
         pic_email: rfq.pic_email,
         pic_phone: rfq.pic_phone === '-' ? '-' : normalizePhoneInput(rfq.pic_phone),
+        deadline_days: rfq.deadline_days ?? '',
       });
       setSelectedGoods(
         rfq.goods
@@ -330,6 +346,7 @@ export default function RFQ() {
         pic_email: emailValue,
         pic_phone: phoneValue,
         client_id: formData.client_id,
+        deadline_days: formData.deadline_days === '' ? 30 : Number(formData.deadline_days),
         goods: goodsPayload,
         attachment_data: attachmentData,
         performed_by: profile?.id,
@@ -354,6 +371,7 @@ export default function RFQ() {
       setSaving(false);
     }
   };
+
 
   const renderGoodsList = (rfq: RFQType) => {
     if (!rfq.goods || rfq.goods.length === 0) return 'No goods listed';
@@ -649,6 +667,21 @@ export default function RFQ() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RFQ Deadline (days)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.deadline_days}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? '' : Number(e.target.value);
+                      setFormData({ ...formData, deadline_days: value });
+                    }}
+                    placeholder="Default 30 days"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leave blank to use 30 days.</p>
+                </div>
                 {contactError && <p className="text-sm text-red-600 md:col-span-2">{contactError}</p>}
               </div>
 
@@ -846,6 +879,10 @@ export default function RFQ() {
                 <p><span className="text-gray-500">Email:</span> {detailRfq.pic_email}</p>
                 <p><span className="text-gray-500">Phone:</span> {detailRfq.pic_phone}</p>
                 <p><span className="text-gray-500">Requested By:</span> {detailRfq.requester_name || 'Unknown user'}</p>
+                <p>
+                  <span className="text-gray-500">Deadline:</span>{' '}
+                  {detailRfq.deadline_days ? `${detailRfq.deadline_days} days` : '30 days'}
+                </p>
                 <div className="flex items-center gap-2">
                   <span className="text-gray-500">Status:</span>
                   <span
