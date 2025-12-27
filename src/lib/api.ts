@@ -30,7 +30,7 @@ type TableName =
   | 'sales_orders'
   | 'delivery_orders'
   | 'invoices'
-  | 'financing'
+  | 'settings'
   | 'users'
   | 'activity_logs';
 

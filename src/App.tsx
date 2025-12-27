@@ -10,12 +10,17 @@ import Quotations from './components/Pages/Quotations';
 import Orders from './components/Pages/Orders';
 import DeliveryOrders from './components/Pages/DeliveryOrders';
 import Invoices from './components/Pages/Invoices';
-import Financing from './components/Pages/Financing';
 import Users from './components/Pages/Users';
 import Profile from './components/Pages/Profile';
+import Settings from './components/Pages/Settings';
+import OrderProgress from './components/Pages/OrderProgress';
 
 function App() {
   const { user, profile, loading } = useAuth();
+  const progressOrderId =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('progress_order')
+      : null;
   const [currentPage, setCurrentPage] = useState(() => {
     if (typeof window === 'undefined') return 'dashboard';
     return localStorage.getItem('currentPage') || 'dashboard';
@@ -23,8 +28,9 @@ function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (progressOrderId) return;
     localStorage.setItem('currentPage', currentPage);
-  }, [currentPage]);
+  }, [currentPage, progressOrderId]);
 
   if (loading) {
     return (
@@ -39,6 +45,10 @@ function App() {
 
   if (!user || !profile) {
     return <Login />;
+  }
+
+  if (progressOrderId) {
+    return <OrderProgress orderId={progressOrderId} />;
   }
 
   const renderPage = () => {
@@ -59,8 +69,8 @@ function App() {
         return <DeliveryOrders />;
       case 'invoices':
         return <Invoices />;
-      case 'financing':
-        return <Financing />;
+      case 'settings':
+        return <Settings />;
       case 'users':
         return <Users />;
       case 'profile':

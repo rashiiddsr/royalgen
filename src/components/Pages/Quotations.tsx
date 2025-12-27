@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -27,6 +28,7 @@ interface QuotationType {
   total_amount: number;
   tax_amount: number;
   grand_total: number;
+  include_tax?: number | boolean;
   status: string;
   negotiation_round?: number;
   created_at: string;
@@ -59,6 +61,11 @@ interface GoodOption {
   status: string;
 }
 
+interface CompanySetting {
+  id: string;
+  tax_rate?: number | null;
+}
+
 const EMPTY_GOOD_ROW: QuotationGood = {
   good_id: '',
   name: '',
@@ -82,6 +89,8 @@ export default function Quotations() {
   const [rfqs, setRfqs] = useState<RFQTypeLite[]>([]);
   const [goods, setGoods] = useState<GoodOption[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [taxRate, setTaxRate] = useState(0);
+  const [includeTax, setIncludeTax] = useState(true);
   const [formData, setFormData] = useState({
     quotation_number: '',
     rfq_id: '',
@@ -100,11 +109,12 @@ export default function Quotations() {
 
   const fetchQuotations = async () => {
     try {
-      const [quotationData, rfqData, goodsData, userData] = await Promise.all([
+      const [quotationData, rfqData, goodsData, userData, settingsData] = await Promise.all([
         getRecords<QuotationType>('quotations'),
         getRecords<RFQTypeLite>('rfqs'),
         getRecords<GoodOption>('goods'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
+        getRecords<CompanySetting>('settings'),
       ]);
 
       const rfqsById = new Map(rfqData.map((rfq) => [rfq.id, rfq]));
@@ -141,6 +151,8 @@ export default function Quotations() {
       setQuotations(mappedQuotations);
       setRfqs(rfqData);
       setGoods(goodsData);
+      const currentSettings = settingsData[0];
+      setTaxRate(Number(currentSettings?.tax_rate) || 0);
     } catch (error) {
       console.error('Error fetching quotations:', error);
     } finally {
@@ -205,6 +217,7 @@ export default function Quotations() {
       payment_time: '',
       status: 'waiting',
     });
+    setIncludeTax(true);
     setGoodsRows([{ ...EMPTY_GOOD_ROW }]);
     setShowModal(true);
   };
@@ -223,6 +236,7 @@ export default function Quotations() {
       payment_time: quotation.payment_time,
       status: quotation.status,
     });
+    setIncludeTax(quotation.include_tax === undefined ? true : Boolean(quotation.include_tax));
     setGoodsRows(parsedGoods.length ? parsedGoods : [{ ...EMPTY_GOOD_ROW }]);
     setShowModal(true);
   };
@@ -338,7 +352,7 @@ export default function Quotations() {
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
     );
-    const taxAmount = 0;
+    const taxAmount = includeTax ? 0 : (totalAmount * taxRate) / 100;
     const grandTotal = totalAmount + taxAmount;
 
     const commonPayload = {
@@ -351,6 +365,7 @@ export default function Quotations() {
       total_amount: totalAmount,
       tax_amount: taxAmount,
       grand_total: grandTotal,
+      include_tax: includeTax,
       payment_time: formData.payment_time,
       performed_by: profile?.id,
       performer_role: profile?.role,
@@ -568,10 +583,10 @@ export default function Quotations() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
-                        Rp {quotation.grand_total.toLocaleString()}
+                        Rp {formatRupiah(Number(quotation.grand_total) || 0)}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Tax: Rp {quotation.tax_amount.toLocaleString()}
+                        Tax: Rp {formatRupiah(Number(quotation.tax_amount) || 0)}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
@@ -736,6 +751,34 @@ export default function Quotations() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Include Tax</p>
+                  <p className="text-xs text-gray-500">
+                    Turn off to add {taxRate}% tax on top of the total.
+                  </p>
+                </div>
+                <label className="inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={includeTax}
+                    onChange={(event) => setIncludeTax(event.target.checked)}
+                  />
+                  <span
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                      includeTax ? 'bg-emerald-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                        includeTax ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </span>
+                </label>
               </div>
 
               <div className="space-y-3">
@@ -1021,10 +1064,10 @@ export default function Quotations() {
                           <td className="px-3 py-2">{row.description || '-'}</td>
                           <td className="px-3 py-2">{row.unit || '-'}</td>
                           <td className="px-3 py-2">{row.qty}</td>
-                          <td className="px-3 py-2">Rp {Number(row.price).toLocaleString()}</td>
+                          <td className="px-3 py-2">Rp {formatRupiah(Number(row.price) || 0)}</td>
                           <td className="px-3 py-2">{row.delivery_time ?? '-'}</td>
                           <td className="px-3 py-2">
-                            Rp {(Number(row.qty) * Number(row.price)).toLocaleString()}
+                            Rp {formatRupiah((Number(row.qty) || 0) * (Number(row.price) || 0))}
                           </td>
                         </tr>
                       ))}
@@ -1037,15 +1080,21 @@ export default function Quotations() {
                 <div className="text-right space-y-1">
                   <div>
                     <span className="text-gray-500">Total:</span>{' '}
-                    <span className="font-semibold">Rp {detailQuotation.total_amount.toLocaleString()}</span>
+                    <span className="font-semibold">
+                      Rp {formatRupiah(Number(detailQuotation.total_amount) || 0)}
+                    </span>
                   </div>
                   <div>
                     <span className="text-gray-500">Tax:</span>{' '}
-                    <span className="font-semibold">Rp {detailQuotation.tax_amount.toLocaleString()}</span>
+                    <span className="font-semibold">
+                      Rp {formatRupiah(Number(detailQuotation.tax_amount) || 0)}
+                    </span>
                   </div>
                   <div>
                     <span className="text-gray-500">Grand Total:</span>{' '}
-                    <span className="font-semibold">Rp {detailQuotation.grand_total.toLocaleString()}</span>
+                    <span className="font-semibold">
+                      Rp {formatRupiah(Number(detailQuotation.grand_total) || 0)}
+                    </span>
                   </div>
                 </div>
               </div>

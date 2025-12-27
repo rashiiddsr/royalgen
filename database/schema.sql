@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `total_amount` DECIMAL(12,2) DEFAULT 0,
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
+  `include_tax` TINYINT(1) NOT NULL DEFAULT 1,
   `status` VARCHAR(50) DEFAULT 'waiting',
   `negotiation_round` INT DEFAULT 0,
   `performed_by` INT DEFAULT NULL,
@@ -158,14 +159,16 @@ CREATE TABLE IF NOT EXISTS `invoices` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Financing records
-CREATE TABLE IF NOT EXISTS `financing` (
+-- Company settings
+CREATE TABLE IF NOT EXISTS `settings` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `transaction_id` VARCHAR(120) NOT NULL,
-  `partner` VARCHAR(255) DEFAULT NULL,
-  `amount` DECIMAL(12,2) DEFAULT 0,
-  `status` VARCHAR(50) DEFAULT 'review',
-  `funding_date` DATE DEFAULT NULL,
+  `company_name` VARCHAR(255) DEFAULT NULL,
+  `company_address` TEXT,
+  `tax_id` VARCHAR(150) DEFAULT NULL,
+  `tax_rate` DECIMAL(5,2) DEFAULT 0,
+  `contact` VARCHAR(255) DEFAULT NULL,
+  `logo_url` VARCHAR(500) DEFAULT NULL,
+  `language` ENUM('indonesia','english') DEFAULT 'indonesia',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
