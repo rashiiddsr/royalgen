@@ -98,6 +98,7 @@ export default function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
   const isEditing = Boolean(editingOrder);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
+  const canApprovePayment = profile?.role === 'superadmin' || profile?.role === 'manager';
 
   useEffect(() => {
     fetchOrders();
@@ -415,10 +416,29 @@ export default function Orders() {
     }
   };
 
+  const handleApprovePayment = async () => {
+    if (!detailOrder) return;
+    const confirmed = window.confirm('Approve this sales order to move to waiting payment?');
+    if (!confirmed) return;
+    try {
+      await updateRecord<OrderType>('sales_orders', detailOrder.id, {
+        status: 'waiting payment',
+        performed_by: profile?.id,
+        performer_role: profile?.role,
+      });
+      await fetchOrders();
+      setDetailOrder((prev) => (prev ? { ...prev, status: 'waiting payment' } : prev));
+    } catch (error) {
+      console.error('Failed to update sales order status', error);
+      alert('Failed to update status. Please try again.');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       ongoing: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
       'on-delivery': 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
+      'waiting approval': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200',
       'waiting payment': 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
       done: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
       delivery: 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
@@ -844,6 +864,15 @@ export default function Orders() {
                 </h2>
               </div>
               <div className="flex items-center gap-2">
+                {canApprovePayment && detailOrder.status === 'waiting approval' && (
+                  <button
+                    type="button"
+                    onClick={handleApprovePayment}
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                  >
+                    Approve Payment
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowDoModal((prev) => !prev)}
