@@ -3,7 +3,6 @@ import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 interface QuotationGood {
   good_id: string;
@@ -55,6 +54,7 @@ interface RFQTypeLite {
 interface GoodOption {
   id: string;
   name: string;
+  sku?: string;
   description: string;
   unit: string;
   minimum_order_quantity?: number;
@@ -78,7 +78,6 @@ const EMPTY_GOOD_ROW: QuotationGood = {
 
 export default function Quotations() {
   const { profile } = useAuth();
-  const { pushNotification } = useNotifications();
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -90,7 +89,7 @@ export default function Quotations() {
   const [goods, setGoods] = useState<GoodOption[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [taxRate, setTaxRate] = useState(0);
-  const [includeTax, setIncludeTax] = useState(true);
+  const [includeTax, setIncludeTax] = useState(false);
   const [formData, setFormData] = useState({
     quotation_number: '',
     rfq_id: '',
@@ -102,6 +101,7 @@ export default function Quotations() {
     status: 'waiting',
   });
   const [goodsRows, setGoodsRows] = useState<QuotationGood[]>([{ ...EMPTY_GOOD_ROW }]);
+  const [activeGoodsIndex, setActiveGoodsIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchQuotations();
@@ -217,8 +217,9 @@ export default function Quotations() {
       payment_time: '',
       status: 'waiting',
     });
-    setIncludeTax(true);
+    setIncludeTax(false);
     setGoodsRows([{ ...EMPTY_GOOD_ROW }]);
+    setActiveGoodsIndex(null);
     setShowModal(true);
   };
 
@@ -236,8 +237,9 @@ export default function Quotations() {
       payment_time: quotation.payment_time,
       status: quotation.status,
     });
-    setIncludeTax(quotation.include_tax === undefined ? true : Boolean(quotation.include_tax));
+    setIncludeTax(quotation.include_tax === undefined ? false : Boolean(quotation.include_tax));
     setGoodsRows(parsedGoods.length ? parsedGoods : [{ ...EMPTY_GOOD_ROW }]);
+    setActiveGoodsIndex(null);
     setShowModal(true);
   };
 
@@ -383,16 +385,8 @@ export default function Quotations() {
     try {
       if (editingQuotation) {
         await updateRecord<QuotationType>('quotations', editingQuotation.id, payload);
-        pushNotification({
-          title: 'Quotation updated',
-          message: `${formData.quotation_number} has been updated.`,
-        });
       } else {
         await addRecord<QuotationType>('quotations', payload);
-        pushNotification({
-          title: 'Quotation created',
-          message: `${formData.quotation_number} has been created.`,
-        });
       }
       setShowModal(false);
       setEditingQuotation(null);
@@ -814,24 +808,66 @@ export default function Quotations() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {goodsRows.map((row, index) => (
-                        <tr key={`${row.good_id}-${index}`}>
-                          <td className="px-3 py-2">
-                            <input
-                              type="search"
-                              list={`goods-options-${index}`}
-                              value={row.name}
-                              onChange={(event) => handleGoodSelect(index, event.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded-lg"
-                              placeholder="Search goods"
-                              required
-                            />
-                            <datalist id={`goods-options-${index}`}>
-                              {activeGoods.map((good) => (
-                                <option key={good.id} value={good.name} />
-                              ))}
-                            </datalist>
-                          </td>
+                      {goodsRows.map((row, index) => {
+                        const query = row.name.trim().toLowerCase();
+                        const matches = query
+                          ? activeGoods.filter(
+                              (good) =>
+                                good.name.toLowerCase().includes(query) ||
+                                (good.sku || '').toLowerCase().includes(query)
+                            )
+                          : activeGoods;
+                        const limitedMatches = matches.slice(0, 8);
+                        const showSuggestions = activeGoodsIndex === index;
+
+                        return (
+                          <tr key={`${row.good_id}-${index}`}>
+                            <td className="px-3 py-2">
+                              <div className="relative">
+                                <input
+                                  type="search"
+                                  value={row.name}
+                                  onChange={(event) => {
+                                    setActiveGoodsIndex(index);
+                                    handleGoodSelect(index, event.target.value);
+                                  }}
+                                  onFocus={() => setActiveGoodsIndex(index)}
+                                  onBlur={() => setTimeout(() => setActiveGoodsIndex(null), 120)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded-lg"
+                                  placeholder="Search goods by name or SKU"
+                                  required
+                                />
+                                {showSuggestions && (
+                                  <div className="absolute z-10 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto">
+                                    {limitedMatches.length === 0 ? (
+                                      <div className="px-3 py-2 text-xs text-gray-500">
+                                        No goods match your search.
+                                      </div>
+                                    ) : (
+                                      limitedMatches.map((good) => (
+                                        <button
+                                          key={good.id}
+                                          type="button"
+                                          onMouseDown={() => {
+                                            handleGoodSelect(index, good.name);
+                                            setActiveGoodsIndex(null);
+                                          }}
+                                          className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                                        >
+                                          <div className="text-sm font-medium text-gray-900">
+                                            {good.name}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {good.sku ? `SKU ${good.sku} · ` : ''}
+                                            {good.unit || '-'} · MOQ {good.minimum_order_quantity || 0}
+                                          </div>
+                                        </button>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
                           <td className="px-3 py-2">
                             <input
                               type="text"
@@ -898,8 +934,9 @@ export default function Quotations() {
                               Remove
                             </button>
                           </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

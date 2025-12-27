@@ -2,7 +2,6 @@ import { useState, useEffect, FormEvent } from 'react';
 import { addRecord, getRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Search, Package, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 interface Good {
   id: string;
@@ -12,7 +11,6 @@ interface Good {
   category: 'consumable' | 'instrument' | 'electrical' | 'piping' | 'other';
   unit: string;
   price: number;
-  stock_quantity: number;
   minimum_order_quantity: number;
   status: string;
   suppliers?: { id: string | number; name: string; status?: string }[];
@@ -21,13 +19,14 @@ interface Good {
 
 type GoodFormData = Omit<
   Good,
-  'id' | 'created_at' | 'suppliers' | 'price' | 'minimum_order_quantity' | 'stock_quantity'
+  'id' | 'created_at' | 'suppliers' | 'price' | 'minimum_order_quantity'
 > & {
   performed_by?: string | number;
   suppliers?: (string | number)[];
+  category: Good['category'] | '';
+  unit: string | '';
   price: number | '';
   minimum_order_quantity: number | '';
-  stock_quantity: number | '';
 };
 
 export default function Goods() {
@@ -41,10 +40,9 @@ export default function Goods() {
     sku: '',
     name: '',
     description: '',
-    category: 'other',
-    unit: 'pcs',
+    category: '',
+    unit: '',
     price: '',
-    stock_quantity: '',
     minimum_order_quantity: '',
     status: 'active',
   });
@@ -53,7 +51,6 @@ export default function Goods() {
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
   const { profile } = useAuth();
-  const { pushNotification } = useNotifications();
 
   const canChangeStatus =
     !!editingGood && ['admin', 'manager', 'superadmin'].includes(profile?.role ?? '');
@@ -88,14 +85,13 @@ export default function Goods() {
     return `rgi-${category}-${String(nextSequence).padStart(4, '0')}`;
   };
 
-  const getInitialForm = (category: Good['category'] = 'other'): GoodFormData => ({
-    sku: generateSku(category),
+  const getInitialForm = (): GoodFormData => ({
+    sku: '',
     name: '',
     description: '',
-    category,
-    unit: 'pcs',
+    category: '',
+    unit: '',
     price: '',
-    stock_quantity: '',
     minimum_order_quantity: '',
     status: 'active',
   });
@@ -129,7 +125,6 @@ export default function Goods() {
       const payload: GoodFormData = {
         ...formData,
         price: formData.price === '' ? 0 : Number(formData.price),
-        stock_quantity: formData.stock_quantity === '' ? 0 : Number(formData.stock_quantity),
         minimum_order_quantity:
           formData.minimum_order_quantity === '' ? 1 : Number(formData.minimum_order_quantity),
         performed_by: profile?.id,
@@ -138,16 +133,8 @@ export default function Goods() {
 
       if (editingGood) {
         await updateRecord<Good>('goods', editingGood.id, payload as Good);
-        pushNotification({
-          title: 'Goods updated',
-          message: `${formData.name} has been updated.`,
-        });
       } else {
         await addRecord<Good>('goods', payload as Good);
-        pushNotification({
-          title: 'Goods created',
-          message: `${formData.name} has been added.`,
-        });
       }
 
       await fetchGoods();
@@ -181,7 +168,6 @@ export default function Goods() {
         category: good.category,
         unit: good.unit,
         price: good.price,
-        stock_quantity: good.stock_quantity,
         minimum_order_quantity: good.minimum_order_quantity,
         status: good.status,
       });
@@ -200,11 +186,15 @@ export default function Goods() {
     setSelectedSuppliers([]);
   };
 
-  const handleCategoryChange = (category: Good['category']) => {
+  const handleCategoryChange = (category: Good['category'] | '') => {
     if (editingGood) {
       setFormData({ ...formData, category });
     } else {
-      setFormData((prev) => ({ ...prev, category, sku: generateSku(category) }));
+      setFormData((prev) => ({
+        ...prev,
+        category,
+        sku: category ? generateSku(category) : '',
+      }));
     }
   };
 
@@ -273,9 +263,6 @@ export default function Goods() {
                   Price
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Unit
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -289,7 +276,7 @@ export default function Goods() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredGoods.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     No goods found. Add your first product to get started.
                   </td>
                 </tr>
@@ -321,9 +308,6 @@ export default function Goods() {
                       <div className="text-xs text-gray-500">
                         MOQ: {good.minimum_order_quantity}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {Number(good.stock_quantity) || 0}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{good.unit}</td>
                     <td className="px-6 py-4">
@@ -374,7 +358,7 @@ export default function Goods() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Auto)</label>
                   <div className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-800">
-                    {formData.sku || 'Generating SKU...'}
+                    {formData.sku || 'Select a category to generate SKU.'}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     SKU is generated automatically using rgi-(category)-0001 format based on sequence.
@@ -396,13 +380,14 @@ export default function Goods() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
+                    Description <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows={3}
+                    required
                   />
                 </div>
 
@@ -487,12 +472,18 @@ export default function Goods() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => handleCategoryChange(e.target.value as Good['category'])}
+                    onChange={(e) => handleCategoryChange(e.target.value as Good['category'] | '')}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
                   >
+                    <option value="" disabled>
+                      Select category
+                    </option>
                     {categories.map((category) => (
                       <option key={category} value={category} className="capitalize">
                         {category}
@@ -502,12 +493,18 @@ export default function Goods() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Unit <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
                   >
+                    <option value="" disabled>
+                      Select unit
+                    </option>
                     <option value="pcs">Pieces</option>
                     <option value="box">Box</option>
                     <option value="kg">Kilogram</option>
@@ -536,23 +533,7 @@ export default function Goods() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stock Quantity
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, stock_quantity: value === '' ? '' : Number(value) });
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Minimum Order Quantity
+                    Minimum Order Quantity <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -566,6 +547,7 @@ export default function Goods() {
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="1"
+                    required
                   />
                 </div>
 
@@ -662,10 +644,6 @@ export default function Goods() {
               <div>
                 <p className="font-semibold text-gray-700">Price</p>
                 <p>Rp {formatRupiah(Number(detailGood.price) || 0)}</p>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-700">Stock Quantity</p>
-                <p>{Number(detailGood.stock_quantity) || 0}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Minimum Order</p>

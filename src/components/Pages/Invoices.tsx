@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { addRecord, getRecords } from '../../lib/api';
 import { Plus, Eye, Receipt, X } from 'lucide-react';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 interface InvoiceType {
   id: string;
@@ -35,7 +34,6 @@ export default function Invoices() {
   const [showModal, setShowModal] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const { pushNotification } = useNotifications();
   const [formData, setFormData] = useState({
     invoice_number: '',
     order_id: '',
@@ -119,10 +117,6 @@ export default function Invoices() {
         paid_date: null,
         payment_method: null,
       } as InvoiceType);
-      pushNotification({
-        title: 'Invoice created',
-        message: `${formData.invoice_number} has been created.`,
-      });
 
       setShowModal(false);
       setFormData({

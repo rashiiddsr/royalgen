@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
+import { applyTheme, ThemePreference } from '../../lib/theme';
 
 interface CompanySetting {
   id?: string;
@@ -9,30 +9,45 @@ interface CompanySetting {
   company_address: string;
   tax_id: string;
   tax_rate: number | '';
-  contact: string;
+  email: string;
+  phone: string;
+  theme: ThemePreference;
   logo_url?: string | null;
   language: 'indonesia' | 'english';
 }
 
 const EMPTY_SETTING: CompanySetting = {
-  company_name: '',
-  company_address: '',
+  company_name: 'PT Royal General Indonesia',
+  company_address:
+    'Jl. Desa Harapan No. 47 RT/RW 004/001 Kel. Air Jamban, Kec. Mandau, Kab. Bengkalis, Prov. Riau 28784',
   tax_id: '',
-  tax_rate: '',
-  contact: '',
+  tax_rate: 11,
+  email: 'royalgeneralindonesia@gmail.com',
+  phone: '+6282170179410',
+  theme: 'system',
   logo_url: null,
-  language: 'indonesia',
+  language: 'english',
 };
+
+const normalizePhoneInput = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('62')) return `+${digits}`;
+  return `+62${digits}`;
+};
+
+const isValidPhone = (value: string) => /^\+62\d{6,}$/.test(value);
 
 export default function Settings() {
   const { profile } = useAuth();
-  const { pushNotification } = useNotifications();
   const [settings, setSettings] = useState<CompanySetting | null>(null);
   const [formData, setFormData] = useState<CompanySetting>(EMPTY_SETTING);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoData, setLogoData] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
   useEffect(() => {
@@ -43,13 +58,15 @@ export default function Settings() {
         if (current) {
           setSettings(current);
           setFormData({
-            company_name: current.company_name || '',
-            company_address: current.company_address || '',
+            company_name: current.company_name || EMPTY_SETTING.company_name,
+            company_address: current.company_address || EMPTY_SETTING.company_address,
             tax_id: current.tax_id || '',
-            tax_rate: current.tax_rate ?? '',
-            contact: current.contact || '',
+            tax_rate: current.tax_rate ?? EMPTY_SETTING.tax_rate,
+            email: current.email || EMPTY_SETTING.email,
+            phone: normalizePhoneInput(current.phone || EMPTY_SETTING.phone),
+            theme: current.theme || 'system',
             logo_url: current.logo_url || null,
-            language: current.language || 'indonesia',
+            language: current.language || 'english',
           });
           if (current.logo_url) {
             setLogoPreview(`${apiRoot}${current.logo_url}`);
@@ -81,14 +98,42 @@ export default function Settings() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
+    setFormError(null);
     try {
+      const normalizedPhone = normalizePhoneInput(formData.phone);
+      const requiredFields = [
+        formData.company_name.trim(),
+        formData.company_address.trim(),
+        formData.tax_id.trim(),
+        formData.email.trim(),
+        normalizedPhone.trim(),
+      ];
+      if (requiredFields.some((field) => field.length === 0)) {
+        setFormError('Please complete all required fields before saving.');
+        setSaving(false);
+        return;
+      }
+      if (!isValidPhone(normalizedPhone)) {
+        setFormError('Phone number must use +62 format.');
+        setSaving(false);
+        return;
+      }
+      if (formData.tax_rate === '' || Number.isNaN(Number(formData.tax_rate))) {
+        setFormError('Tax rate is required.');
+        setSaving(false);
+        return;
+      }
+
       const payload: Record<string, unknown> = {
         company_name: formData.company_name,
         company_address: formData.company_address,
         tax_id: formData.tax_id,
         tax_rate: formData.tax_rate === '' ? 0 : Number(formData.tax_rate),
-        contact: formData.contact,
+        email: formData.email,
+        phone: normalizedPhone,
+        theme: formData.theme,
         language: formData.language,
+        performed_by: profile?.id,
       };
 
       if (logoData) {
@@ -109,11 +154,8 @@ export default function Settings() {
           setLogoPreview(`${apiRoot}${saved.logo_url}`);
         }
       }
-
-      pushNotification({
-        title: 'Settings saved',
-        message: 'Company settings have been updated.',
-      });
+      applyTheme(formData.theme);
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Failed to save settings', error);
       alert('Failed to save settings. Please try again.');
@@ -148,38 +190,49 @@ export default function Settings() {
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nama PT</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company Name <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={formData.company_name}
               onChange={(event) => setFormData((prev) => ({ ...prev, company_name: event.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">NPWP</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tax ID <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={formData.tax_id}
               onChange={(event) => setFormData((prev) => ({ ...prev, tax_id: event.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Address <span className="text-red-500">*</span>
+          </label>
           <textarea
             value={formData.company_address}
             onChange={(event) => setFormData((prev) => ({ ...prev, company_address: event.target.value }))}
             rows={3}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            required
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Besar Pajak (%)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tax Rate (%) <span className="text-red-500">*</span>
+            </label>
             <input
               type="number"
               min="0"
@@ -192,25 +245,72 @@ export default function Settings() {
                 }))
               }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Kontak</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email <span className="text-red-500">*</span>
+            </label>
             <input
-              type="text"
-              value={formData.contact}
-              onChange={(event) => setFormData((prev) => ({ ...prev, contact: event.target.value }))}
+              type="email"
+              value={formData.email}
+              onChange={(event) => setFormData((prev) => ({ ...prev, email: event.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bahasa</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Theme <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.theme}
+              onChange={(event) =>
+                setFormData((prev) => ({ ...prev, theme: event.target.value as ThemePreference }))
+              }
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
+            >
+              <option value="system">System Default</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone <span className="text-red-500">*</span>
+            </label>
+            <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
+              <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
+              <input
+                type="tel"
+                value={formData.phone.replace(/^\+62/, '')}
+                onChange={(event) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    phone: normalizePhoneInput(`+62${event.target.value}`),
+                  }))
+                }
+                className="flex-1 px-3 py-2 focus:outline-none"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Language <span className="text-red-500">*</span>
+            </label>
             <select
               value={formData.language}
               onChange={(event) =>
                 setFormData((prev) => ({ ...prev, language: event.target.value as CompanySetting['language'] }))
               }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
             >
               <option value="indonesia">Indonesia</option>
               <option value="english">English</option>
@@ -218,11 +318,13 @@ export default function Settings() {
           </div>
         </div>
 
+        {formError && <p className="text-sm text-red-600">{formError}</p>}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Logo Perusahaan</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo</label>
             <input type="file" accept="image/*" onChange={handleLogoChange} />
-            <p className="text-xs text-gray-500 mt-1">Upload logo perusahaan (optional).</p>
+            <p className="text-xs text-gray-500 mt-1">Upload a company logo (optional).</p>
           </div>
           {logoPreview && (
             <div className="flex items-center justify-center border border-dashed border-gray-200 rounded-lg p-3 bg-gray-50">
@@ -241,6 +343,23 @@ export default function Settings() {
           </button>
         </div>
       </form>
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 text-center">
+            <h3 className="text-lg font-semibold text-gray-900">Settings Updated</h3>
+            <p className="text-sm text-gray-600 mt-2">
+              Company settings have been updated successfully.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowSuccessModal(false)}
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
