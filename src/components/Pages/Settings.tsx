@@ -10,6 +10,8 @@ interface CompanySetting {
   tax_rate: number | '';
   email: string;
   phone: string;
+  bank_name: string;
+  bank_account: string;
   logo_url?: string | null;
 }
 
@@ -21,6 +23,8 @@ const EMPTY_SETTING: CompanySetting = {
   tax_rate: 11,
   email: 'royalgeneralindonesia@gmail.com',
   phone: '+6282170179410',
+  bank_name: '',
+  bank_account: '',
   logo_url: null,
 };
 
@@ -59,6 +63,8 @@ export default function Settings() {
             tax_rate: current.tax_rate ?? EMPTY_SETTING.tax_rate,
             email: current.email || EMPTY_SETTING.email,
             phone: normalizePhoneInput(current.phone || EMPTY_SETTING.phone),
+            bank_name: current.bank_name || '',
+            bank_account: current.bank_account || '',
             logo_url: current.logo_url || null,
           });
           if (current.logo_url) {
@@ -99,6 +105,8 @@ export default function Settings() {
         formData.company_address.trim(),
         formData.email.trim(),
         normalizedPhone.trim(),
+        formData.bank_name.trim(),
+        formData.bank_account.trim(),
       ];
       if (requiredFields.some((field) => field.length === 0)) {
         setFormError('Please complete all required fields before saving.');
@@ -123,6 +131,8 @@ export default function Settings() {
         tax_rate: formData.tax_rate === '' ? 0 : Number(formData.tax_rate),
         email: formData.email,
         phone: normalizedPhone,
+        bank_name: formData.bank_name,
+        bank_account: formData.bank_account,
         performed_by: profile?.id,
       };
 
@@ -270,6 +280,33 @@ export default function Settings() {
                 required
               />
             </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Bank Type <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.bank_name}
+              onChange={(event) => setFormData((prev) => ({ ...prev, bank_name: event.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Bank Account Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.bank_account}
+              onChange={(event) => setFormData((prev) => ({ ...prev, bank_account: event.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              required
+            />
           </div>
         </div>
 

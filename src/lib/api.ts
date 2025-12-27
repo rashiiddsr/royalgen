@@ -23,6 +23,7 @@ export interface UserProfile {
 }
 
 type TableName =
+  | 'clients'
   | 'suppliers'
   | 'goods'
   | 'rfqs'
