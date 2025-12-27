@@ -159,6 +159,8 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
     );
   }, [progressRows]);
 
+  const overallProgress = totals.qty > 0 ? (totals.delivered / totals.qty) * 100 : 0;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -179,24 +181,41 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h1 className="text-2xl font-bold text-gray-900">View Progress</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {order.po_number || order.order_number} · {order.project_name || 'Project'}
-          </p>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <p className="text-gray-500">Company</p>
-              <p className="font-medium text-gray-900">{order.company_name || '-'}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Total Delivered</p>
-              <p className="font-medium text-gray-900">
-                {totals.delivered} / {totals.qty} items
+              <h1 className="text-2xl font-bold text-gray-900">Order Progress</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {order.po_number || order.order_number} · {order.project_name || 'Project'}
               </p>
             </div>
-            <div>
-              <p className="text-gray-500">Delivered Value</p>
-              <p className="font-medium text-gray-900">{formatCurrency(totals.progressValue)}</p>
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Overall Progress</p>
+              <p className="text-lg font-semibold text-gray-900">{overallProgress.toFixed(1)}%</p>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-2">
+            <div className="h-2 w-full rounded-full bg-gray-100">
+              <div
+                className="h-2 rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${Math.min(overallProgress, 100)}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-gray-500">Company</p>
+                <p className="font-medium text-gray-900">{order.company_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Total Delivered</p>
+                <p className="font-medium text-gray-900">
+                  {totals.delivered} / {totals.qty} items
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-500">Delivered Value</p>
+                <p className="font-medium text-gray-900">{formatCurrency(totals.progressValue)}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -207,17 +226,16 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
                   <th className="px-3 py-2 text-left">No</th>
-                  <th className="px-3 py-2 text-left">Nama Material</th>
+                  <th className="px-3 py-2 text-left">Material</th>
                   <th className="px-3 py-2 text-left">Unit</th>
-                  <th className="px-3 py-2 text-left">Qty</th>
-                  <th className="px-3 py-2 text-left">Price</th>
-                  <th className="px-3 py-2 text-left">Sub Total</th>
-                  <th className="px-3 py-2 text-left">Workload</th>
-                  <th className="px-3 py-2 text-left">Progress</th>
+                  <th className="px-3 py-2 text-left">Ordered</th>
+                  <th className="px-3 py-2 text-left">Delivered</th>
                   <th className="px-3 py-2 text-left">Remaining</th>
+                  <th className="px-3 py-2 text-left">Progress</th>
+                  <th className="px-3 py-2 text-left">Workload</th>
+                  <th className="px-3 py-2 text-left">Subtotal</th>
                   <th className="px-3 py-2 text-left">Progress Value</th>
                   <th className="px-3 py-2 text-left">Remaining Value</th>
-                  <th className="px-3 py-2 text-left">BBT%</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -227,14 +245,23 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
                     <td className="px-3 py-2">{row.name}</td>
                     <td className="px-3 py-2">{row.unit}</td>
                     <td className="px-3 py-2">{row.qty}</td>
-                    <td className="px-3 py-2">{formatCurrency(row.price)}</td>
-                    <td className="px-3 py-2">{formatCurrency(row.subtotal)}</td>
-                    <td className="px-3 py-2">{row.workload.toFixed(2)}%</td>
                     <td className="px-3 py-2">{row.delivered}</td>
                     <td className="px-3 py-2">{row.remaining}</td>
+                    <td className="px-3 py-2 min-w-[160px]">
+                      <div className="space-y-1">
+                        <div className="h-2 w-full rounded-full bg-gray-100">
+                          <div
+                            className="h-2 rounded-full bg-emerald-500"
+                            style={{ width: `${Math.min(row.progressPercent, 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500">{row.progressPercent.toFixed(1)}%</div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">{row.workload.toFixed(2)}%</td>
+                    <td className="px-3 py-2">{formatCurrency(row.subtotal)}</td>
                     <td className="px-3 py-2">{formatCurrency(row.progressValue)}</td>
                     <td className="px-3 py-2">{formatCurrency(row.remainingValue)}</td>
-                    <td className="px-3 py-2">{row.progressPercent.toFixed(2)}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -243,12 +270,12 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
                   <td className="px-3 py-2 font-semibold" colSpan={5}>
                     Total
                   </td>
-                  <td className="px-3 py-2 font-semibold">{formatCurrency(totals.subtotal)}</td>
-                  <td className="px-3 py-2" colSpan={2} />
                   <td className="px-3 py-2 font-semibold">{totals.qty - totals.delivered}</td>
+                  <td className="px-3 py-2" />
+                  <td className="px-3 py-2" />
+                  <td className="px-3 py-2 font-semibold">{formatCurrency(totals.subtotal)}</td>
                   <td className="px-3 py-2 font-semibold">{formatCurrency(totals.progressValue)}</td>
                   <td className="px-3 py-2 font-semibold">{formatCurrency(totals.remainingValue)}</td>
-                  <td className="px-3 py-2" />
                 </tr>
               </tfoot>
             </table>

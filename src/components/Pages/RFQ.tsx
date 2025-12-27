@@ -1,8 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent, useMemo } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, FileText, UploadCloud, Trash2, Search, Eye, Edit2, Clock } from 'lucide-react';
+import { Plus, FileText, UploadCloud, Trash2, Search, Eye, Edit2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 interface RFQGoodItem {
   type: 'existing' | 'other';
@@ -47,7 +46,6 @@ const DEFAULT_FORM = {
 
 export default function RFQ() {
   const { profile } = useAuth();
-  const { pushNotification } = useNotifications();
   const apiRoot = useMemo(
     () => (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, ''),
     [],
@@ -272,16 +270,8 @@ export default function RFQ() {
           return;
         }
         await updateRecord<RFQType>('rfqs', editingRfq.id, payload);
-        pushNotification({
-          title: 'RFQ updated',
-          message: `${formData.rfq_number} has been updated.`,
-        });
       } else {
         await addRecord<RFQType>('rfqs', payload);
-        pushNotification({
-          title: 'RFQ created',
-          message: `${formData.rfq_number} has been created.`,
-        });
       }
 
       await fetchData();
@@ -406,14 +396,6 @@ export default function RFQ() {
                         aria-label="View RFQ details"
                       >
                         <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                        title="Progress tracking coming soon"
-                        disabled
-                      >
-                        <Clock className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => openModal(rfq)}

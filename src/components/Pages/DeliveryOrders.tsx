@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Eye, Plus, Search, Truck, X } from 'lucide-react';
 import { addRecord, getRecords } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 interface DeliveryGood {
   good_id?: string;
@@ -50,7 +49,6 @@ const EMPTY_FORM = {
 
 export default function DeliveryOrders() {
   const { profile } = useAuth();
-  const { pushNotification } = useNotifications();
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [goodsRows, setGoodsRows] = useState<DeliveryGood[]>([]);
@@ -247,10 +245,6 @@ export default function DeliveryOrders() {
         company_name: formData.company_name,
         goods: payloadGoods,
         created_by: profile?.id,
-      });
-      pushNotification({
-        title: 'Delivery order created',
-        message: `${formData.delivery_number} has been created.`,
       });
       setShowModal(false);
       setFormData(EMPTY_FORM);

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
+import { getRecords } from './lib/api';
+import { applyTheme, ThemePreference } from './lib/theme';
 import Login from './components/Auth/Login';
 import Dashboard from './components/Layout/Dashboard';
 import DashboardHome from './components/Pages/DashboardHome';
@@ -25,12 +27,46 @@ function App() {
     if (typeof window === 'undefined') return 'dashboard';
     return localStorage.getItem('currentPage') || 'dashboard';
   });
+  const [themePreference, setThemePreference] = useState<ThemePreference>('system');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (progressOrderId) return;
     localStorage.setItem('currentPage', currentPage);
   }, [currentPage, progressOrderId]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchTheme = async () => {
+      try {
+        const settings = await getRecords<{ theme?: ThemePreference }>('settings');
+        const nextTheme = settings[0]?.theme || 'system';
+        setThemePreference(nextTheme);
+        applyTheme(nextTheme);
+      } catch (error) {
+        console.error('Failed to fetch theme setting', error);
+        applyTheme(themePreference);
+      }
+    };
+
+    fetchTheme();
+  }, [user]);
+
+  useEffect(() => {
+    applyTheme(themePreference);
+  }, [themePreference]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (themePreference === 'system') {
+        applyTheme('system');
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [themePreference]);
 
   if (loading) {
     return (

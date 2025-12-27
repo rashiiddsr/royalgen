@@ -54,12 +54,11 @@ CREATE TABLE IF NOT EXISTS `goods` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `sku` VARCHAR(120) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
-  `description` TEXT,
-  `category` ENUM('consumable','instrument','electrical','piping','other') DEFAULT 'other',
-  `unit` VARCHAR(50) DEFAULT 'pcs',
+  `description` TEXT NOT NULL,
+  `category` ENUM('consumable','instrument','electrical','piping','other') NOT NULL,
+  `unit` VARCHAR(50) NOT NULL,
   `price` DECIMAL(12,2) DEFAULT 0,
-  `stock_quantity` INT DEFAULT 0,
-  `minimum_order_quantity` INT DEFAULT 1,
+  `minimum_order_quantity` INT NOT NULL,
   `status` VARCHAR(50) DEFAULT 'active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -104,7 +103,7 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `total_amount` DECIMAL(12,2) DEFAULT 0,
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
-  `include_tax` TINYINT(1) NOT NULL DEFAULT 1,
+  `include_tax` TINYINT(1) NOT NULL DEFAULT 0,
   `status` VARCHAR(50) DEFAULT 'waiting',
   `negotiation_round` INT DEFAULT 0,
   `performed_by` INT DEFAULT NULL,
@@ -162,13 +161,15 @@ CREATE TABLE IF NOT EXISTS `invoices` (
 -- Company settings
 CREATE TABLE IF NOT EXISTS `settings` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `company_name` VARCHAR(255) DEFAULT NULL,
-  `company_address` TEXT,
-  `tax_id` VARCHAR(150) DEFAULT NULL,
-  `tax_rate` DECIMAL(5,2) DEFAULT 0,
-  `contact` VARCHAR(255) DEFAULT NULL,
+  `company_name` VARCHAR(255) NOT NULL DEFAULT 'PT Royal General Indonesia',
+  `company_address` TEXT NOT NULL DEFAULT 'Jl. Desa Harapan No. 47 RT/RW 004/001 Kel. Air Jamban, Kec. Mandau, Kab. Bengkalis, Prov. Riau 28784',
+  `tax_id` VARCHAR(150) NOT NULL DEFAULT '',
+  `tax_rate` DECIMAL(5,2) NOT NULL DEFAULT 11,
+  `email` VARCHAR(255) NOT NULL DEFAULT 'royalgeneralindonesia@gmail.com',
+  `phone` VARCHAR(50) NOT NULL DEFAULT '+6282170179410',
+  `theme` ENUM('system','light','dark') NOT NULL DEFAULT 'system',
   `logo_url` VARCHAR(500) DEFAULT NULL,
-  `language` ENUM('indonesia','english') DEFAULT 'indonesia',
+  `language` ENUM('indonesia','english') NOT NULL DEFAULT 'english',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

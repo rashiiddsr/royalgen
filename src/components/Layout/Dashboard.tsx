@@ -61,7 +61,7 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900/80 dark:to-slate-900/60">
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-gray-200 z-40 px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center">
             <div className="relative">
@@ -199,7 +199,7 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
                       <div className="px-4 py-6 text-center text-sm text-gray-500">
-                        No notifications yet.
+                        Notifications are temporarily disabled.
                       </div>
                     ) : (
                       notifications.map((item) => (

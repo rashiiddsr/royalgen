@@ -3,7 +3,6 @@ import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 interface OrderDocument {
   name: string;
@@ -83,7 +82,6 @@ const EMPTY_FORM = {
 
 export default function Orders() {
   const { profile } = useAuth();
-  const { pushNotification } = useNotifications();
   const [orders, setOrders] = useState<OrderType[]>([]);
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
   const [usersById, setUsersById] = useState<Record<string, string>>({});
@@ -405,16 +403,8 @@ export default function Orders() {
           ...payload,
           performed_by: profile?.id,
         });
-        pushNotification({
-          title: 'Sales order updated',
-          message: `${formData.po_number || payload.order_number} has been updated.`,
-        });
       } else {
         await addRecord<OrderType>('sales_orders', payload);
-        pushNotification({
-          title: 'Sales order created',
-          message: `${formData.po_number || payload.order_number} has been created.`,
-        });
       }
       setShowModal(false);
       setEditingOrder(null);
@@ -933,12 +923,9 @@ export default function Orders() {
 
               {showDoModal && (
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Linked Delivery Orders</h3>
-                    <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
-                      Waiting payment
-                    </span>
-                  </div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Linked Delivery Orders</h3>
+                </div>
                   {linkedDeliveries.length === 0 ? (
                     <p className="text-sm text-gray-500">No delivery orders linked yet.</p>
                   ) : (

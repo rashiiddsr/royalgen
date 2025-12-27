@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { addRecord, deleteRecordWithContext, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, Search, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 interface Supplier {
   id: string;
@@ -50,7 +49,6 @@ export default function Suppliers() {
     status: 'active',
   });
   const { profile } = useAuth();
-  const { pushNotification } = useNotifications();
 
   const normalizePhoneInput = (value: string) => {
     const trimmed = value.trim();
@@ -133,16 +131,8 @@ export default function Suppliers() {
 
       if (editingSupplier) {
         await updateRecord<Supplier>('suppliers', editingSupplier.id, payload as Supplier);
-        pushNotification({
-          title: 'Supplier updated',
-          message: `${formData.name} has been updated.`,
-        });
       } else {
         await addRecord<Supplier>('suppliers', payload as Supplier);
-        pushNotification({
-          title: 'Supplier created',
-          message: `${formData.name} has been added.`,
-        });
       }
 
       await fetchSuppliers();
@@ -164,6 +154,7 @@ export default function Suppliers() {
       fetchSuppliers();
     } catch (error) {
       console.error('Error deleting supplier:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete supplier.');
     }
   };
 

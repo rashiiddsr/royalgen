@@ -88,7 +88,7 @@ const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') 
 };
 
 const normalizeSettingsPayload = (payload = {}, id) => {
-  const { logo_data: logoData, logo_url: logoUrl, ...rest } = payload;
+  const { logo_data: logoData, logo_url: logoUrl, performed_by: _performedBy, performedBy: _performedByAlt, ...rest } = payload;
   const nextPayload = { ...rest };
   if (logoData && typeof logoData === 'string') {
     nextPayload.logo_url = saveBase64File(logoData, id ? `company-logo-${id}` : 'company-logo');
@@ -952,9 +952,18 @@ app.post('/api/:table', async (req, res) => {
     }
 
     if (table === 'settings') {
+      const { performed_by: performedBy } = payload;
       const settingsPayload = normalizeSettingsPayload(payload);
       const result = await query('INSERT INTO ?? SET ?', [table, settingsPayload]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'settings',
+        entityId: result.insertId,
+        action: 'create',
+        description: 'Created company settings',
+      });
       return res.status(201).json(created);
     }
 
@@ -1302,9 +1311,18 @@ app.put('/api/:table/:id', async (req, res) => {
     }
 
     if (table === 'settings') {
+      const { performed_by: performedBy } = req.body || {};
       const settingsUpdates = normalizeSettingsPayload(req.body || {}, id);
       await query('UPDATE ?? SET ? WHERE id = ?', [table, settingsUpdates, id]);
       const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'settings',
+        entityId: Number(id),
+        action: 'update',
+        description: 'Updated company settings',
+      });
       return res.json(updated);
     }
 
@@ -1440,18 +1458,11 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(403).json({ error: 'Only managers can update status' });
       }
 
-      let shouldNotifyRenegotiation = false;
-      const shouldNotifyWaiting =
-        isStatusChange && requestedStatus === 'waiting';
-      const shouldNotifyRenegotiationStatusChange =
-        isStatusChange && requestedStatus === 'renegotiation';
-      const shouldNotifyProcess = isStatusChange && requestedStatus === 'process';
-      if (!isStatusChange && existing.status === 'negotiation' && isOtherUpdate) {
+      const shouldAutoRenegotiate =
+        !isStatusChange && existing.status === 'negotiation' && isOtherUpdate;
+      if (shouldAutoRenegotiate) {
         nextUpdates.status = 'renegotiation';
-        shouldNotifyRenegotiation = true;
       }
-      const shouldNotifyWaitingOrRenegotiation =
-        shouldNotifyWaiting || shouldNotifyRenegotiation || shouldNotifyRenegotiationStatusChange;
 
       if (isStatusChange && requestedStatus === 'negotiation') {
         const currentRound = Number(existing.negotiation_round || 0);
@@ -1474,7 +1485,7 @@ app.put('/api/:table/:id', async (req, res) => {
         });
       }
 
-      if (isStatusChange || shouldNotifyRenegotiation) {
+      if (isStatusChange || shouldAutoRenegotiate) {
         await logActivity({
           performedBy,
           entityType: 'quotations',
@@ -1489,14 +1500,22 @@ app.put('/api/:table/:id', async (req, res) => {
       const roleEmails = await getRoleEmails(['superadmin', 'manager']);
       const requesterEmail = requester?.email ? requester.email.toLowerCase() : null;
       const roleRecipients = roleEmails.filter((email) => email.toLowerCase() !== requesterEmail);
-      const statusForNotification = shouldNotifyRenegotiation ? 'renegotiation' : updated?.status || existing.status;
+      const statusForNotification = shouldAutoRenegotiate ? 'renegotiation' : updated?.status || existing.status;
       const shouldNotifyRequester =
         ['negotiation', 'rejected', 'renegotiation'].includes(statusForNotification) &&
-        (isStatusChange || shouldNotifyRenegotiation);
+        (isStatusChange || shouldAutoRenegotiate);
       const requesterRecipients =
         shouldNotifyRequester && requester?.email && requester?.role !== 'superadmin'
           ? [requester.email]
           : [];
+
+      const shouldNotifyWaiting =
+        isStatusChange && requestedStatus === 'waiting';
+      const shouldNotifyRenegotiationStatusChange =
+        isStatusChange && requestedStatus === 'renegotiation';
+      const shouldNotifyProcess = isStatusChange && requestedStatus === 'process';
+      const shouldNotifyWaitingOrRenegotiation =
+        shouldNotifyWaiting || shouldAutoRenegotiate || shouldNotifyRenegotiationStatusChange;
 
       if (shouldNotifyWaitingOrRenegotiation) {
         await sendQuotationNotification({
@@ -1757,6 +1776,13 @@ app.delete('/api/:table/:id', async (req, res) => {
       }
     }
     if (table === 'suppliers') {
+      const [linked] = await query(
+        'SELECT COUNT(*) as count FROM goods_suppliers WHERE supplier_id = ?',
+        [id]
+      );
+      if (Number(linked?.count || 0) > 0) {
+        return res.status(400).json({ error: 'Supplier is linked to goods and cannot be deleted' });
+      }
       await logActivity({
         performedBy,
         entityType: 'suppliers',
