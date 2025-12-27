@@ -149,11 +149,15 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
       >
         <div className="h-full flex flex-col">
           <div className="p-6 border-b border-gray-200/50 dark:border-slate-800">
-            <div className="flex items-center">
+            <div className={`flex items-center ${sidebarOpen ? '' : 'justify-center'}`}>
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-2xl blur-lg opacity-50"></div>
-                <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-3 rounded-2xl overflow-hidden">
-                  <Building2 className="h-8 w-8 text-white" />
+                <div
+                  className={`relative bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl overflow-hidden ${
+                    sidebarOpen ? 'p-3' : 'p-2'
+                  }`}
+                >
+                  <Building2 className={`${sidebarOpen ? 'h-8 w-8' : 'h-6 w-6'} text-white`} />
                 </div>
               </div>
               <div

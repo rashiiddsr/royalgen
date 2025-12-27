@@ -698,6 +698,165 @@ const sendQuotationNotification = async ({
   }
 };
 
+const formatOrderStatusLabel = (status) => {
+  const map = {
+    ongoing: 'Ongoing',
+    'on-delivery': 'On Delivery',
+    'waiting approval': 'Waiting Approval',
+    'waiting payment': 'Waiting Payment',
+    done: 'Done',
+  };
+  return map[status] || status || '-';
+};
+
+const buildDeliveryApprovalEmailHtml = ({ order, orderGoods, deliveries, requester }) => {
+  const goodsRows = orderGoods.length
+    ? orderGoods
+        .map(
+          (item, index) => `
+            <tr>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${index + 1}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.name || item.description || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.price)}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(
+                (Number(item.qty) || 0) * (Number(item.price) || 0)
+              )}</td>
+            </tr>
+          `
+        )
+        .join('')
+    : `
+        <tr>
+          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">No items</td>
+        </tr>
+      `;
+
+  const deliveryRows = deliveries.length
+    ? deliveries
+        .map((delivery) => {
+          const deliveryGoods = parseJsonArray(delivery.goods);
+          const deliveryGoodsRows = deliveryGoods.length
+            ? deliveryGoods
+                .map(
+                  (item, index) => `
+                    <tr>
+                      <td style="padding:6px;border:1px solid #e2e8f0;">${index + 1}</td>
+                      <td style="padding:6px;border:1px solid #e2e8f0;">${item.name || item.description || '-'}</td>
+                      <td style="padding:6px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
+                      <td style="padding:6px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
+                    </tr>
+                  `
+                )
+                .join('')
+            : `
+                <tr>
+                  <td colspan="4" style="padding:6px;border:1px solid #e2e8f0;text-align:center;">No items</td>
+                </tr>
+              `;
+          return `
+            <tr>
+              <td style="padding:8px;border:1px solid #e2e8f0;vertical-align:top;">
+                <strong>${delivery.delivery_number || '-'}</strong><br />
+                <span style="font-size:12px;color:#475569;">${delivery.delivery_date || '-'}</span>
+              </td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">
+                <table style="border-collapse:collapse;width:100%;">
+                  <thead>
+                    <tr>
+                      <th style="padding:6px;border:1px solid #e2e8f0;text-align:left;">No</th>
+                      <th style="padding:6px;border:1px solid #e2e8f0;text-align:left;">Goods</th>
+                      <th style="padding:6px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
+                      <th style="padding:6px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${deliveryGoodsRows}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          `;
+        })
+        .join('')
+    : `
+        <tr>
+          <td colspan="2" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">No delivery orders</td>
+        </tr>
+      `;
+
+  return `
+    <p>Hello Team,</p>
+    <p>All delivery orders have been completed. Sales order status is now <strong>${formatOrderStatusLabel(
+      order.status
+    )}</strong> and is waiting for approval before moving to payment.</p>
+    <h3>Sales Order Information</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Sales Order</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.po_number || order.order_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Project</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.project_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Company</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.company_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.pic_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC Email</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.pic_email || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC Phone</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.pic_phone || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Payment Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.payment_time || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(order.total_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Tax</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(order.tax_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Grand Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(order.grand_total)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Submitted by</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || 'User'} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
+    </table>
+    <h3>Sales Order Goods</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <thead>
+        <tr>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">No</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Name</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Price</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${goodsRows}
+      </tbody>
+    </table>
+    <h3>Delivery Orders</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <thead>
+        <tr>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Delivery</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Goods</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${deliveryRows}
+      </tbody>
+    </table>
+    <p>Please review and approve to move the status to waiting payment.</p>
+  `;
+};
+
+const sendDeliveryApprovalNotification = async ({ order, orderGoods, deliveries, recipients, requester }) => {
+  try {
+    const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
+    if (!uniqueRecipients.length) return;
+    const subject = `Sales Order ${order.po_number || order.order_number || order.id} - Waiting Approval`;
+    const html = buildDeliveryApprovalEmailHtml({ order, orderGoods, deliveries, requester });
+    await Promise.allSettled(
+      uniqueRecipients.map((email) =>
+        sendSmtpMail({
+          to: email,
+          subject,
+          html,
+        })
+      )
+    );
+  } catch (error) {
+    console.error('Delivery approval notification error', error);
+  }
+};
+
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body || {};
 
@@ -1158,7 +1317,7 @@ app.post('/api/:table', async (req, res) => {
       const [order] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [salesOrderId]);
       if (order) {
         const orderGoods = parseJsonArray(order.goods);
-        const deliveries = await query('SELECT goods FROM `delivery_orders` WHERE sales_order_id = ?', [
+        const deliveries = await query('SELECT * FROM `delivery_orders` WHERE sales_order_id = ?', [
           salesOrderId,
         ]);
         const shippedMap = {};
@@ -1179,8 +1338,20 @@ app.post('/api/:table', async (req, res) => {
             return orderedQty > 0 ? shippedQty >= orderedQty : true;
           });
 
-        const nextStatus = allShipped ? 'waiting payment' : 'on-delivery';
+        const nextStatus = allShipped ? 'waiting approval' : 'on-delivery';
         await query('UPDATE `sales_orders` SET status = ? WHERE id = ?', [nextStatus, salesOrderId]);
+
+        if (allShipped) {
+          const roleEmails = await getRoleEmails(['superadmin', 'manager']);
+          const requester = await getUserById(createdBy || order.created_by);
+          await sendDeliveryApprovalNotification({
+            order: { ...order, status: nextStatus },
+            orderGoods,
+            deliveries,
+            recipients: roleEmails,
+            requester,
+          });
+        }
       }
 
       await logActivity({
@@ -1342,7 +1513,13 @@ app.put('/api/:table/:id', async (req, res) => {
     }
 
     if (table === 'sales_orders') {
-      const { goods, documents, performed_by: performedBy, ...orderUpdates } = req.body || {};
+      const {
+        goods,
+        documents,
+        performed_by: performedBy,
+        performer_role: performerRole,
+        ...orderUpdates
+      } = req.body || {};
       const [existing] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [id]);
 
       if (!existing) {
@@ -1350,6 +1527,14 @@ app.put('/api/:table/:id', async (req, res) => {
       }
 
       const nextUpdates = { ...orderUpdates };
+      const requestedStatus = orderUpdates.status;
+      const isStatusChange = requestedStatus && requestedStatus !== existing.status;
+      const isPrivileged = performerRole && ['superadmin', 'manager'].includes(performerRole);
+
+      if (isStatusChange && requestedStatus === 'waiting payment' && !isPrivileged) {
+        return res.status(403).json({ error: 'Only managers can update status to waiting payment' });
+      }
+
       if (nextUpdates.order_date) {
         nextUpdates.order_date = formatDateOnly(nextUpdates.order_date);
       }
@@ -1398,6 +1583,16 @@ app.put('/api/:table/:id', async (req, res) => {
         action: 'update',
         description: `Updated sales order ${updated?.order_number || id}`,
       });
+
+      if (isStatusChange) {
+        await logActivity({
+          performedBy,
+          entityType: 'sales_orders',
+          entityId: Number(id),
+          action: 'status',
+          description: `Updated sales order status to ${requestedStatus}`,
+        });
+      }
 
       return res.json({
         ...updated,
