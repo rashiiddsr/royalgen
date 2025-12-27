@@ -6,7 +6,6 @@ import Login from './components/Auth/Login';
 import Dashboard from './components/Layout/Dashboard';
 import DashboardHome from './components/Pages/DashboardHome';
 import Suppliers from './components/Pages/Suppliers';
-import Clients from './components/Pages/Clients';
 import Goods from './components/Pages/Goods';
 import RFQ from './components/Pages/RFQ';
 import Quotations from './components/Pages/Quotations';
@@ -78,8 +77,6 @@ function App() {
         return <DashboardHome />;
       case 'suppliers':
         return <Suppliers />;
-      case 'clients':
-        return <Clients />;
       case 'goods':
         return <Goods />;
       case 'rfq':

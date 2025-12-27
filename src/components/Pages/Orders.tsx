@@ -27,7 +27,6 @@ interface OrderType {
   project_name?: string;
   order_date?: string;
   quotation_id: string;
-  client_id?: string | null;
   company_name?: string;
   pic_name?: string;
   pic_email?: string;
@@ -48,7 +47,6 @@ interface OrderType {
 interface QuotationType {
   id: string;
   quotation_number: string;
-  client_id?: string | null;
   company_name: string;
   pic_name: string;
   pic_email: string;
@@ -75,7 +73,6 @@ const EMPTY_FORM = {
   po_number: '',
   order_date: '',
   quotation_id: '',
-  client_id: '',
   company_name: '',
   pic_name: '',
   pic_email: '',
@@ -244,7 +241,6 @@ export default function Orders() {
       po_number: normalizePoNumber(order.po_number || order.order_number || ''),
       order_date: formatDateInput(order.order_date),
       quotation_id: order.quotation_id || '',
-      client_id: order.client_id || '',
       company_name: order.company_name || '',
       pic_name: order.pic_name || '',
       pic_email: order.pic_email || '',
@@ -267,7 +263,6 @@ export default function Orders() {
     setFormData((prev) => ({
       ...prev,
       quotation_id: quotationId,
-      client_id: quotation?.client_id || '',
       company_name: quotation?.company_name || '',
       pic_name: quotation?.pic_name || '',
       pic_email: quotation?.pic_email || '',
@@ -395,7 +390,6 @@ export default function Orders() {
       : ({
           ...basePayload,
           quotation_id: formData.quotation_id,
-          client_id: formData.client_id,
           company_name: formData.company_name,
           pic_name: formData.pic_name,
           pic_email: formData.pic_email,

@@ -44,7 +44,6 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   const navigation = [
     { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Suppliers', icon: Users, page: 'suppliers', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: 'Clients', icon: Building2, page: 'clients', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Goods', icon: Package, page: 'goods', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'RFQ', icon: FileText, page: 'rfq', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Quotations', icon: FileCheck, page: 'quotations', roles: ['superadmin', 'admin', 'manager', 'staff'] },

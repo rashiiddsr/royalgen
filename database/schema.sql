@@ -49,18 +49,6 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Clients
-CREATE TABLE IF NOT EXISTS `clients` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `company_name` VARCHAR(255) NOT NULL,
-  `address` TEXT NOT NULL,
-  `phone` VARCHAR(100) NOT NULL,
-  `email` VARCHAR(255) NOT NULL,
-  `tax_id` VARCHAR(150) DEFAULT NULL,
-  `ship_addresses` JSON DEFAULT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Goods / products
 CREATE TABLE IF NOT EXISTS `goods` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,7 +78,6 @@ CREATE TABLE IF NOT EXISTS `goods_suppliers` (
 CREATE TABLE IF NOT EXISTS `rfqs` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `rfq_number` VARCHAR(120) NOT NULL,
-  `client_id` INT DEFAULT NULL,
   `company_name` VARCHAR(255) NOT NULL,
   `pic_name` VARCHAR(255) NOT NULL,
   `pic_email` VARCHAR(255) NOT NULL,
@@ -107,7 +94,6 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `quotation_number` VARCHAR(120) NOT NULL,
   `rfq_id` INT DEFAULT NULL,
-  `client_id` INT DEFAULT NULL,
   `company_name` VARCHAR(255) DEFAULT NULL,
   `pic_name` VARCHAR(255) DEFAULT NULL,
   `pic_email` VARCHAR(255) DEFAULT NULL,
@@ -132,7 +118,6 @@ CREATE TABLE IF NOT EXISTS `sales_orders` (
   `project_name` VARCHAR(255) DEFAULT NULL,
   `order_date` DATE DEFAULT NULL,
   `quotation_id` INT DEFAULT NULL,
-  `client_id` INT DEFAULT NULL,
   `company_name` VARCHAR(255) DEFAULT NULL,
   `pic_name` VARCHAR(255) DEFAULT NULL,
   `pic_email` VARCHAR(255) DEFAULT NULL,
@@ -155,9 +140,7 @@ CREATE TABLE IF NOT EXISTS `delivery_orders` (
   `delivery_number` VARCHAR(120) NOT NULL,
   `delivery_date` DATE NOT NULL,
   `sales_order_id` INT NOT NULL,
-  `client_id` INT DEFAULT NULL,
   `company_name` VARCHAR(255) DEFAULT NULL,
-  `ship_address` TEXT DEFAULT NULL,
   `goods` JSON DEFAULT NULL,
   `created_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -184,8 +167,6 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `tax_rate` DECIMAL(5,2) NOT NULL DEFAULT 11,
   `email` VARCHAR(255) NOT NULL DEFAULT 'royalgeneralindonesia@gmail.com',
   `phone` VARCHAR(50) NOT NULL DEFAULT '+6282170179410',
-  `bank_name` VARCHAR(150) NOT NULL DEFAULT 'Bank',
-  `bank_account` VARCHAR(150) NOT NULL DEFAULT '0000000000',
   `logo_url` VARCHAR(500) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
