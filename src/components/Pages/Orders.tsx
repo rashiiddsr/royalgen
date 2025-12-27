@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
-import { Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
+import { CheckCircle, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface OrderDocument {
@@ -159,6 +159,7 @@ export default function Orders() {
   };
 
   const formatCurrency = (value: number) => `Rp ${formatRupiah(value)}`;
+  const canEditOrder = (order: OrderType) => !['waiting payment', 'done'].includes(order.status);
 
   const resolveOrderTotals = (orderGoods: OrderGood[], order?: OrderType) => {
     const subtotal =
@@ -238,6 +239,7 @@ export default function Orders() {
   };
 
   const openEditModal = (order: OrderType) => {
+    if (!canEditOrder(order)) return;
     setEditingOrder(order);
     setFormData({
       project_name: order.project_name || '',
@@ -422,18 +424,21 @@ export default function Orders() {
     }
   };
 
-  const handleApprovePayment = async () => {
-    if (!detailOrder) return;
-    const confirmed = window.confirm('Approve this sales order to move to waiting payment?');
+  const handleAcceptApproval = async (order?: OrderType) => {
+    const targetOrder = order ?? detailOrder;
+    if (!targetOrder) return;
+    const confirmed = window.confirm('Accept this approval and move the sales order to waiting payment?');
     if (!confirmed) return;
     try {
-      await updateRecord<OrderType>('sales_orders', detailOrder.id, {
+      await updateRecord<OrderType>('sales_orders', targetOrder.id, {
         status: 'waiting payment',
         performed_by: profile?.id,
         performer_role: profile?.role,
       });
       await fetchOrders();
-      setDetailOrder((prev) => (prev ? { ...prev, status: 'waiting payment' } : prev));
+      setDetailOrder((prev) =>
+        prev && prev.id === targetOrder.id ? { ...prev, status: 'waiting payment' } : prev
+      );
     } catch (error) {
       console.error('Failed to update sales order status', error);
       alert('Failed to update status. Please try again.');
@@ -483,7 +488,7 @@ export default function Orders() {
   );
   const availableQuotations = quotations.filter(
     (quotation) =>
-      quotation.status === 'process' &&
+      ['process', 'success'].includes(quotation.status) &&
       (!usedQuotationIds.has(String(quotation.id)) ||
         String(quotation.id) === String(formData.quotation_id))
   );
@@ -601,10 +606,25 @@ export default function Orders() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+                      {canApprovePayment && order.status === 'waiting approval' && (
+                        <button
+                          onClick={() => handleAcceptApproval(order)}
+                          className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                          aria-label="Accept approval"
+                          title="Accept approval"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => openEditModal(order)}
-                        className="inline-flex items-center p-2 rounded-lg transition text-gray-600 hover:bg-gray-100"
+                        className={`inline-flex items-center p-2 rounded-lg transition ${
+                          canEditOrder(order)
+                            ? 'text-gray-600 hover:bg-gray-100'
+                            : 'text-gray-300 cursor-not-allowed'
+                        }`}
                         aria-label="Edit order"
+                        disabled={!canEditOrder(order)}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -873,10 +893,10 @@ export default function Orders() {
                 {canApprovePayment && detailOrder.status === 'waiting approval' && (
                   <button
                     type="button"
-                    onClick={handleApprovePayment}
+                    onClick={() => handleAcceptApproval()}
                     className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
                   >
-                    Approve Payment
+                    Accept Approval
                   </button>
                 )}
                 <button

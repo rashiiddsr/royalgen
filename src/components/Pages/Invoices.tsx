@@ -145,7 +145,7 @@ export default function Invoices() {
 
   const handleMarkPaid = async (invoice: InvoiceType) => {
     const confirmed = window.confirm(
-      'Mark this invoice as paid? After updating, the invoice becomes read-only.',
+      'Konfirmasi pembayaran: pastikan data sudah benar dan pembayaran sudah diterima.',
     );
     if (!confirmed) return;
 
