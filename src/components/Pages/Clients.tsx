@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, deleteRecordWithContext, getRecords, updateRecord } from '../../lib/api';
 import { Eye, Plus, Search, Trash2, UserRound, Edit2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -11,7 +11,6 @@ interface Client {
   email: string;
   tax_id?: string | null;
   ship_addresses?: string[] | string | null;
-  status?: string | null;
   created_at: string;
 }
 
@@ -82,7 +81,6 @@ export default function Clients() {
         .map((client) => ({
           ...client,
           ship_addresses: parseShipAddresses(client.ship_addresses),
-          status: client.status || 'active',
         }))
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setClients(sorted);
@@ -198,23 +196,19 @@ export default function Clients() {
     }
   };
 
-  const handleBlacklist = async (id: string) => {
-    if (!profile || !['superadmin', 'manager'].includes(profile.role)) {
-      alert('Only managers can blacklist clients.');
+  const handleDelete = async (id: string) => {
+    if (profile?.role !== 'superadmin') {
+      alert('Only the superadmin can delete clients.');
       return;
     }
-    if (!confirm('Blacklist this client? This action cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this client?')) return;
 
     try {
-      await updateRecord<Client>('clients', id, {
-        status: 'blacklist',
-        performed_by: profile?.id,
-        performer_role: profile?.role,
-      });
+      await deleteRecordWithContext('clients', id, { performed_by: profile?.id });
       fetchClients();
     } catch (error) {
-      console.error('Error blacklisting client:', error);
-      alert(error instanceof Error ? error.message : 'Failed to blacklist client.');
+      console.error('Error deleting client:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete client.');
     }
   };
 
@@ -277,9 +271,6 @@ export default function Clients() {
                   Tax ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ship Addresses
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -290,7 +281,7 @@ export default function Clients() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredClients.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={5} className="px-6 py-12 text-center">
                     <UserRound className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No clients found.</p>
                   </td>
@@ -309,17 +300,6 @@ export default function Clients() {
                         <div className="text-xs text-gray-500">{client.phone}</div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{client.tax_id || '-'}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            client.status === 'blacklist'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {client.status || 'active'}
-                        </span>
-                      </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {shipAddresses.length > 0 ? `${shipAddresses.length} address(es)` : '-'}
                       </td>
@@ -339,14 +319,9 @@ export default function Clients() {
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleBlacklist(client.id)}
-                          disabled={client.status === 'blacklist'}
-                          className={`inline-flex items-center p-2 rounded-lg transition ${
-                            client.status === 'blacklist'
-                              ? 'text-gray-300 cursor-not-allowed'
-                              : 'text-red-600 hover:bg-red-50'
-                          }`}
-                          aria-label="Blacklist client"
+                          onClick={() => handleDelete(client.id)}
+                          className="inline-flex items-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                          aria-label="Delete client"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -570,10 +545,6 @@ export default function Clients() {
                 <div>
                   <p className="text-gray-500">Tax ID</p>
                   <p className="font-medium text-gray-900">{detailClient.tax_id || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Status</p>
-                  <p className="font-medium text-gray-900">{detailClient.status || 'active'}</p>
                 </div>
               </div>
               <div>

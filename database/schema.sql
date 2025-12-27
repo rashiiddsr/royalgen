@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS `clients` (
   `email` VARCHAR(255) NOT NULL,
   `tax_id` VARCHAR(150) DEFAULT NULL,
   `ship_addresses` JSON DEFAULT NULL,
-  `status` VARCHAR(50) DEFAULT 'active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -168,18 +167,11 @@ CREATE TABLE IF NOT EXISTS `delivery_orders` (
 CREATE TABLE IF NOT EXISTS `invoices` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `invoice_number` VARCHAR(120) NOT NULL,
-  `sales_order_id` INT DEFAULT NULL,
-  `client_id` INT DEFAULT NULL,
-  `company_name` VARCHAR(255) DEFAULT NULL,
-  `billing_address` TEXT DEFAULT NULL,
-  `payment_time` VARCHAR(120) DEFAULT NULL,
-  `invoice_date` DATE DEFAULT NULL,
-  `goods` JSON DEFAULT NULL,
+  `customer_name` VARCHAR(255) DEFAULT NULL,
+  `order_reference` VARCHAR(120) DEFAULT NULL,
   `total_amount` DECIMAL(12,2) DEFAULT 0,
-  `tax_amount` DECIMAL(12,2) DEFAULT 0,
-  `grand_total` DECIMAL(12,2) DEFAULT 0,
-  `status` VARCHAR(50) DEFAULT 'overdue',
-  `paid_date` DATE DEFAULT NULL,
+  `status` VARCHAR(50) DEFAULT 'draft',
+  `due_date` DATE DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -31,7 +31,7 @@ type GoodFormData = Omit<
 
 export default function Goods() {
   const [goods, setGoods] = useState<Good[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string; status?: string | null }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingGood, setEditingGood] = useState<Good | null>(null);
@@ -112,8 +112,8 @@ export default function Goods() {
 
   const fetchSuppliers = async () => {
     try {
-      const data = await getRecords<{ id: string; name: string; status?: string | null }>('suppliers');
-      setSuppliers(data.map((supplier) => ({ id: supplier.id, name: supplier.name, status: supplier.status })));
+      const data = await getRecords<{ id: string; name: string }>('suppliers');
+      setSuppliers(data.map((supplier) => ({ id: supplier.id, name: supplier.name })));
     } catch (error) {
       console.error('Error fetching suppliers:', error);
     }
@@ -214,8 +214,7 @@ export default function Goods() {
     );
   });
 
-  const activeSuppliers = suppliers.filter((supplier) => (supplier.status || 'active') === 'active');
-  const filteredSuppliers = activeSuppliers.filter((supplier) =>
+  const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(supplierSearch.toLowerCase())
   );
 
@@ -451,8 +450,8 @@ export default function Goods() {
                       <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
                         {filteredSuppliers.length === 0 ? (
                           <div className="p-3 text-sm text-gray-600">
-                            {activeSuppliers.length === 0
-                              ? 'No active suppliers available. Add active suppliers first.'
+                            {suppliers.length === 0
+                              ? 'No suppliers available. Add suppliers first.'
                               : 'No suppliers match your search.'}
                           </div>
                         ) : (
