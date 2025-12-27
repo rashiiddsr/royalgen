@@ -33,7 +33,6 @@ interface DashboardProps {
 export default function Dashboard({ children, currentPage, onNavigate, themePreference, onThemeChange }: DashboardProps) {
   const { profile, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement | null>(null);
@@ -66,10 +65,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 1024px)');
-    const handleChange = () => {
-      setIsDesktop(mediaQuery.matches);
-      setSidebarOpen(mediaQuery.matches);
-    };
+    const handleChange = () => setSidebarOpen(mediaQuery.matches);
     handleChange();
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
@@ -113,13 +109,6 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900/80 dark:to-slate-900/60">
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-gray-200 z-40 px-4 py-3 flex items-center justify-between shadow-sm dark:bg-slate-900/80 dark:border-slate-800">
         <div className="flex items-center">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="mr-3 rounded-xl border border-gray-200 bg-white/80 p-2 shadow-sm transition-all hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
-            aria-label="Toggle navigation menu"
-          >
-            {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg blur opacity-50"></div>
             <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-2 rounded-lg overflow-hidden">
@@ -133,42 +122,36 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
             <p className="text-xs text-gray-600 font-medium dark:text-slate-400">Procurement</p>
           </div>
         </div>
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-xl hover:bg-gray-100 transition-all dark:hover:bg-slate-800"
+        >
+          {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
       </div>
 
       <div
         className={`fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-30 lg:hidden transition-opacity ${
-          !isDesktop && sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setSidebarOpen(false)}
       />
 
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-72 bg-white/80 backdrop-blur-xl border-r border-gray-200/50 z-40 shadow-2xl transition-[transform,width] duration-300 dark:bg-slate-900/80 dark:border-slate-800 ${
-          isDesktop ? (sidebarOpen ? 'lg:w-72' : 'lg:w-20') : ''
-        } ${isDesktop ? 'translate-x-0' : sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed top-0 left-0 bottom-0 w-72 bg-white/80 backdrop-blur-xl border-r border-gray-200/50 z-40 transition-transform shadow-2xl dark:bg-slate-900/80 dark:border-slate-800 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
         <div className="h-full flex flex-col">
           <div className="p-6 border-b border-gray-200/50 dark:border-slate-800">
             <div className="flex items-center">
-              <button
-                type="button"
-                onClick={() => setSidebarOpen((prev) => !prev)}
-                className="mr-3 hidden lg:inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                aria-label="Toggle navigation menu"
-              >
-                {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-              </button>
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-2xl blur-lg opacity-50"></div>
                 <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-3 rounded-2xl overflow-hidden">
                   <Building2 className="h-8 w-8 text-white" />
                 </div>
               </div>
-              <div
-                className={`ml-4 transition-all duration-200 ${
-                  sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'
-                }`}
-              >
+              <div className="ml-4">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
                   RGI NexaProc
                 </h1>
@@ -186,25 +169,20 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                   key={item.page}
                   onClick={() => {
                     onNavigate(item.page);
+                    setSidebarOpen(false);
                     setNotificationsOpen(false);
                     setProfileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center rounded-xl transition-all duration-200 ${
+                  className={`w-full flex items-center px-4 py-3.5 rounded-xl transition-all duration-200 ${
                     isActive
                       ? 'bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold shadow-lg shadow-blue-500/30 transform scale-[1.02]'
                       : 'text-gray-700 hover:bg-gray-100 font-medium dark:text-slate-200 dark:hover:bg-slate-800/70'
-                  } ${sidebarOpen ? 'gap-3 px-4 py-3.5 justify-start' : 'justify-center px-3 py-3'}`}
+                  }`}
                 >
                   <Icon
-                    className={`h-5 w-5 ${isActive ? 'text-white' : 'text-gray-500 dark:text-slate-400'}`}
+                    className={`h-5 w-5 mr-3 ${isActive ? 'text-white' : 'text-gray-500 dark:text-slate-400'}`}
                   />
-                  <span
-                    className={`whitespace-nowrap text-sm transition-all duration-200 ${
-                      sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'
-                    }`}
-                  >
-                    {item.name}
-                  </span>
+                  {item.name}
                 </button>
               );
             })}
@@ -212,14 +190,18 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
         </div>
       </aside>
 
-      <main
-        className={`pt-16 lg:pt-0 transition-[margin] ${
-          isDesktop ? (sidebarOpen ? 'lg:ml-72' : 'lg:ml-20') : 'lg:ml-0'
-        }`}
-      >
+      <main className={`pt-16 lg:pt-0 transition-all ${sidebarOpen ? 'lg:ml-72' : 'lg:ml-0'}`}>
         <div className="p-6 lg:p-10">
           <div className="flex justify-end mb-4">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen((prev) => !prev)}
+                className="hidden lg:inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Toggle navigation menu"
+              >
+                {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
               <div className="relative" ref={notificationRef}>
                 <button
                   type="button"
