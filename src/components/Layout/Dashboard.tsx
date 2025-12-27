@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ThemePreference } from '../../lib/theme';
+import ChatWidget from '../Chat/ChatWidget';
 
 interface DashboardProps {
   children: ReactNode;
@@ -360,6 +361,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
           {children}
         </div>
       </main>
+      {profile && <ChatWidget profile={profile} />}
     </div>
   );
 }

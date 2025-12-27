@@ -211,3 +211,16 @@ CREATE TABLE IF NOT EXISTS `activity_logs` (
   INDEX `idx_user_action` (`user_id`, `entity_type`, `entity_id`),
   CONSTRAINT `fk_activity_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 );
+
+-- Live chat messages (retained for 7 days)
+CREATE TABLE IF NOT EXISTS `chat_messages` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `user_role` VARCHAR(50) NOT NULL,
+  `user_name` VARCHAR(255),
+  `message` TEXT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_chat_created_at` (`created_at`),
+  INDEX `idx_chat_user_id` (`user_id`),
+  CONSTRAINT `fk_chat_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
