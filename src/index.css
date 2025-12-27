@@ -65,12 +65,20 @@
   background-color: rgba(30, 41, 59, 0.6);
 }
 
+.dark .hover\:bg-gray-100:hover {
+  background-color: rgba(30, 41, 59, 0.8);
+}
+
 .dark .hover\:bg-blue-50:hover {
   background-color: rgba(30, 64, 175, 0.2);
 }
 
 .dark .hover\:bg-amber-50:hover {
   background-color: rgba(180, 83, 9, 0.2);
+}
+
+.dark .hover\:bg-emerald-50:hover {
+  background-color: rgba(16, 185, 129, 0.15);
 }
 
 .dark .hover\:bg-red-50:hover {
@@ -131,4 +139,8 @@
 
 .dark .border-white\/20 {
   border-color: rgba(148, 163, 184, 0.2);
+}
+
+.dark .focus\:bg-white:focus {
+  background-color: #0f172a;
 }

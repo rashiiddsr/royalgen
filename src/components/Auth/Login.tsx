@@ -332,7 +332,7 @@ export default function Login() {
                   type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="email@company.com or username"
                   required
                 />
@@ -347,7 +347,7 @@ export default function Login() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="••••••••"
                   required
                 />
@@ -402,7 +402,7 @@ export default function Login() {
                   type="email"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="you@company.com"
                   required
                 />
@@ -441,7 +441,7 @@ export default function Login() {
                   type="password"
                   value={resetPassword}
                   onChange={(e) => setResetPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="••••••••"
                   required
                 />
@@ -456,7 +456,7 @@ export default function Login() {
                   type="password"
                   value={resetConfirm}
                   onChange={(e) => setResetConfirm(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="••••••••"
                   required
                 />
@@ -495,7 +495,7 @@ export default function Login() {
                   type="password"
                   value={setupCurrentPassword}
                   onChange={(e) => setSetupCurrentPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="Enter your default password"
                   required
                 />
@@ -509,7 +509,7 @@ export default function Login() {
                   type="text"
                   value={setupUsername}
                   onChange={(e) => setSetupUsername(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="username"
                   required
                 />
@@ -524,7 +524,7 @@ export default function Login() {
                   type="password"
                   value={setupPassword}
                   onChange={(e) => setSetupPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="••••••••"
                   required
                 />
@@ -539,7 +539,7 @@ export default function Login() {
                   type="password"
                   value={setupConfirm}
                   onChange={(e) => setSetupConfirm(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:bg-slate-900"
                   placeholder="••••••••"
                   required
                 />
