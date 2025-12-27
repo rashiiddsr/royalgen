@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { UserProfile, withLanguageHeaders } from '../lib/api';
+import { UserProfile } from '../lib/api';
 
 interface AuthContextType {
   user: { email: string } | null;
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
     const response = await fetch(`${apiBase}/auth/login`, {
       method: 'POST',
-      headers: withLanguageHeaders({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password }),
     });
 
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
     const response = await fetch(`${apiBase}/auth/google`, {
       method: 'POST',
-      headers: withLanguageHeaders({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ credential }),
     });
 
@@ -134,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
         await fetch(`${apiBase}/auth/logout`, {
           method: 'POST',
-          headers: withLanguageHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId }),
         });
       } catch (error) {
