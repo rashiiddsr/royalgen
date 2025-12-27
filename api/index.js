@@ -568,6 +568,124 @@ const sendSmtpMail = async ({ to, subject, html }) => {
   client.socket.end();
 };
 
+const getRoleEmails = async (roles) => {
+  const rows = await query('SELECT email FROM users WHERE role IN (?)', [roles]);
+  const emails = rows.map((row) => row.email).filter(Boolean);
+  return Array.from(new Set(emails));
+};
+
+const getUserById = async (id) => {
+  if (!id) return null;
+  const [user] = await query('SELECT id, email, full_name, role FROM users WHERE id = ? LIMIT 1', [id]);
+  return user || null;
+};
+
+const getRfqById = async (id) => {
+  if (!id) return null;
+  const [rfq] = await query(
+    'SELECT id, rfq_number, company_name, pic_name, pic_email, pic_phone FROM rfqs WHERE id = ? LIMIT 1',
+    [id]
+  );
+  return rfq || null;
+};
+
+const formatCurrency = (value) =>
+  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(value || 0));
+
+const formatStatusLabel = (status) => {
+  const map = {
+    waiting: 'Waiting',
+    negotiation: 'Negotiation',
+    renegotiation: 'Renegotiation',
+    rejected: 'Rejected',
+    process: 'Processed',
+    approved: 'Approved',
+  };
+  return map[status] || status || '-';
+};
+
+const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel }) => {
+  const rows = Array.isArray(goods) ? goods : [];
+  const goodsRows = rows.length
+    ? rows
+        .map(
+          (item, index) => `
+            <tr>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${index + 1}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.name || item.description || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.price)}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.delivery_time ?? '-'}</td>
+            </tr>
+          `
+        )
+        .join('')
+    : `
+        <tr>
+          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">Tidak ada item</td>
+        </tr>
+      `;
+
+  return `
+    <p>Halo Tim,</p>
+    <p>Berikut update quotation dengan status <strong>${formatStatusLabel(statusLabel)}</strong>.</p>
+    <h3>Informasi Quotation</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Nomor Quotation</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.quotation_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Status</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatStatusLabel(statusLabel)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Perusahaan</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.company_name || rfq?.company_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Project</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.project_name || rfq?.project_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_name || rfq?.pic_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Email PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_email || rfq?.pic_email || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Telepon PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_phone || rfq?.pic_phone || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Payment Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.payment_time || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.total_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PPN</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.tax_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Grand Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.grand_total)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">RFQ</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${rfq?.rfq_number || quotation.rfq_id || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Diajukan oleh</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || 'User'} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
+    </table>
+    <h3>Item Barang</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <thead>
+        <tr>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">No</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Nama</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Harga</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Delivery Time (days)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${goodsRows}
+      </tbody>
+    </table>
+    <p>Terima kasih.</p>
+  `;
+};
+
+const sendQuotationNotification = async ({ quotation, goods, statusLabel, recipients, requester, rfq }) => {
+  try {
+    const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
+    if (!uniqueRecipients.length) return;
+    const subject = `Quotation ${quotation.quotation_number || quotation.id} - ${formatStatusLabel(statusLabel)}`;
+    const html = buildQuotationEmailHtml({ quotation, goods, requester, rfq, statusLabel });
+    await Promise.allSettled(
+      uniqueRecipients.map((email) =>
+        sendSmtpMail({
+          to: email,
+          subject,
+          html,
+        })
+      )
+    );
+  } catch (error) {
+    console.error('Quotation notification error', error);
+  }
+};
+
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body || {};
 
@@ -958,6 +1076,22 @@ app.post('/api/:table', async (req, res) => {
         action: 'create',
         description: `Created quotation ${cleanedQuotationPayload.quotation_number || result.insertId}`,
       });
+
+      if (status === 'waiting') {
+        const requester = await getUserById(performedBy);
+        const rfq = await getRfqById(rfqId);
+        const roleEmails = await getRoleEmails(['superadmin', 'manager']);
+        const requesterEmail = requester?.email ? requester.email.toLowerCase() : null;
+        const recipients = roleEmails.filter((email) => email.toLowerCase() !== requesterEmail);
+        await sendQuotationNotification({
+          quotation: created,
+          goods: cleanedGoods,
+          statusLabel: 'waiting',
+          recipients,
+          requester,
+          rfq,
+        });
+      }
 
       return res.status(201).json({ ...created, goods: cleanedGoods });
     }
@@ -1358,6 +1492,64 @@ app.put('/api/:table/:id', async (req, res) => {
           entityId: id,
           action: 'status',
           description: `Updated quotation status to ${updated?.status || requestedStatus}`,
+        });
+      }
+
+      const requester = await getUserById(updated?.performed_by || existing.performed_by);
+      const rfq = await getRfqById(updated?.rfq_id || existing.rfq_id);
+      const roleEmails = await getRoleEmails(['superadmin', 'manager']);
+      const requesterEmail = requester?.email ? requester.email.toLowerCase() : null;
+      const roleRecipients = roleEmails.filter((email) => email.toLowerCase() !== requesterEmail);
+      const statusForNotification = shouldAutoRenegotiate ? 'renegotiation' : updated?.status || existing.status;
+      const shouldNotifyRequester =
+        ['negotiation', 'rejected', 'renegotiation'].includes(statusForNotification) &&
+        (isStatusChange || shouldAutoRenegotiate);
+      const requesterRecipients =
+        shouldNotifyRequester && requester?.email && requester?.role !== 'superadmin'
+          ? [requester.email]
+          : [];
+
+      const shouldNotifyWaiting =
+        isStatusChange && requestedStatus === 'waiting';
+      const shouldNotifyRenegotiationStatusChange =
+        isStatusChange && requestedStatus === 'renegotiation';
+      const shouldNotifyProcess = isStatusChange && requestedStatus === 'process';
+      const shouldNotifyWaitingOrRenegotiation =
+        shouldNotifyWaiting || shouldAutoRenegotiate || shouldNotifyRenegotiationStatusChange;
+
+      if (shouldNotifyWaitingOrRenegotiation) {
+        await sendQuotationNotification({
+          quotation: updated,
+          goods: cleanedGoods,
+          statusLabel: statusForNotification,
+          recipients: roleRecipients,
+          requester,
+          rfq,
+        });
+      }
+
+      if (shouldNotifyRequester) {
+        await sendQuotationNotification({
+          quotation: updated,
+          goods: cleanedGoods,
+          statusLabel: statusForNotification,
+          recipients: requesterRecipients,
+          requester,
+          rfq,
+        });
+      }
+
+      if (shouldNotifyProcess) {
+        const processRecipients = Array.from(
+          new Set([...roleRecipients, ...(requester?.email ? [requester.email] : [])])
+        );
+        await sendQuotationNotification({
+          quotation: updated,
+          goods: cleanedGoods,
+          statusLabel: 'process',
+          recipients: processRecipients,
+          requester,
+          rfq,
         });
       }
 
