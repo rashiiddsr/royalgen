@@ -811,14 +811,22 @@ export default function Quotations() {
                       {goodsRows.map((row, index) => {
                         const query = row.name.trim().toLowerCase();
                         const matches = query
-                          ? activeGoods.filter(
-                              (good) =>
+                          ? activeGoods.filter((good) => {
+                              const description = (good.description || '').toLowerCase();
+                              const sku = (good.sku || '').toLowerCase();
+                              const category = (good.category || '').toLowerCase();
+                              const unit = (good.unit || '').toLowerCase();
+                              return (
                                 good.name.toLowerCase().includes(query) ||
-                                (good.sku || '').toLowerCase().includes(query)
-                            )
-                          : activeGoods;
+                                sku.includes(query) ||
+                                description.includes(query) ||
+                                category.includes(query) ||
+                                unit.includes(query)
+                              );
+                            })
+                          : [];
                         const limitedMatches = matches.slice(0, 8);
-                        const showSuggestions = activeGoodsIndex === index;
+                        const showSuggestions = activeGoodsIndex === index && query.length > 0;
 
                         return (
                           <tr key={`${row.good_id}-${index}`}>
@@ -833,7 +841,7 @@ export default function Quotations() {
                                   }}
                                   onFocus={() => setActiveGoodsIndex(index)}
                                   onBlur={() => setTimeout(() => setActiveGoodsIndex(null), 120)}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded-lg"
+                                  className="w-40 max-w-full px-2 py-1 border border-gray-300 rounded-lg"
                                   placeholder="Search goods by name or SKU"
                                   required
                                 />

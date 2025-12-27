@@ -1,9 +1,6 @@
 import { ThemePreference } from './theme';
 
-export type LanguagePreference = 'indonesia' | 'english';
-
 const THEME_KEY = 'rgi_theme_preference';
-const LANGUAGE_KEY = 'rgi_language_preference';
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 const readCookie = (key: string) => {
@@ -33,17 +30,4 @@ export const setThemePreference = (value: ThemePreference) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(THEME_KEY, value);
   writeCookie(THEME_KEY, value);
-};
-
-export const getLanguagePreference = (): LanguagePreference => {
-  if (typeof window === 'undefined') return 'english';
-  const stored = localStorage.getItem(LANGUAGE_KEY) ?? readCookie(LANGUAGE_KEY);
-  if (stored === 'indonesia' || stored === 'english') return stored;
-  return 'english';
-};
-
-export const setLanguagePreference = (value: LanguagePreference) => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(LANGUAGE_KEY, value);
-  writeCookie(LANGUAGE_KEY, value);
 };

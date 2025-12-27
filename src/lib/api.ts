@@ -46,12 +46,16 @@ async function handleResponse(response: Response) {
 }
 
 export async function getRecords<T extends BaseRecord>(table: TableName): Promise<T[]> {
-  const response = await fetch(`${API_BASE_URL}/${table}`);
+  const response = await fetch(`${API_BASE_URL}/${table}`, {
+    headers: {},
+  });
   return handleResponse(response);
 }
 
 export async function getRecord<T extends BaseRecord>(table: TableName, id: string | number): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/${table}/${id}`);
+  const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
+    headers: {},
+  });
   return handleResponse(response);
 }
 
@@ -92,6 +96,7 @@ export async function updateRecord<T extends BaseRecord>(
 export async function deleteRecord(table: TableName, id: string | number): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
     method: 'DELETE',
+    headers: {},
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -124,6 +129,8 @@ export async function logActivity(payload: Partial<ActivityLog>) {
 
 export async function getActivityLogs(userId?: number | string) {
   const query = userId ? `?user_id=${userId}` : '';
-  const response = await fetch(`${API_BASE_URL}/activity_logs${query}`);
+  const response = await fetch(`${API_BASE_URL}/activity_logs${query}`, {
+    headers: {},
+  });
   return handleResponse(response) as Promise<ActivityLog[]>;
 }
