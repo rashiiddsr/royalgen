@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface QuotationGood {
   good_id: string;
@@ -70,6 +71,7 @@ const EMPTY_GOOD_ROW: QuotationGood = {
 
 export default function Quotations() {
   const { profile } = useAuth();
+  const { pushNotification } = useNotifications();
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -366,8 +368,16 @@ export default function Quotations() {
     try {
       if (editingQuotation) {
         await updateRecord<QuotationType>('quotations', editingQuotation.id, payload);
+        pushNotification({
+          title: 'Quotation updated',
+          message: `${formData.quotation_number} has been updated.`,
+        });
       } else {
         await addRecord<QuotationType>('quotations', payload);
+        pushNotification({
+          title: 'Quotation created',
+          message: `${formData.quotation_number} has been created.`,
+        });
       }
       setShowModal(false);
       setEditingQuotation(null);

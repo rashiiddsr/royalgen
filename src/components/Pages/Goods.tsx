@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { addRecord, getRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Search, Package, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface Good {
   id: string;
@@ -11,16 +12,17 @@ interface Good {
   category: 'consumable' | 'instrument' | 'electrical' | 'piping' | 'other';
   unit: string;
   price: number;
-  stock_quantity: number;
   minimum_order_quantity: number;
   status: string;
   suppliers?: { id: string | number; name: string; status?: string }[];
   created_at: string;
 }
 
-type GoodFormData = Omit<Good, 'id' | 'created_at' | 'suppliers'> & {
+type GoodFormData = Omit<Good, 'id' | 'created_at' | 'suppliers' | 'price' | 'minimum_order_quantity'> & {
   performed_by?: string | number;
   suppliers?: (string | number)[];
+  price: number | '';
+  minimum_order_quantity: number | '';
 };
 
 export default function Goods() {
@@ -36,9 +38,8 @@ export default function Goods() {
     description: '',
     category: 'other',
     unit: 'pcs',
-    price: 0,
-    stock_quantity: 0,
-    minimum_order_quantity: 1,
+    price: '',
+    minimum_order_quantity: '',
     status: 'active',
   });
   const [detailGood, setDetailGood] = useState<Good | null>(null);
@@ -46,6 +47,7 @@ export default function Goods() {
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
   const { profile } = useAuth();
+  const { pushNotification } = useNotifications();
 
   const canChangeStatus =
     !!editingGood && ['admin', 'manager', 'superadmin'].includes(profile?.role ?? '');
@@ -86,9 +88,8 @@ export default function Goods() {
     description: '',
     category,
     unit: 'pcs',
-    price: 0,
-    stock_quantity: 0,
-    minimum_order_quantity: 1,
+    price: '',
+    minimum_order_quantity: '',
     status: 'active',
   });
 
@@ -120,17 +121,25 @@ export default function Goods() {
     try {
       const payload: GoodFormData = {
         ...formData,
-        price: Number(formData.price),
-        stock_quantity: Number(formData.stock_quantity),
-        minimum_order_quantity: Number(formData.minimum_order_quantity),
+        price: formData.price === '' ? 0 : Number(formData.price),
+        minimum_order_quantity:
+          formData.minimum_order_quantity === '' ? 1 : Number(formData.minimum_order_quantity),
         performed_by: profile?.id,
         suppliers: selectedSuppliers,
       };
 
       if (editingGood) {
         await updateRecord<Good>('goods', editingGood.id, payload as Good);
+        pushNotification({
+          title: 'Goods updated',
+          message: `${formData.name} has been updated.`,
+        });
       } else {
         await addRecord<Good>('goods', payload as Good);
+        pushNotification({
+          title: 'Goods created',
+          message: `${formData.name} has been added.`,
+        });
       }
 
       await fetchGoods();
@@ -164,7 +173,6 @@ export default function Goods() {
         category: good.category,
         unit: good.unit,
         price: good.price,
-        stock_quantity: good.stock_quantity,
         minimum_order_quantity: good.minimum_order_quantity,
         status: good.status,
       });
@@ -200,6 +208,9 @@ export default function Goods() {
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(supplierSearch.toLowerCase())
   );
+
+  const formatRupiah = (value: number) =>
+    new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(value);
 
   if (loading) {
     return (
@@ -253,7 +264,7 @@ export default function Goods() {
                   Price
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Stock
+                  Unit
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -294,16 +305,12 @@ export default function Goods() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      Rp {good.price.toLocaleString()} / {good.unit}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {good.stock_quantity} {good.unit}
-                      </div>
+                      <div>Rp {formatRupiah(Number(good.price) || 0)}</div>
                       <div className="text-xs text-gray-500">
                         MOQ: {good.minimum_order_quantity}
                       </div>
                     </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{good.unit}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -360,7 +367,9 @@ export default function Goods() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.name}
@@ -500,30 +509,13 @@ export default function Goods() {
                   <input
                     type="number"
                     value={formData.price}
-                    onChange={(e) =>
-                      setFormData({ ...formData, price: Number(e.target.value) || 0 })
-                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, price: value === '' ? '' : Number(value) });
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="0"
                     step="0.01"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stock Quantity
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        stock_quantity: Math.max(0, Number(e.target.value) || 0),
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
                   />
                 </div>
 
@@ -534,12 +526,13 @@ export default function Goods() {
                   <input
                     type="number"
                     value={formData.minimum_order_quantity}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const value = e.target.value;
                       setFormData({
                         ...formData,
-                        minimum_order_quantity: Math.max(1, Number(e.target.value) || 1),
-                      })
-                    }
+                        minimum_order_quantity: value === '' ? '' : Math.max(1, Number(value) || 1),
+                      });
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="1"
                   />
@@ -637,13 +630,7 @@ export default function Goods() {
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Price</p>
-                <p>Rp {detailGood.price.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-700">Stock</p>
-                <p>
-                  {detailGood.stock_quantity} {detailGood.unit}
-                </p>
+                <p>Rp {formatRupiah(Number(detailGood.price) || 0)}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Minimum Order</p>

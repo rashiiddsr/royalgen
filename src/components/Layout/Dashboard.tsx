@@ -16,7 +16,10 @@ import {
   LogOut,
   Menu,
   X,
+  Bell,
+  CheckCircle,
 } from 'lucide-react';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface DashboardProps {
   children: ReactNode;
@@ -27,7 +30,9 @@ interface DashboardProps {
 export default function Dashboard({ children, currentPage, onNavigate }: DashboardProps) {
   const { profile, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
+  const { notifications, unreadCount, markAllRead, dismissNotification } = useNotifications();
 
   const navigation = [
     { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['superadmin', 'admin', 'manager', 'staff'] },
@@ -164,6 +169,69 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
 
       <main className="lg:ml-72 pt-16 lg:pt-0">
         <div className="p-6 lg:p-10">
+          <div className="flex justify-end mb-4">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen((prev) => !prev)}
+                className="relative inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:bg-gray-50"
+                aria-label="Toggle notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              {notificationsOpen && (
+                <div className="absolute right-0 z-30 mt-3 w-80 rounded-xl border border-gray-200 bg-white shadow-xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                    <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                    <button
+                      type="button"
+                      onClick={() => markAllRead()}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      Mark all read
+                    </button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-gray-500">
+                        No notifications yet.
+                      </div>
+                    ) : (
+                      notifications.map((item) => (
+                        <div
+                          key={item.id}
+                          className="border-b border-gray-100 px-4 py-3 last:border-b-0"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                              <p className="text-xs text-gray-600 mt-1">{item.message}</p>
+                              <p className="text-xs text-gray-400 mt-2">
+                                {new Date(item.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => dismissNotification(item.id)}
+                              className="text-gray-400 hover:text-gray-600"
+                              aria-label="Dismiss notification"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           {children}
         </div>
       </main>

@@ -2,6 +2,7 @@ import { useState, useEffect, ChangeEvent, FormEvent, useMemo } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, FileText, UploadCloud, Trash2, Search, Eye, Edit2, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface RFQGoodItem {
   type: 'existing' | 'other';
@@ -46,6 +47,7 @@ const DEFAULT_FORM = {
 
 export default function RFQ() {
   const { profile } = useAuth();
+  const { pushNotification } = useNotifications();
   const apiRoot = useMemo(
     () => (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, ''),
     [],
@@ -99,6 +101,10 @@ export default function RFQ() {
 
   useEffect(() => {
     fetchData();
+    const interval = window.setInterval(() => {
+      fetchData();
+    }, 60000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const fetchData = async () => {
@@ -266,8 +272,16 @@ export default function RFQ() {
           return;
         }
         await updateRecord<RFQType>('rfqs', editingRfq.id, payload);
+        pushNotification({
+          title: 'RFQ updated',
+          message: `${formData.rfq_number} has been updated.`,
+        });
       } else {
         await addRecord<RFQType>('rfqs', payload);
+        pushNotification({
+          title: 'RFQ created',
+          message: `${formData.rfq_number} has been created.`,
+        });
       }
 
       await fetchData();
@@ -597,7 +611,9 @@ export default function RFQ() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Other Goods *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Other Goods <span className="text-red-500">*</span>
+                </label>
                   <div className="space-y-2">
                     {otherGoods.map((item, index) => (
                       <div key={index} className="flex items-center gap-2">
@@ -632,7 +648,9 @@ export default function RFQ() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Attachment *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Attachment <span className="text-red-500">*</span>
+                </label>
                 <div className="flex items-center gap-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <UploadCloud className="h-5 w-5 text-gray-500" />
                   <div>

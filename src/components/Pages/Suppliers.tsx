@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { addRecord, deleteRecordWithContext, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, Search, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface Supplier {
   id: string;
@@ -19,6 +20,12 @@ interface Supplier {
 }
 
 type SupplierFormData = Omit<Supplier, 'id' | 'created_at'> & { performed_by?: string | number };
+interface Good {
+  id: string;
+  name: string;
+  sku?: string;
+  suppliers?: { id: string | number; name: string }[];
+}
 
 export default function Suppliers() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -28,6 +35,8 @@ export default function Suppliers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [contactError, setContactError] = useState('');
+  const [goods, setGoods] = useState<Good[]>([]);
+  const [showGoodsModal, setShowGoodsModal] = useState(false);
   const [formData, setFormData] = useState<SupplierFormData>({
     name: '',
     contact_person: '',
@@ -41,6 +50,7 @@ export default function Suppliers() {
     status: 'active',
   });
   const { profile } = useAuth();
+  const { pushNotification } = useNotifications();
 
   const normalizePhoneInput = (value: string) => {
     const trimmed = value.trim();
@@ -61,6 +71,7 @@ export default function Suppliers() {
 
   useEffect(() => {
     fetchSuppliers();
+    fetchGoods();
   }, []);
 
   const fetchSuppliers = async () => {
@@ -74,6 +85,15 @@ export default function Suppliers() {
       console.error('Error fetching suppliers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchGoods = async () => {
+    try {
+      const data = await getRecords<Good>('goods');
+      setGoods(data);
+    } catch (error) {
+      console.error('Error fetching goods:', error);
     }
   };
 
@@ -107,13 +127,22 @@ export default function Suppliers() {
         ...formData,
         email: emailValue,
         phone: phoneValue,
+        country: 'Indonesia',
         performed_by: profile?.id,
       };
 
       if (editingSupplier) {
         await updateRecord<Supplier>('suppliers', editingSupplier.id, payload as Supplier);
+        pushNotification({
+          title: 'Supplier updated',
+          message: `${formData.name} has been updated.`,
+        });
       } else {
         await addRecord<Supplier>('suppliers', payload as Supplier);
+        pushNotification({
+          title: 'Supplier created',
+          message: `${formData.name} has been added.`,
+        });
       }
 
       await fetchSuppliers();
@@ -148,7 +177,7 @@ export default function Suppliers() {
         phone: supplier.phone === '-' ? '-' : normalizePhoneInput(supplier.phone),
         address: supplier.address,
         city: supplier.city,
-        country: supplier.country,
+        country: 'Indonesia',
         tax_id: supplier.tax_id,
         payment_terms: supplier.payment_terms,
         status: supplier.status,
@@ -169,6 +198,7 @@ export default function Suppliers() {
       });
     }
     setContactError('');
+    setShowGoodsModal(false);
     setShowModal(true);
   };
 
@@ -183,6 +213,12 @@ export default function Suppliers() {
     supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     supplier.city.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const linkedGoods = detailSupplier
+    ? goods.filter((good) =>
+        (good.suppliers || []).some((supplier) => String(supplier.id) === String(detailSupplier.id))
+      )
+    : [];
 
   if (loading) {
     return (
@@ -325,7 +361,7 @@ export default function Suppliers() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Supplier Name *
+                    Supplier Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -338,7 +374,7 @@ export default function Suppliers() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact Person *
+                    Contact Person <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -350,7 +386,9 @@ export default function Suppliers() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.email}
@@ -365,7 +403,9 @@ export default function Suppliers() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone <span className="text-red-500">*</span>
+                  </label>
                   <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
                     <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
                     <input
@@ -410,9 +450,9 @@ export default function Suppliers() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
                   <input
                     type="text"
-                    value={formData.country}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value="Indonesia"
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   />
                 </div>
 
@@ -488,7 +528,10 @@ export default function Suppliers() {
                 <p className="text-sm text-gray-600">Full profile for {detailSupplier.name}</p>
               </div>
               <button
-                onClick={() => setDetailSupplier(null)}
+                onClick={() => {
+                  setDetailSupplier(null);
+                  setShowGoodsModal(false);
+                }}
                 className="text-gray-500 hover:text-gray-700"
                 aria-label="Close details"
               >
@@ -545,7 +588,38 @@ export default function Suppliers() {
                   {detailSupplier.status}
                 </span>
               </div>
+              <div className="md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGoodsModal((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                  View Goods Linked
+                </button>
+              </div>
             </div>
+            {showGoodsModal && (
+              <div className="border-t border-gray-200 px-6 py-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Goods Linked</h4>
+                {linkedGoods.length === 0 ? (
+                  <p className="text-sm text-gray-500">No goods linked to this supplier.</p>
+                ) : (
+                  <ul className="space-y-2 text-sm text-gray-700">
+                    {linkedGoods.map((good) => (
+                      <li
+                        key={good.id}
+                        className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">{good.name}</p>
+                          <p className="text-xs text-gray-500">{good.sku || '-'}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
