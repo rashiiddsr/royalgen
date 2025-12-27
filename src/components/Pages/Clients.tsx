@@ -198,23 +198,28 @@ export default function Clients() {
     }
   };
 
-  const handleBlacklist = async (id: string) => {
+  const handleToggleStatus = async (client: Client) => {
     if (!profile || !['superadmin', 'manager'].includes(profile.role)) {
-      alert('Only managers can blacklist clients.');
+      alert('Only managers can update client status.');
       return;
     }
-    if (!confirm('Blacklist this client? This action cannot be undone.')) return;
+    const nextStatus = client.status === 'blacklist' ? 'active' : 'blacklist';
+    const confirmation =
+      nextStatus === 'blacklist'
+        ? 'Blacklist this client? This action cannot be undone.'
+        : 'Activate this client?';
+    if (!confirm(confirmation)) return;
 
     try {
-      await updateRecord<Client>('clients', id, {
-        status: 'blacklist',
+      await updateRecord<Client>('clients', client.id, {
+        status: nextStatus,
         performed_by: profile?.id,
         performer_role: profile?.role,
       });
       fetchClients();
     } catch (error) {
-      console.error('Error blacklisting client:', error);
-      alert(error instanceof Error ? error.message : 'Failed to blacklist client.');
+      console.error('Error updating client status:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update client.');
     }
   };
 
@@ -339,16 +344,28 @@ export default function Clients() {
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleBlacklist(client.id)}
-                          disabled={client.status === 'blacklist'}
-                          className={`inline-flex items-center p-2 rounded-lg transition ${
-                            client.status === 'blacklist'
+                          onClick={() => handleToggleStatus(client)}
+                          disabled={!profile || !['superadmin', 'manager'].includes(profile.role ?? '')}
+                          className={`inline-flex items-center p-2 rounded-full transition ${
+                            !profile || !['superadmin', 'manager'].includes(profile.role ?? '')
                               ? 'text-gray-300 cursor-not-allowed'
-                              : 'text-red-600 hover:bg-red-50'
+                              : client.status === 'blacklist'
+                                ? 'text-gray-600 hover:bg-gray-100'
+                                : 'text-emerald-600 hover:bg-emerald-50'
                           }`}
-                          aria-label="Blacklist client"
+                          aria-label={`Set client ${client.status === 'blacklist' ? 'active' : 'blacklist'}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <span
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full ${
+                              client.status === 'blacklist' ? 'bg-gray-300' : 'bg-emerald-500'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                                client.status === 'blacklist' ? 'translate-x-1' : 'translate-x-4'
+                              }`}
+                            />
+                          </span>
                         </button>
                       </td>
                     </tr>

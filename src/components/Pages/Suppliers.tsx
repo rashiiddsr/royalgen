@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Edit2, Trash2, Search, Eye } from 'lucide-react';
+import { Plus, Edit2, Search, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Supplier {
@@ -63,9 +63,6 @@ export default function Suppliers() {
 
   const isValidEmail = (value: string) => value === '-' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   const isValidPhone = (value: string) => value === '-' || /^\+62\d{6,}$/.test(value);
-
-  const canManageStatus =
-    !!editingSupplier && ['superadmin', 'manager'].includes(profile?.role ?? '');
 
   useEffect(() => {
     fetchSuppliers();
@@ -142,16 +139,21 @@ export default function Suppliers() {
     }
   };
 
-  const handleDeactivate = async (id: string) => {
+  const handleToggleStatus = async (supplier: Supplier) => {
     if (!profile || !['superadmin', 'manager'].includes(profile.role)) {
-      alert('Only managers can inactivate suppliers.');
+      alert('Only managers can update supplier status.');
       return;
     }
-    if (!confirm('Mark this supplier as inactive?')) return;
+    const nextStatus = supplier.status === 'active' ? 'inactive' : 'active';
+    const confirmation =
+      nextStatus === 'inactive'
+        ? 'Mark this supplier as inactive?'
+        : 'Activate this supplier?';
+    if (!confirm(confirmation)) return;
 
     try {
-      await updateRecord<Supplier>('suppliers', id, {
-        status: 'inactive',
+      await updateRecord<Supplier>('suppliers', supplier.id, {
+        status: nextStatus,
         performed_by: profile?.id,
         performer_role: profile?.role,
       });
@@ -327,16 +329,28 @@ export default function Suppliers() {
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDeactivate(supplier.id)}
-                        disabled={!canDeactivateSupplier || supplier.status === 'inactive'}
-                        className={`inline-flex items-center p-2 rounded-lg transition ${
-                          !canDeactivateSupplier || supplier.status === 'inactive'
+                        onClick={() => handleToggleStatus(supplier)}
+                        disabled={!canDeactivateSupplier}
+                        className={`inline-flex items-center p-2 rounded-full transition ${
+                          !canDeactivateSupplier
                             ? 'text-gray-300 cursor-not-allowed'
-                            : 'text-red-600 hover:bg-red-50'
+                            : supplier.status === 'active'
+                              ? 'text-emerald-600 hover:bg-emerald-50'
+                              : 'text-gray-600 hover:bg-gray-100'
                         }`}
-                        aria-label="Inactivate supplier"
+                        aria-label={`Set supplier ${supplier.status === 'active' ? 'inactive' : 'active'}`}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <span
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full ${
+                            supplier.status === 'active' ? 'bg-emerald-500' : 'bg-gray-300'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                              supplier.status === 'active' ? 'translate-x-4' : 'translate-x-1'
+                            }`}
+                          />
+                        </span>
                       </button>
                     </td>
                   </tr>
@@ -483,19 +497,6 @@ export default function Suppliers() {
                   </select>
                 </div>
 
-                {canManageStatus && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                )}
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

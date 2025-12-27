@@ -52,8 +52,7 @@ export default function Goods() {
   const [supplierSearch, setSupplierSearch] = useState('');
   const { profile } = useAuth();
 
-  const canChangeStatus =
-    !!editingGood && ['admin', 'manager', 'superadmin'].includes(profile?.role ?? '');
+  const canToggleStatus = ['admin', 'manager', 'superadmin'].includes(profile?.role ?? '');
 
   const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
   const getCategoryBadge = (category: Good['category']) => {
@@ -202,6 +201,30 @@ export default function Goods() {
     }
   };
 
+  const handleToggleStatus = async (good: Good) => {
+    if (!canToggleStatus) {
+      alert('Only managers can update goods status.');
+      return;
+    }
+    const nextStatus = good.status === 'active' ? 'inactive' : 'active';
+    const confirmation =
+      nextStatus === 'inactive'
+        ? 'Mark this good as inactive?'
+        : 'Activate this good?';
+    if (!confirm(confirmation)) return;
+
+    try {
+      await updateRecord<Good>('goods', good.id, {
+        status: nextStatus,
+        performed_by: profile?.id,
+      });
+      fetchGoods();
+    } catch (error) {
+      console.error('Error updating goods status:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update goods.');
+    }
+  };
+
   const filteredGoods = goods.filter((good) => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return true;
@@ -347,6 +370,32 @@ export default function Goods() {
                         className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition dark:hover:bg-slate-800/60"
                       >
                         <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleToggleStatus(good)}
+                        disabled={!canToggleStatus}
+                        className={`inline-flex items-center p-2 rounded-full transition ${
+                          !canToggleStatus
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : good.status === 'active'
+                              ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
+                              : 'text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800/60'
+                        }`}
+                        aria-label={`Set good ${good.status === 'active' ? 'inactive' : 'active'}`}
+                      >
+                        <span
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full ${
+                            good.status === 'active'
+                              ? 'bg-emerald-500'
+                              : 'bg-gray-300 dark:bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                              good.status === 'active' ? 'translate-x-4' : 'translate-x-1'
+                            }`}
+                          />
+                        </span>
                       </button>
                     </td>
                   </tr>
@@ -567,38 +616,21 @@ export default function Goods() {
                   />
                 </div>
 
-                {canChangeStatus ? (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <div className="mt-1">
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        formData.status === 'active'
+                          ? 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'
+                      }`}
                     >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                      {formData.status}
+                    </span>
                   </div>
-                ) : editingGood ? (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <div className="mt-1">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          formData.status === 'active'
-                            ? 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
-                            : 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'
-                        }`}
-                      >
-                        {formData.status}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="md:col-span-2 text-sm text-gray-600">
-                    Status defaults to Active and cannot be changed during creation.
-                  </div>
-                )}
+                  <p className="text-xs text-gray-500 mt-1">Status can be changed via the toggle in the table.</p>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

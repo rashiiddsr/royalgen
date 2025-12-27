@@ -191,10 +191,10 @@ export default function Invoices() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 border-b border-gray-200 dark:bg-slate-800 dark:border-slate-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Invoice
@@ -216,7 +216,7 @@ export default function Invoices() {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-900 dark:divide-slate-800">
               {invoices.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
@@ -268,7 +268,7 @@ export default function Invoices() {
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => setDetailInvoice(invoice)}
-                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition dark:hover:bg-slate-800/60"
                         aria-label="View invoice"
                       >
                         <Eye className="h-4 w-4" />
@@ -279,7 +279,7 @@ export default function Invoices() {
                         className={`inline-flex items-center p-2 rounded-lg transition ${
                           invoice.status === 'paid'
                             ? 'text-gray-300 cursor-not-allowed'
-                            : 'text-emerald-600 hover:bg-emerald-50'
+                            : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
                         }`}
                         aria-label="Edit invoice"
                       >
@@ -291,7 +291,7 @@ export default function Invoices() {
                         className={`inline-flex items-center p-2 rounded-lg transition ${
                           invoice.status !== 'overdue'
                             ? 'text-gray-300 cursor-not-allowed'
-                            : 'text-purple-600 hover:bg-purple-50'
+                            : 'text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-500/10'
                         }`}
                         aria-label="Mark invoice paid"
                       >
@@ -446,20 +446,19 @@ export default function Invoices() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Billing Address</label>
-                <input
-                  type="text"
-                  list="billing-address-options"
+                <select
                   value={editForm.billing_address}
                   onChange={(e) => setEditForm({ ...editForm, billing_address: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Select or enter billing address"
                   required
-                />
-                <datalist id="billing-address-options">
+                >
+                  <option value="">Select billing address</option>
                   {resolveAddressOptions(editingInvoice).map((address) => (
-                    <option key={address} value={address} />
+                    <option key={address} value={address}>
+                      {address}
+                    </option>
                   ))}
-                </datalist>
+                </select>
                 <p className="text-xs text-gray-500 mt-1">
                   Choose from the main address or ship addresses of the company.
                 </p>
