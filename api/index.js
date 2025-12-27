@@ -7,8 +7,6 @@ import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import net from 'net';
 import tls from 'tls';
-import http from 'http';
-import { Server as SocketIOServer } from 'socket.io';
 import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,7 +15,6 @@ const __dirname = path.dirname(__filename);
 loadEnv();
 
 const app = express();
-const server = http.createServer(app);
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 4000);
 const uploadDir = path.join(__dirname, 'uploads');
 
@@ -28,69 +25,6 @@ if (!fs.existsSync(uploadDir)) {
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/uploads', express.static(uploadDir));
-
-const io = new SocketIOServer(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
-  },
-});
-
-const CHAT_ROLES = new Set(['superadmin', 'admin', 'manager', 'staff']);
-const CHAT_ROOM = 'shared';
-const CHAT_RETENTION_DAYS = 7;
-
-const buildMessagePayload = ({ id, message, sender, createdAt, attachment }) => ({
-  id,
-  room: CHAT_ROOM,
-  message,
-  sender,
-  attachment,
-  created_at: createdAt,
-});
-
-const pruneOldChatMessages = async () => {
-  await query('DELETE FROM chat_messages WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)', [
-    CHAT_RETENTION_DAYS,
-  ]);
-};
-
-const fetchChatHistory = async () => {
-  const rows = await query(
-    'SELECT id, user_id, user_role, user_name, user_photo_url, message, attachment_url, attachment_name, attachment_type, created_at FROM chat_messages WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) ORDER BY created_at ASC',
-    [CHAT_RETENTION_DAYS],
-  );
-  return rows.map((row) =>
-    buildMessagePayload({
-      id: String(row.id),
-      message: row.message,
-      sender: { id: row.user_id, role: row.user_role, name: row.user_name, photo_url: row.user_photo_url },
-      attachment:
-        row.attachment_url
-          ? { url: row.attachment_url, name: row.attachment_name, type: row.attachment_type }
-          : null,
-      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
-    }),
-  );
-};
-
-const normalizeChatAttachment = (attachment) => {
-  if (!attachment || typeof attachment !== 'object') return null;
-  const { data, name, type } = attachment;
-  if (!data || typeof data !== 'string') return null;
-  const url = saveBase64File(data, 'chat-attachment');
-  return {
-    url,
-    name: name || 'attachment',
-    type: type || 'application/octet-stream',
-  };
-};
-
-const resolveChatUserId = async (userId) => {
-  if (!userId) return null;
-  const [row] = await query('SELECT id FROM users WHERE id = ? LIMIT 1', [userId]);
-  return row?.id ? userId : null;
-};
 
 const TABLES = [
   'suppliers',
@@ -2372,78 +2306,6 @@ app.delete('/api/:table/:id', async (req, res) => {
   }
 });
 
-io.on('connection', (socket) => {
-  socket.on('register', (payload = {}, callback) => {
-    const { user_id: userId, role, name, photo_url: photoUrl } = payload;
-    if (!userId || !role || !CHAT_ROLES.has(role)) {
-      if (callback) callback({ ok: false, error: 'Invalid user payload' });
-      return;
-    }
-    socket.data.user = { id: userId, role, name: name || null, photo_url: photoUrl || null };
-    socket.join(CHAT_ROOM);
-    const respond = async () => {
-      try {
-        await pruneOldChatMessages();
-        const history = await fetchChatHistory();
-        socket.emit('chat_history', history);
-      } catch (error) {
-        console.error('Failed to load chat history', error);
-      }
-    };
-    respond();
-    if (callback) callback({ ok: true });
-  });
-
-  socket.on('chat_message', (payload = {}, callback) => {
-    const { message, attachment } = payload;
-    const user = socket.data.user;
-    if (!user) {
-      if (callback) callback({ ok: false, error: 'User not registered' });
-      return;
-    }
-    const normalizedAttachment = normalizeChatAttachment(attachment);
-    const hasMessage = typeof message === 'string' && message.trim().length > 0;
-    if (!hasMessage && !normalizedAttachment) {
-      if (callback) callback({ ok: false, error: 'Message or attachment is required' });
-      return;
-    }
-    const trimmedMessage = hasMessage ? message.trim() : '';
-    const handleMessage = async () => {
-      try {
-        await pruneOldChatMessages();
-        const resolvedUserId = await resolveChatUserId(user.id);
-        const result = await query(
-          'INSERT INTO chat_messages (user_id, user_role, user_name, user_photo_url, message, attachment_url, attachment_name, attachment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            resolvedUserId,
-            user.role,
-            user.name,
-            user.photo_url,
-            trimmedMessage,
-            normalizedAttachment?.url || null,
-            normalizedAttachment?.name || null,
-            normalizedAttachment?.type || null,
-          ],
-        );
-        const createdAt = new Date().toISOString();
-        const payloadToSend = buildMessagePayload({
-          id: String(result.insertId || crypto.randomUUID()),
-          message: trimmedMessage,
-          sender: { id: user.id, role: user.role, name: user.name, photo_url: user.photo_url },
-          attachment: normalizedAttachment,
-          createdAt,
-        });
-        io.to(CHAT_ROOM).emit('chat_message', payloadToSend);
-        if (callback) callback({ ok: true, message: payloadToSend });
-      } catch (error) {
-        console.error('Failed to save chat message', error);
-        if (callback) callback({ ok: false, error: 'Failed to save message' });
-      }
-    };
-    handleMessage();
-  });
-});
-
-server.listen(port, '0.0.0.0', () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`RGI NexaProc API listening on port ${port}`);
 });
