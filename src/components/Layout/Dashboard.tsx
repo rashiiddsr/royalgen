@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, ReactNode } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useI18n } from '../../contexts/I18nContext';
 import {
   Building2,
   Home,
@@ -21,7 +20,9 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { getRecords } from '../../lib/api';
 import { ThemePreference } from '../../lib/theme';
+import { getLanguagePreference, LanguagePreference, setLanguagePreference } from '../../lib/userPreferences';
 
 interface DashboardProps {
   children: ReactNode;
@@ -36,29 +37,46 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const { language, setLanguage, t } = useI18n();
+  const [languagePreference, setLanguagePreferenceState] = useState<LanguagePreference>(() =>
+    getLanguagePreference()
+  );
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
   const notificationRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const { notifications, unreadCount, markAllRead, dismissNotification } = useNotifications();
 
   const navigation = [
-    { name: t('Dashboard'), icon: Home, page: 'dashboard', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('Suppliers'), icon: Users, page: 'suppliers', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('Goods'), icon: Package, page: 'goods', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('RFQ'), icon: FileText, page: 'rfq', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('Quotations'), icon: FileCheck, page: 'quotations', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('Sales Orders'), icon: ShoppingCart, page: 'orders', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('Delivery Orders'), icon: Truck, page: 'delivery-orders', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('Invoices'), icon: Receipt, page: 'invoices', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('Profile'), icon: UserCircle, page: 'profile', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: t('User Management'), icon: UserCog, page: 'users', roles: ['superadmin', 'admin', 'manager'] },
-    { name: t('Settings'), icon: Settings, page: 'settings', roles: ['superadmin'] },
+    { name: 'Dashboard', icon: Home, page: 'dashboard', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'Suppliers', icon: Users, page: 'suppliers', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'Goods', icon: Package, page: 'goods', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'RFQ', icon: FileText, page: 'rfq', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'Quotations', icon: FileCheck, page: 'quotations', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'Delivery Orders', icon: Truck, page: 'delivery-orders', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'Profile', icon: UserCircle, page: 'profile', roles: ['superadmin', 'admin', 'manager', 'staff'] },
+    { name: 'User Management', icon: UserCog, page: 'users', roles: ['superadmin', 'admin', 'manager'] },
+    { name: 'Settings', icon: Settings, page: 'settings', roles: ['superadmin'] },
   ];
 
   const filteredNavigation = navigation.filter(item =>
     profile?.role && item.roles.includes(profile.role)
   );
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await getRecords<{ logo_url?: string | null }>('settings');
+        const logoUrl = settings[0]?.logo_url;
+        setCompanyLogoUrl(logoUrl ? `${apiRoot}${logoUrl}` : null);
+      } catch (error) {
+        console.error('Failed to fetch company logo', error);
+      }
+    };
+
+    fetchSettings();
+  }, [apiRoot]);
 
   useEffect(() => {
     setNotificationsOpen(false);
@@ -88,8 +106,9 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
     }
   };
 
-  const handleLanguageChange = (value: typeof language) => {
-    setLanguage(value);
+  const handleLanguageChange = (value: LanguagePreference) => {
+    setLanguagePreferenceState(value);
+    setLanguagePreference(value);
   };
 
   const avatarContent = profile?.photo_url ? (
@@ -110,14 +129,18 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg blur opacity-50"></div>
             <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-2 rounded-lg overflow-hidden">
-              <Building2 className="h-5 w-5 text-white" />
+              {companyLogoUrl ? (
+                <img src={companyLogoUrl} alt="RGI logo" className="h-5 w-5 object-contain" />
+              ) : (
+                <Building2 className="h-5 w-5 text-white" />
+              )}
             </div>
           </div>
           <div className="ml-3">
             <h1 className="text-base font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
               RGI NexaProc
             </h1>
-            <p className="text-xs text-gray-600 font-medium dark:text-slate-400">{t('Procurement')}</p>
+            <p className="text-xs text-gray-600 font-medium dark:text-slate-400">Procurement</p>
           </div>
         </div>
         <button
@@ -146,14 +169,18 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-2xl blur-lg opacity-50"></div>
                 <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-3 rounded-2xl overflow-hidden">
-                  <Building2 className="h-8 w-8 text-white" />
+                  {companyLogoUrl ? (
+                    <img src={companyLogoUrl} alt="RGI logo" className="h-8 w-8 object-contain" />
+                  ) : (
+                    <Building2 className="h-8 w-8 text-white" />
+                  )}
                 </div>
               </div>
               <div className="ml-4">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
                   RGI NexaProc
                 </h1>
-                <p className="text-sm text-gray-600 font-medium dark:text-slate-400">{t('Procurement')}</p>
+                <p className="text-sm text-gray-600 font-medium dark:text-slate-400">Procurement</p>
               </div>
             </div>
           </div>
@@ -197,7 +224,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                   type="button"
                   onClick={() => setNotificationsOpen((prev) => !prev)}
                   className="relative inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  aria-label={t('Toggle notifications')}
+                  aria-label="Toggle notifications"
                 >
                   <Bell className="h-5 w-5" />
                   {unreadCount > 0 && (
@@ -209,19 +236,19 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                 {notificationsOpen && (
                   <div className="absolute right-0 z-30 mt-3 w-80 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
                     <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-slate-800">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{t('Notifications')}</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</p>
                       <button
                         type="button"
                         onClick={() => markAllRead()}
                         className="text-xs font-semibold text-blue-600 hover:text-blue-700"
                       >
-                        {t('Mark all read')}
+                        Mark all read
                       </button>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (
                         <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">
-                          {t('Notifications are temporarily disabled.')}
+                          Notifications are temporarily disabled.
                         </div>
                       ) : (
                         notifications.map((item) => (
@@ -245,7 +272,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                                 type="button"
                                 onClick={() => dismissNotification(item.id)}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
-                                aria-label={t('Dismiss notification')}
+                                aria-label="Dismiss notification"
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </button>
@@ -287,29 +314,29 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                     <div className="px-4 py-3 space-y-3">
                       <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">
-                          {t('Theme')}
+                          Theme
                         </label>
                         <select
                           value={themePreference}
                           onChange={(event) => onThemeChange(event.target.value as ThemePreference)}
                           className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         >
-                          <option value="system">{t('System Default')}</option>
-                          <option value="light">{t('Light')}</option>
-                          <option value="dark">{t('Dark')}</option>
+                          <option value="system">System Default</option>
+                          <option value="light">Light</option>
+                          <option value="dark">Dark</option>
                         </select>
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">
-                          {t('Language')}
+                          Language
                         </label>
                         <select
-                          value={language}
-                          onChange={(event) => handleLanguageChange(event.target.value as typeof language)}
+                          value={languagePreference}
+                          onChange={(event) => handleLanguageChange(event.target.value as LanguagePreference)}
                           className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         >
-                          <option value="indonesia">{t('Indonesia')}</option>
-                          <option value="english">{t('English')}</option>
+                          <option value="indonesia">Indonesia</option>
+                          <option value="english">English</option>
                         </select>
                       </div>
                     </div>
@@ -322,14 +349,14 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                         }}
                         className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
-                        {t('Profile Settings')}
+                        Profile Settings
                       </button>
                       <button
                         type="button"
                         onClick={handleSignOut}
                         className="w-full px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                       >
-                        {t('Sign Out')}
+                        Sign Out
                       </button>
                     </div>
                   </div>

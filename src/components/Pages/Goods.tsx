@@ -2,7 +2,6 @@ import { useState, useEffect, FormEvent } from 'react';
 import { addRecord, getRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Search, Package, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useI18n } from '../../contexts/I18nContext';
 
 interface Good {
   id: string;
@@ -52,7 +51,6 @@ export default function Goods() {
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
   const { profile } = useAuth();
-  const { t } = useI18n();
 
   const canChangeStatus =
     !!editingGood && ['admin', 'manager', 'superadmin'].includes(profile?.role ?? '');
@@ -125,7 +123,7 @@ export default function Goods() {
     e.preventDefault();
     try {
       if (formData.price === '') {
-        alert(t('Price is required.'));
+        alert('Price is required.');
         return;
       }
       const payload: GoodFormData = {
@@ -204,17 +202,11 @@ export default function Goods() {
     }
   };
 
-  const filteredGoods = goods.filter((good) => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return true;
-    return (
-      good.name.toLowerCase().includes(query) ||
-      good.sku.toLowerCase().includes(query) ||
-      good.category.toLowerCase().includes(query) ||
-      good.description.toLowerCase().includes(query) ||
-      good.unit.toLowerCase().includes(query)
-    );
-  });
+  const filteredGoods = goods.filter(good =>
+    good.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    good.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    good.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(supplierSearch.toLowerCase())
@@ -226,7 +218,7 @@ export default function Goods() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">{t('Loading...')}</div>
+        <div className="text-gray-600">Loading...</div>
       </div>
     );
   }
@@ -235,15 +227,15 @@ export default function Goods() {
     <div>
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('Goods')}</h1>
-          <p className="text-gray-600 mt-1">{t('Manage your product inventory')}</p>
+          <h1 className="text-3xl font-bold text-gray-900">Goods</h1>
+          <p className="text-gray-600 mt-1">Manage your product inventory</p>
         </div>
         <button
           onClick={() => openModal()}
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           <Plus className="h-5 w-5 mr-2" />
-          {t('Add Good')}
+          Add Good
         </button>
       </div>
 
@@ -252,7 +244,7 @@ export default function Goods() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder={t('Search goods...')}
+            placeholder="Search goods..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -266,22 +258,22 @@ export default function Goods() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('Product')}
+                  Product
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('Category')}
+                  Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('Price')}
+                  Price
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('Unit')}
+                  Unit
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('Status')}
+                  Status
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('Actions')}
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -289,7 +281,7 @@ export default function Goods() {
               {filteredGoods.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    {t('No goods found. Add your first product to get started.')}
+                    No goods found. Add your first product to get started.
                   </td>
                 </tr>
               ) : (
@@ -302,9 +294,7 @@ export default function Goods() {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-slate-100">{good.name}</div>
-                          <div className="text-sm text-gray-500 dark:text-slate-400">
-                            {t('SKU: {sku}', { sku: good.sku })}
-                          </div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">SKU: {good.sku}</div>
                         </div>
                       </div>
                     </td>
@@ -318,9 +308,9 @@ export default function Goods() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">
-                      <div>{t('Rp {amount}', { amount: formatRupiah(Number(good.price) || 0) })}</div>
+                      <div>Rp {formatRupiah(Number(good.price) || 0)}</div>
                       <div className="text-xs text-gray-500 dark:text-slate-400">
-                        {t('MOQ: {value}', { value: good.minimum_order_quantity })}
+                        MOQ: {good.minimum_order_quantity}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">{good.unit}</td>
@@ -338,14 +328,14 @@ export default function Goods() {
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => openDetails(good)}
-                        className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition dark:hover:bg-amber-500/10"
-                        aria-label={t('View details')}
+                        className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                        aria-label="View details"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => openModal(good)}
-                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition dark:hover:bg-slate-800/60"
+                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
@@ -363,25 +353,25 @@ export default function Goods() {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900">
-                {editingGood ? t('Edit Good') : t('Add Good')}
+                {editingGood ? 'Edit Good' : 'Add Good'}
               </h2>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('SKU (Auto)')}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Auto)</label>
                   <div className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-800">
-                    {formData.sku || t('Select a category to generate SKU.')}
+                    {formData.sku || 'Select a category to generate SKU.'}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {t('SKU is generated automatically using rgi-(category)-0001 format based on sequence.')}
+                    SKU is generated automatically using rgi-(category)-0001 format based on sequence.
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('Name')} <span className="text-red-500">*</span>
+                    Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -394,7 +384,7 @@ export default function Goods() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('Description')} <span className="text-red-500">*</span>
+                    Description <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={formData.description}
@@ -406,7 +396,7 @@ export default function Goods() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('Suppliers')}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Suppliers</label>
                   <div className="space-y-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -414,14 +404,14 @@ export default function Goods() {
                         type="text"
                         value={supplierSearch}
                         onChange={(e) => setSupplierSearch(e.target.value)}
-                        placeholder={t('Search and add suppliers')}
+                        placeholder="Search and add suppliers"
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       {selectedSuppliers.length === 0 ? (
-                        <span className="text-sm text-gray-500">{t('No suppliers linked yet.')}</span>
+                        <span className="text-sm text-gray-500">No suppliers linked yet.</span>
                       ) : (
                         selectedSuppliers.map((supplierId) => {
                           const supplier = suppliers.find((item) => String(item.id) === supplierId);
@@ -438,7 +428,7 @@ export default function Goods() {
                                 onClick={() =>
                                   setSelectedSuppliers((prev) => prev.filter((id) => id !== supplierId))
                                 }
-                                aria-label={t('Remove {name}', { name: supplier.name })}
+                                aria-label={`Remove ${supplier.name}`}
                               >
                                 ✕
                               </button>
@@ -453,8 +443,8 @@ export default function Goods() {
                         {filteredSuppliers.length === 0 ? (
                           <div className="p-3 text-sm text-gray-600">
                             {suppliers.length === 0
-                              ? t('No suppliers available. Add suppliers first.')
-                              : t('No suppliers match your search.')}
+                              ? 'No suppliers available. Add suppliers first.'
+                              : 'No suppliers match your search.'}
                           </div>
                         ) : (
                           filteredSuppliers.map((supplier) => (
@@ -472,24 +462,22 @@ export default function Goods() {
                             >
                               <span className="text-sm text-gray-800">{supplier.name}</span>
                               {selectedSuppliers.includes(String(supplier.id)) && (
-                                <span className="text-xs text-blue-600 font-semibold">{t('Linked')}</span>
+                                <span className="text-xs text-blue-600 font-semibold">Linked</span>
                               )}
                             </button>
                           ))
                         )}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500">{t('Type to search suppliers.')}</p>
+                      <p className="text-sm text-gray-500">Type to search suppliers.</p>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      {t('Search and select multiple suppliers for this good.')}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Search and select multiple suppliers for this good.</p>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('Category')} <span className="text-red-500">*</span>
+                    Category <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={formData.category}
@@ -498,7 +486,7 @@ export default function Goods() {
                     required
                   >
                     <option value="" disabled>
-                      {t('Select category')}
+                      Select category
                     </option>
                     {categories.map((category) => (
                       <option key={category} value={category} className="capitalize">
@@ -510,7 +498,7 @@ export default function Goods() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('Unit')} <span className="text-red-500">*</span>
+                    Unit <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={formData.unit}
@@ -519,20 +507,20 @@ export default function Goods() {
                     required
                   >
                     <option value="" disabled>
-                      {t('Select unit')}
+                      Select unit
                     </option>
-                    <option value="pcs">{t('Pieces')}</option>
-                    <option value="box">{t('Box')}</option>
-                    <option value="kg">{t('Kilogram')}</option>
-                    <option value="liter">{t('Liter')}</option>
-                    <option value="meter">{t('Meter')}</option>
-                    <option value="set">{t('Set')}</option>
+                    <option value="pcs">Pieces</option>
+                    <option value="box">Box</option>
+                    <option value="kg">Kilogram</option>
+                    <option value="liter">Liter</option>
+                    <option value="meter">Meter</option>
+                    <option value="set">Set</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('Price (Rp)')} <span className="text-red-500">*</span>
+                    Price (Rp) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -550,7 +538,7 @@ export default function Goods() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('Minimum Order Quantity')} <span className="text-red-500">*</span>
+                    Minimum Order Quantity <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -570,19 +558,19 @@ export default function Goods() {
 
                 {canChangeStatus ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('Status')}</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="active">{t('Active')}</option>
-                      <option value="inactive">{t('Inactive')}</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
                     </select>
                   </div>
                 ) : editingGood ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('Status')}</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <div className="mt-1">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -597,7 +585,7 @@ export default function Goods() {
                   </div>
                 ) : (
                   <div className="md:col-span-2 text-sm text-gray-600">
-                    {t('Status defaults to Active and cannot be changed during creation.')}
+                    Status defaults to Active and cannot be changed during creation.
                   </div>
                 )}
               </div>
@@ -608,13 +596,13 @@ export default function Goods() {
                   onClick={closeModal}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
-                  {t('Cancel')}
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  {editingGood ? t('Update') : t('Create')}
+                  {editingGood ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>
@@ -627,13 +615,13 @@ export default function Goods() {
           <div className="bg-white rounded-xl shadow-xl max-w-xl w-full overflow-hidden">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{t('Goods Details')}</h3>
-                <p className="text-sm text-gray-600">{t('SKU {sku}', { sku: detailGood.sku })}</p>
+                <h3 className="text-xl font-bold text-gray-900">Goods Details</h3>
+                <p className="text-sm text-gray-600">SKU {detailGood.sku}</p>
               </div>
               <button
                 onClick={() => setDetailGood(null)}
                 className="text-gray-500 hover:text-gray-700"
-                aria-label={t('Close details')}
+                aria-label="Close details"
               >
                 ✕
               </button>
@@ -641,11 +629,11 @@ export default function Goods() {
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-800">
               <div>
-                <p className="font-semibold text-gray-700">{t('Name')}</p>
+                <p className="font-semibold text-gray-700">Name</p>
                 <p>{detailGood.name}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">{t('Category')}</p>
+                <p className="font-semibold text-gray-700">Category</p>
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full capitalize ${getCategoryBadge(
                     detailGood.category,
@@ -655,19 +643,19 @@ export default function Goods() {
                 </span>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">{t('Unit')}</p>
+                <p className="font-semibold text-gray-700">Unit</p>
                 <p>{detailGood.unit}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">{t('Price')}</p>
-                <p>{t('Rp {amount}', { amount: formatRupiah(Number(detailGood.price) || 0) })}</p>
+                <p className="font-semibold text-gray-700">Price</p>
+                <p>Rp {formatRupiah(Number(detailGood.price) || 0)}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">{t('Minimum Order')}</p>
+                <p className="font-semibold text-gray-700">Minimum Order</p>
                 <p>{detailGood.minimum_order_quantity}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">{t('Status')}</p>
+                <p className="font-semibold text-gray-700">Status</p>
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                     detailGood.status === 'active'
@@ -679,16 +667,16 @@ export default function Goods() {
                 </span>
               </div>
               <div className="md:col-span-2">
-                <p className="font-semibold text-gray-700">{t('Description')}</p>
+                <p className="font-semibold text-gray-700">Description</p>
                 <p>{detailGood.description || '-'}</p>
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 space-y-3 text-sm text-gray-800">
               {detailLoading && (
-                <p className="text-gray-500">{t('Loading the latest supplier information...')}</p>
+                <p className="text-gray-500">Loading the latest supplier information...</p>
               )}
               <div>
-                <p className="font-semibold text-gray-700">{t('Suppliers')}</p>
+                <p className="font-semibold text-gray-700">Suppliers</p>
                 {detailGood.suppliers && detailGood.suppliers.length > 0 ? (
                   <ul className="mt-2 space-y-2">
                     {detailGood.suppliers.map((supplier) => (
@@ -698,15 +686,13 @@ export default function Goods() {
                       >
                         <span className="font-medium text-gray-900">{supplier.name}</span>
                         {supplier.status && (
-                          <span className="text-xs text-gray-500">
-                            {t('Status')}: {supplier.status}
-                          </span>
+                          <span className="text-xs text-gray-500">Status: {supplier.status}</span>
                         )}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-gray-600 mt-1">{t('No linked suppliers yet.')}</p>
+                  <p className="text-gray-600 mt-1">No linked suppliers yet.</p>
                 )}
               </div>
             </div>

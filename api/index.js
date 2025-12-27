@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import net from 'net';
 import tls from 'tls';
 import { loadEnv, query } from './db.js';
-import { getRequestLanguage, t as translate } from './i18n.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,11 +25,6 @@ if (!fs.existsSync(uploadDir)) {
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/uploads', express.static(uploadDir));
-app.use((req, _res, next) => {
-  req.language = getRequestLanguage(req);
-  req.t = (key, params) => translate(req.language || 'english', key, params);
-  next();
-});
 
 const TABLES = [
   'suppliers',
@@ -241,12 +235,11 @@ const attachSuppliersToGoods = async (goodsRows) => {
 };
 
 app.post('/api/auth/login', async (req, res) => {
-  const t = req.t;
   const { identifier, email, password } = req.body;
   const loginIdentifier = identifier || email;
 
   if (!loginIdentifier || !password) {
-    return res.status(400).json({ error: t('Email/username and password are required') });
+    return res.status(400).json({ error: 'Email/username and password are required' });
   }
 
   try {
@@ -256,12 +249,12 @@ app.post('/api/auth/login', async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(401).json({ error: t('Invalid credentials') });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const passwordValid = await verifyPassword(password, rows[0].password);
     if (!passwordValid) {
-      return res.status(401).json({ error: t('Invalid credentials') });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     if (!isPasswordHashed(rows[0].password)) {
@@ -288,18 +281,17 @@ app.post('/api/auth/login', async (req, res) => {
       entityType: 'auth',
       entityId: rows[0].id,
       action: 'login',
-      description: t('User logged in'),
+      description: 'User logged in',
     });
     const requiresSetup = !rows[0].username || rows[0].password_reset_required === 1;
     return res.json({ profile, requires_setup: requiresSetup });
   } catch (error) {
     console.error('Login error', error);
-    return res.status(500).json({ error: t('Internal server error') });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 app.post('/api/auth/logout', async (req, res) => {
-  const t = req.t;
   const { user_id: userId } = req.body || {};
 
   try {
@@ -308,7 +300,7 @@ app.post('/api/auth/logout', async (req, res) => {
       entityType: 'auth',
       entityId: userId || 0,
       action: 'logout',
-      description: t('User logged out'),
+      description: 'User logged out',
     });
   } catch (error) {
     console.error('Logout log error', error);
@@ -318,29 +310,26 @@ app.post('/api/auth/logout', async (req, res) => {
 });
 
 app.post('/api/auth/complete-setup', async (req, res) => {
-  const t = req.t;
   const { user_id: userId, current_password: currentPassword, username, password } = req.body || {};
 
   if (!userId || !currentPassword || !username || !password) {
-    return res
-      .status(400)
-      .json({ error: t('User, current password, username, and new password are required') });
+    return res.status(400).json({ error: 'User, current password, username, and new password are required' });
   }
 
   try {
     const normalizedUsername = normalizeUsername(username);
     if (!normalizedUsername) {
-      return res.status(400).json({ error: t('Username is required') });
+      return res.status(400).json({ error: 'Username is required' });
     }
 
     const [user] = await query('SELECT id, password, username FROM users WHERE id = ? LIMIT 1', [userId]);
     if (!user) {
-      return res.status(404).json({ error: t('User not found') });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     const passwordValid = await verifyPassword(currentPassword, user.password);
     if (!passwordValid) {
-      return res.status(401).json({ error: t('Current password is incorrect') });
+      return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
     const [existingUsername] = await query(
@@ -348,7 +337,7 @@ app.post('/api/auth/complete-setup', async (req, res) => {
       [normalizedUsername, userId]
     );
     if (existingUsername) {
-      return res.status(409).json({ error: t('Username is already taken') });
+      return res.status(409).json({ error: 'Username is already taken' });
     }
 
     const hashedPassword = await hashPassword(password);
@@ -362,26 +351,25 @@ app.post('/api/auth/complete-setup', async (req, res) => {
       entityType: 'auth',
       entityId: userId,
       action: 'complete_setup',
-      description: t('User completed initial setup'),
+      description: 'User completed initial setup',
     });
 
     return res.json({ success: true });
   } catch (error) {
     console.error('Complete setup error', error);
-    return res.status(500).json({ error: t('Failed to complete setup') });
+    return res.status(500).json({ error: 'Failed to complete setup' });
   }
 });
 
 app.post('/api/auth/google', async (req, res) => {
-  const t = req.t;
   const { credential } = req.body || {};
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!credential) {
-    return res.status(400).json({ error: t('Google credential is required') });
+    return res.status(400).json({ error: 'Google credential is required' });
   }
   if (!googleClientId) {
-    return res.status(500).json({ error: t('Google client ID is not configured') });
+    return res.status(500).json({ error: 'Google client ID is not configured' });
   }
 
   try {
@@ -390,15 +378,15 @@ app.post('/api/auth/google', async (req, res) => {
     );
     const tokenInfo = await tokenInfoResponse.json();
     if (!tokenInfoResponse.ok) {
-      return res.status(401).json({ error: tokenInfo?.error_description || t('Invalid Google token') });
+      return res.status(401).json({ error: tokenInfo?.error_description || 'Invalid Google token' });
     }
     if (tokenInfo.aud !== googleClientId) {
-      return res.status(401).json({ error: t('Invalid Google token audience') });
+      return res.status(401).json({ error: 'Invalid Google token audience' });
     }
 
     const email = tokenInfo.email?.toLowerCase();
     if (!email) {
-      return res.status(400).json({ error: t('Google account has no email') });
+      return res.status(400).json({ error: 'Google account has no email' });
     }
 
     const rows = await query(
@@ -407,7 +395,7 @@ app.post('/api/auth/google', async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(401).json({ error: t('No user found for this Google account') });
+      return res.status(401).json({ error: 'No user found for this Google account' });
     }
 
     const profile = {
@@ -425,14 +413,14 @@ app.post('/api/auth/google', async (req, res) => {
       entityType: 'auth',
       entityId: rows[0].id,
       action: 'login_google',
-      description: t('User logged in with Google'),
+      description: 'User logged in with Google',
     });
 
     const requiresSetup = !rows[0].username || rows[0].password_reset_required === 1;
     return res.json({ profile, requires_setup: requiresSetup });
   } catch (error) {
     console.error('Google login error', error);
-    return res.status(500).json({ error: t('Failed to login with Google') });
+    return res.status(500).json({ error: 'Failed to login with Google' });
   }
 });
 
@@ -601,25 +589,22 @@ const getRfqById = async (id) => {
   return rfq || null;
 };
 
-const formatCurrency = (value, language = 'english') =>
-  new Intl.NumberFormat(language === 'indonesia' ? 'id-ID' : 'en-US', {
-    style: 'currency',
-    currency: 'IDR',
-  }).format(Number(value || 0));
+const formatCurrency = (value) =>
+  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(value || 0));
 
-const formatStatusLabel = (status, t) => {
+const formatStatusLabel = (status) => {
   const map = {
-    waiting: t('Waiting'),
-    negotiation: t('Negotiation'),
-    renegotiation: t('Renegotiation'),
-    rejected: t('Rejected'),
-    process: t('Processed'),
-    approved: t('Approved'),
+    waiting: 'Waiting',
+    negotiation: 'Negotiation',
+    renegotiation: 'Renegotiation',
+    rejected: 'Rejected',
+    process: 'Processed',
+    approved: 'Approved',
   };
   return map[status] || status || '-';
 };
 
-const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel, t, language }) => {
+const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel }) => {
   const rows = Array.isArray(goods) ? goods : [];
   const goodsRows = rows.length
     ? rows
@@ -630,7 +615,7 @@ const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.name || item.description || '-'}</td>
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
-              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.price, language)}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.price)}</td>
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.delivery_time ?? '-'}</td>
             </tr>
           `
@@ -638,67 +623,55 @@ const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel
         .join('')
     : `
         <tr>
-          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">${t('No items')}</td>
+          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">Tidak ada item</td>
         </tr>
       `;
 
   return `
-    <p>${t('Hello Team')},</p>
-    <p>${t('Here is the quotation update with status')} <strong>${formatStatusLabel(statusLabel, t)}</strong>.</p>
-    <h3>${t('Quotation Information')}</h3>
+    <p>Halo Tim,</p>
+    <p>Berikut update quotation dengan status <strong>${formatStatusLabel(statusLabel)}</strong>.</p>
+    <h3>Informasi Quotation</h3>
     <table style="border-collapse:collapse;width:100%;max-width:720px;">
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Quotation Number')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.quotation_number || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Status')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatStatusLabel(statusLabel, t)}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Company')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.company_name || rfq?.company_name || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Project')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.project_name || rfq?.project_name || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('PIC')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_name || rfq?.pic_name || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Email PIC')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_email || rfq?.pic_email || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('PIC Phone')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_phone || rfq?.pic_phone || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Payment Time')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.payment_time || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Total')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.total_amount, language)}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Tax')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.tax_amount, language)}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Grand Total')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.grand_total, language)}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('RFQ')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${rfq?.rfq_number || quotation.rfq_id || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">${t('Submitted by')}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || t('User')} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Nomor Quotation</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.quotation_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Status</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatStatusLabel(statusLabel)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Perusahaan</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.company_name || rfq?.company_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Project</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.project_name || rfq?.project_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_name || rfq?.pic_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Email PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_email || rfq?.pic_email || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Telepon PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_phone || rfq?.pic_phone || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Payment Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.payment_time || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.total_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PPN</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.tax_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Grand Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.grand_total)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">RFQ</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${rfq?.rfq_number || quotation.rfq_id || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Diajukan oleh</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || 'User'} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
     </table>
-    <h3>${t('Goods Items')}</h3>
+    <h3>Item Barang</h3>
     <table style="border-collapse:collapse;width:100%;max-width:720px;">
       <thead>
         <tr>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">${t('No')}</th>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">${t('Name')}</th>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">${t('Unit')}</th>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">${t('Qty')}</th>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">${t('Price')}</th>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">${t('Delivery Time (days)')}</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">No</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Nama</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Harga</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Delivery Time (days)</th>
         </tr>
       </thead>
       <tbody>
         ${goodsRows}
       </tbody>
     </table>
-    <p>${t('Thank you.')}</p>
+    <p>Terima kasih.</p>
   `;
 };
 
-const sendQuotationNotification = async ({
-  quotation,
-  goods,
-  statusLabel,
-  recipients,
-  requester,
-  rfq,
-  language,
-  t,
-}) => {
+const sendQuotationNotification = async ({ quotation, goods, statusLabel, recipients, requester, rfq }) => {
   try {
     const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
     if (!uniqueRecipients.length) return;
-    const subject = `${t('Quotation')} ${quotation.quotation_number || quotation.id} - ${formatStatusLabel(
-      statusLabel,
-      t
-    )}`;
-    const html = buildQuotationEmailHtml({ quotation, goods, requester, rfq, statusLabel, t, language });
+    const subject = `Quotation ${quotation.quotation_number || quotation.id} - ${formatStatusLabel(statusLabel)}`;
+    const html = buildQuotationEmailHtml({ quotation, goods, requester, rfq, statusLabel });
     await Promise.allSettled(
       uniqueRecipients.map((email) =>
         sendSmtpMail({
@@ -714,11 +687,10 @@ const sendQuotationNotification = async ({
 };
 
 app.post('/api/auth/forgot-password', async (req, res) => {
-  const t = req.t;
   const { email } = req.body || {};
 
   if (!email) {
-    return res.status(400).json({ error: t('Email is required') });
+    return res.status(400).json({ error: 'Email is required' });
   }
 
   try {
@@ -740,29 +712,28 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
       await sendSmtpMail({
         to: user.email,
-        subject: t('Reset Password - RGI NexaProc'),
+        subject: 'Reset Password - RGI NexaProc',
         html: `
-          <p>${t('Hello')} ${user.full_name || t('User')},</p>
-          <p>${t('Click the link below to reset your password:')}</p>
+          <p>Halo ${user.full_name || 'User'},</p>
+          <p>Klik tautan berikut untuk mengganti password Anda:</p>
           <p><a href="${resetLink}">${resetLink}</a></p>
-          <p>${t('This link is valid for 1 hour.')}</p>
+          <p>Tautan ini berlaku selama 1 jam.</p>
         `,
       });
     }
 
-    return res.json({ success: true, message: t('If the email exists, a reset link has been sent.') });
+    return res.json({ success: true, message: 'If the email exists, a reset link has been sent.' });
   } catch (error) {
     console.error('Forgot password error', error);
-    return res.status(500).json({ error: t('Failed to process reset request') });
+    return res.status(500).json({ error: 'Failed to process reset request' });
   }
 });
 
 app.post('/api/auth/reset-password', async (req, res) => {
-  const t = req.t;
   const { token, password } = req.body || {};
 
   if (!token || !password) {
-    return res.status(400).json({ error: t('Token and password are required') });
+    return res.status(400).json({ error: 'Token and password are required' });
   }
 
   try {
@@ -773,7 +744,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     );
 
     if (!resetEntry) {
-      return res.status(400).json({ error: t('Reset token is invalid or expired') });
+      return res.status(400).json({ error: 'Reset token is invalid or expired' });
     }
 
     const hashedPassword = await hashPassword(password);
@@ -785,20 +756,19 @@ app.post('/api/auth/reset-password', async (req, res) => {
       entityType: 'auth',
       entityId: resetEntry.user_id,
       action: 'reset_password',
-      description: t('User reset password via email link'),
+      description: 'User reset password via email link',
     });
 
     return res.json({ success: true });
   } catch (error) {
     console.error('Reset password error', error);
-    return res.status(500).json({ error: t('Failed to reset password') });
+    return res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
 app.get('/api/:table', async (req, res) => {
-  const t = req.t;
   const { table } = req.params;
-  if (!isValidTable(table)) return res.status(404).json({ error: t('Table not found') });
+  if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
     if (table === 'activity_logs') {
@@ -824,10 +794,7 @@ app.get('/api/:table', async (req, res) => {
 
         const mappedGoods = goods.map((item) => ({
           ...item,
-          display_name:
-            item.type === 'existing'
-              ? goodsMap[item.good_id] || item.name || t('Existing good')
-              : item.name,
+          display_name: item.type === 'existing' ? goodsMap[item.good_id] || item.name || 'Existing good' : item.name,
         }));
 
         return { ...row, goods: mappedGoods };
@@ -881,20 +848,19 @@ app.get('/api/:table', async (req, res) => {
     return res.json(rows);
   } catch (error) {
     console.error('Fetch error', error);
-    return res.status(500).json({ error: t('Failed to fetch data') });
+    return res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
 app.get('/api/:table/:id', async (req, res) => {
-  const t = req.t;
   const { table, id } = req.params;
-  if (!isValidTable(table)) return res.status(404).json({ error: t('Table not found') });
+  if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
     if (table === 'goods') {
       const goodsRows = await query('SELECT * FROM `goods` WHERE id = ? LIMIT 1', [id]);
       if (!goodsRows.length) {
-        return res.status(404).json({ error: t('Record not found') });
+        return res.status(404).json({ error: 'Record not found' });
       }
       const [goodWithSuppliers] = await attachSuppliersToGoods(goodsRows);
       return res.json(goodWithSuppliers);
@@ -903,7 +869,7 @@ app.get('/api/:table/:id', async (req, res) => {
     if (table === 'rfqs') {
       const rows = await query('SELECT * FROM `rfqs` WHERE id = ? LIMIT 1', [id]);
       if (!rows.length) {
-        return res.status(404).json({ error: t('Record not found') });
+        return res.status(404).json({ error: 'Record not found' });
       }
 
       let goods = [];
@@ -919,7 +885,7 @@ app.get('/api/:table/:id', async (req, res) => {
     if (table === 'quotations') {
       const rows = await query('SELECT * FROM `quotations` WHERE id = ? LIMIT 1', [id]);
       if (!rows.length) {
-        return res.status(404).json({ error: t('Record not found') });
+        return res.status(404).json({ error: 'Record not found' });
       }
 
       let goods = [];
@@ -935,7 +901,7 @@ app.get('/api/:table/:id', async (req, res) => {
     if (table === 'sales_orders') {
       const rows = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [id]);
       if (!rows.length) {
-        return res.status(404).json({ error: t('Record not found') });
+        return res.status(404).json({ error: 'Record not found' });
       }
       return res.json({ ...rows[0], order_date: formatDateOnly(rows[0].order_date) });
     }
@@ -943,7 +909,7 @@ app.get('/api/:table/:id', async (req, res) => {
     if (table === 'delivery_orders') {
       const rows = await query('SELECT * FROM `delivery_orders` WHERE id = ? LIMIT 1', [id]);
       if (!rows.length) {
-        return res.status(404).json({ error: t('Record not found') });
+        return res.status(404).json({ error: 'Record not found' });
       }
       return res.json({
         ...rows[0],
@@ -955,20 +921,19 @@ app.get('/api/:table/:id', async (req, res) => {
     const rows = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
 
     if (!rows.length) {
-      return res.status(404).json({ error: t('Record not found') });
+      return res.status(404).json({ error: 'Record not found' });
     }
 
     return res.json(rows[0]);
   } catch (error) {
     console.error('Fetch error', error);
-    return res.status(500).json({ error: t('Failed to fetch data') });
+    return res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
 app.post('/api/:table', async (req, res) => {
-  const t = req.t;
   const { table } = req.params;
-  if (!isValidTable(table)) return res.status(404).json({ error: t('Table not found') });
+  if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
     const payload = req.body || {};
@@ -976,7 +941,7 @@ app.post('/api/:table', async (req, res) => {
     if (table === 'activity_logs') {
       const { user_id: userId, entity_type, entity_id, action, description } = payload;
       if (!userId || !entity_type || !entity_id || !action) {
-        return res.status(400).json({ error: t('Missing required fields') });
+        return res.status(400).json({ error: 'Missing required fields' });
       }
       const result = await query(
         'INSERT INTO activity_logs (user_id, entity_type, entity_id, action, description) VALUES (?, ?, ?, ?, ?)',
@@ -1125,8 +1090,6 @@ app.post('/api/:table', async (req, res) => {
           recipients,
           requester,
           rfq,
-          language: req.language,
-          t: req.t,
         });
       }
 
@@ -1562,8 +1525,6 @@ app.put('/api/:table/:id', async (req, res) => {
           recipients: roleRecipients,
           requester,
           rfq,
-          language: req.language,
-          t: req.t,
         });
       }
 
@@ -1575,8 +1536,6 @@ app.put('/api/:table/:id', async (req, res) => {
           recipients: requesterRecipients,
           requester,
           rfq,
-          language: req.language,
-          t: req.t,
         });
       }
 
@@ -1591,8 +1550,6 @@ app.put('/api/:table/:id', async (req, res) => {
           recipients: processRecipients,
           requester,
           rfq,
-          language: req.language,
-          t: req.t,
         });
       }
 

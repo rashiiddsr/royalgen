@@ -1,14 +1,4 @@
-import { getLanguagePreference } from './userPreferences';
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-
-export const getLanguageHeader = () => (getLanguagePreference() === 'indonesia' ? 'id' : 'en');
-
-export const withLanguageHeaders = (headers: Record<string, string> = {}) => ({
-  'Accept-Language': getLanguageHeader(),
-  'X-Language': getLanguageHeader(),
-  ...headers,
-});
 
 export type UserRole = 'staff' | 'manager' | 'admin' | 'superadmin';
 
@@ -56,16 +46,12 @@ async function handleResponse(response: Response) {
 }
 
 export async function getRecords<T extends BaseRecord>(table: TableName): Promise<T[]> {
-  const response = await fetch(`${API_BASE_URL}/${table}`, {
-    headers: withLanguageHeaders(),
-  });
+  const response = await fetch(`${API_BASE_URL}/${table}`);
   return handleResponse(response);
 }
 
 export async function getRecord<T extends BaseRecord>(table: TableName, id: string | number): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
-    headers: withLanguageHeaders(),
-  });
+  const response = await fetch(`${API_BASE_URL}/${table}/${id}`);
   return handleResponse(response);
 }
 
@@ -75,7 +61,7 @@ export async function addRecord<T extends BaseRecord>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/${table}`, {
     method: 'POST',
-    headers: withLanguageHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
   });
   return handleResponse(response);
@@ -84,7 +70,7 @@ export async function addRecord<T extends BaseRecord>(
 export async function uploadUserPhoto(id: string | number, photoData: string): Promise<{ photo_url: string }> {
   const response = await fetch(`${API_BASE_URL}/users/${id}/photo`, {
     method: 'POST',
-    headers: withLanguageHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ photoData }),
   });
   return handleResponse(response);
@@ -97,7 +83,7 @@ export async function updateRecord<T extends BaseRecord>(
 ): Promise<T | null> {
   const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
     method: 'PUT',
-    headers: withLanguageHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
   return handleResponse(response);
@@ -106,7 +92,6 @@ export async function updateRecord<T extends BaseRecord>(
 export async function deleteRecord(table: TableName, id: string | number): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
     method: 'DELETE',
-    headers: withLanguageHeaders(),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -122,7 +107,7 @@ export async function deleteRecordWithContext(
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/${table}/${id}`, {
     method: 'DELETE',
-    headers: withLanguageHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 
@@ -139,8 +124,6 @@ export async function logActivity(payload: Partial<ActivityLog>) {
 
 export async function getActivityLogs(userId?: number | string) {
   const query = userId ? `?user_id=${userId}` : '';
-  const response = await fetch(`${API_BASE_URL}/activity_logs${query}`, {
-    headers: withLanguageHeaders(),
-  });
+  const response = await fetch(`${API_BASE_URL}/activity_logs${query}`);
   return handleResponse(response) as Promise<ActivityLog[]>;
 }
