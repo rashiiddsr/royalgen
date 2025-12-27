@@ -10,6 +10,7 @@ interface QuotationGood {
   unit: string;
   qty: number;
   price: number;
+  delivery_time: number;
 }
 
 interface QuotationType {
@@ -20,7 +21,6 @@ interface QuotationType {
   pic_name: string;
   pic_email: string;
   pic_phone: string;
-  delivery_time: string;
   payment_time: string;
   goods: QuotationGood[] | string | null;
   total_amount: number;
@@ -65,6 +65,7 @@ const EMPTY_GOOD_ROW: QuotationGood = {
   unit: '',
   qty: 0,
   price: 0,
+  delivery_time: 0,
 };
 
 export default function Quotations() {
@@ -86,7 +87,6 @@ export default function Quotations() {
     pic_name: '',
     pic_email: '',
     pic_phone: '',
-    delivery_time: '',
     payment_time: '',
     status: 'waiting',
   });
@@ -200,7 +200,6 @@ export default function Quotations() {
       pic_name: '',
       pic_email: '',
       pic_phone: '',
-      delivery_time: '',
       payment_time: '',
       status: 'waiting',
     });
@@ -219,7 +218,6 @@ export default function Quotations() {
       pic_name: quotation.pic_name,
       pic_email: quotation.pic_email,
       pic_phone: quotation.pic_phone,
-      delivery_time: quotation.delivery_time,
       payment_time: quotation.payment_time,
       status: quotation.status,
     });
@@ -275,7 +273,8 @@ export default function Quotations() {
     setGoodsRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
-        const updatedValue = field === 'qty' || field === 'price' ? Number(value) : value;
+        const updatedValue =
+          field === 'qty' || field === 'price' || field === 'delivery_time' ? Number(value) : value;
         return { ...row, [field]: updatedValue } as QuotationGood;
       })
     );
@@ -308,6 +307,14 @@ export default function Quotations() {
       return;
     }
 
+    const invalidDeliveryTime = goodsRows.find(
+      (row) => row.delivery_time === null || row.delivery_time === undefined || Number(row.delivery_time) < 0
+    );
+    if (invalidDeliveryTime) {
+      alert('Delivery time per goods must be filled out.');
+      return;
+    }
+
     const totalAmount = goodsRows.reduce(
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
@@ -320,11 +327,11 @@ export default function Quotations() {
         ...row,
         qty: Number(row.qty) || 0,
         price: Number(row.price) || 0,
+        delivery_time: Number(row.delivery_time) || 0,
       })),
       total_amount: totalAmount,
       tax_amount: taxAmount,
       grand_total: grandTotal,
-      delivery_time: formData.delivery_time,
       payment_time: formData.payment_time,
       performed_by: profile?.id,
       performer_role: profile?.role,
@@ -677,7 +684,7 @@ export default function Quotations() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Phone</label>
                   <input
@@ -685,21 +692,6 @@ export default function Quotations() {
                     value={formData.pic_phone}
                     readOnly
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Delivery Time (days) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.delivery_time}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, delivery_time: event.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    required
                   />
                 </div>
                 <div>
@@ -744,6 +736,9 @@ export default function Quotations() {
                         </th>
                         <th className="px-3 py-2 text-left">
                           Price <span className="text-red-500">*</span>
+                        </th>
+                        <th className="px-3 py-2 text-left">
+                          Delivery Time (days) <span className="text-red-500">*</span>
                         </th>
                         <th className="px-3 py-2 text-left">Action</th>
                       </tr>
@@ -807,6 +802,18 @@ export default function Quotations() {
                               value={row.price}
                               onChange={(event) =>
                                 handleGoodsRowChange(index, 'price', event.target.value)
+                              }
+                              className="w-full px-2 py-1 border border-gray-300 rounded-lg"
+                              required
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={row.delivery_time}
+                              onChange={(event) =>
+                                handleGoodsRowChange(index, 'delivery_time', event.target.value)
                               }
                               className="w-full px-2 py-1 border border-gray-300 rounded-lg"
                               required
@@ -942,12 +949,6 @@ export default function Quotations() {
                   <p className="font-medium text-gray-900">{detailQuotation.pic_phone || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Delivery Time</p>
-                  <p className="font-medium text-gray-900">
-                    {detailQuotation.delivery_time ? `${detailQuotation.delivery_time} days` : '-'}
-                  </p>
-                </div>
-                <div>
                   <p className="text-gray-500">Payment Time</p>
                   <p className="font-medium text-gray-900">
                     {detailQuotation.payment_time ? `${detailQuotation.payment_time} days` : '-'}
@@ -981,6 +982,7 @@ export default function Quotations() {
                         <th className="px-3 py-2 text-left">Unit</th>
                         <th className="px-3 py-2 text-left">Qty</th>
                         <th className="px-3 py-2 text-left">Price</th>
+                        <th className="px-3 py-2 text-left">Delivery Time (days)</th>
                         <th className="px-3 py-2 text-left">Subtotal</th>
                       </tr>
                     </thead>
@@ -993,6 +995,7 @@ export default function Quotations() {
                           <td className="px-3 py-2">{row.unit || '-'}</td>
                           <td className="px-3 py-2">{row.qty}</td>
                           <td className="px-3 py-2">Rp {Number(row.price).toLocaleString()}</td>
+                          <td className="px-3 py-2">{row.delivery_time ?? '-'}</td>
                           <td className="px-3 py-2">
                             Rp {(Number(row.qty) * Number(row.price)).toLocaleString()}
                           </td>

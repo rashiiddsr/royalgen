@@ -48,7 +48,11 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
   }
 
   const mimeType = matches[1];
-  const extension = mimeType.split('/')[1] || 'bin';
+  const extensionMap = {
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/msword': 'doc',
+  };
+  const extension = extensionMap[mimeType] || mimeType.split('/')[1] || 'bin';
   const buffer = Buffer.from(matches[2], 'base64');
   const filename = `${filenamePrefix}-${Date.now()}.${extension}`;
   const filePath = path.join(uploadDir, filename);
@@ -589,13 +593,14 @@ const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
               <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.price)}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.delivery_time ?? '-'}</td>
             </tr>
           `
         )
         .join('')
     : `
         <tr>
-          <td colspan="5" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">Tidak ada item</td>
+          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">Tidak ada item</td>
         </tr>
       `;
 
@@ -611,7 +616,6 @@ const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_name || rfq?.pic_name || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Email PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_email || rfq?.pic_email || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Telepon PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_phone || rfq?.pic_phone || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Delivery Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.delivery_time || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Payment Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.payment_time || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.total_amount)}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PPN</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.tax_amount)}</td></tr>
@@ -628,6 +632,7 @@ const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel
           <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
           <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
           <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Harga</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Delivery Time (days)</th>
         </tr>
       </thead>
       <tbody>
@@ -978,6 +983,7 @@ app.post('/api/:table', async (req, res) => {
             unit: item.unit || null,
             qty: item.qty || 0,
             price: item.price || 0,
+            delivery_time: item.delivery_time ?? null,
           }))
         : [];
       const cleanedQuotationPayload = { ...quotationPayload };
@@ -1231,11 +1237,12 @@ app.put('/api/:table/:id', async (req, res) => {
               unit: item.unit || null,
               qty: item.qty || 0,
               price: item.price || 0,
+              delivery_time: item.delivery_time ?? null,
             }))
           : []
         : JSON.parse(existing.goods || '[]');
 
-      const editableFields = ['delivery_time', 'payment_time', 'total_amount', 'tax_amount', 'grand_total'];
+      const editableFields = ['payment_time', 'total_amount', 'tax_amount', 'grand_total'];
       const sanitizedUpdates = Object.fromEntries(
         Object.entries(quotationUpdates || {}).filter(([key]) => editableFields.includes(key))
       );
