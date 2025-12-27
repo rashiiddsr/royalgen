@@ -15,6 +15,7 @@ interface OrderGood {
   unit?: string;
   qty: number;
   price: number;
+  deadline_days?: number;
 }
 
 interface OrderType {
@@ -28,7 +29,6 @@ interface OrderType {
   pic_name?: string;
   pic_email?: string;
   pic_phone?: string;
-  delivery_time?: string;
   payment_time?: string;
   goods?: OrderGood[] | string | null;
   documents?: OrderDocument[] | string | null;
@@ -47,7 +47,6 @@ interface QuotationType {
   pic_name: string;
   pic_email: string;
   pic_phone: string;
-  delivery_time: string;
   payment_time: string;
   status: string;
   goods?: OrderGood[] | string | null;
@@ -62,7 +61,6 @@ const EMPTY_FORM = {
   pic_name: '',
   pic_email: '',
   pic_phone: '',
-  delivery_time: '',
   payment_time: '',
 };
 
@@ -198,10 +196,14 @@ export default function Orders() {
       pic_name: order.pic_name || '',
       pic_email: order.pic_email || '',
       pic_phone: order.pic_phone || '',
-      delivery_time: order.delivery_time || '',
       payment_time: order.payment_time || '',
     });
-    setGoodsRows(parseGoods(order.goods));
+    setGoodsRows(
+      parseGoods(order.goods).map((row) => ({
+        ...row,
+        deadline_days: row.deadline_days ?? 0,
+      }))
+    );
     setDocuments(parseDocuments(order.documents));
     setDocumentsError('');
     setShowModal(true);
@@ -216,10 +218,18 @@ export default function Orders() {
       pic_name: quotation?.pic_name || '',
       pic_email: quotation?.pic_email || '',
       pic_phone: quotation?.pic_phone || '',
-      delivery_time: quotation?.delivery_time || '',
       payment_time: quotation?.payment_time || '',
     }));
-    setGoodsRows(parseGoods(quotation?.goods || []));
+    const nextGoods = parseGoods(quotation?.goods || []).map((row) => ({
+      good_id: row.good_id,
+      name: row.name,
+      description: row.description,
+      unit: row.unit,
+      qty: row.qty,
+      price: row.price,
+      deadline_days: 0,
+    }));
+    setGoodsRows(nextGoods);
   };
 
   const handleDocumentsChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,10 +276,26 @@ export default function Orders() {
     setDocuments((prev) => prev.filter((_, docIndex) => docIndex !== index));
   };
 
+  const handleGoodsDeadlineChange = (index: number, value: string) => {
+    setGoodsRows((prev) =>
+      prev.map((row, rowIndex) => {
+        if (rowIndex !== index) return row;
+        return { ...row, deadline_days: Number(value) };
+      })
+    );
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (documents.length === 0) {
       setDocumentsError('Documents are required.');
+      return;
+    }
+    const invalidDeadline = goodsRows.find(
+      (row) => row.deadline_days === null || row.deadline_days === undefined || Number(row.deadline_days) < 0
+    );
+    if (invalidDeadline) {
+      alert('Deadline (days) is required for each goods.');
       return;
     }
     const totalAmount = goodsRows.reduce(
@@ -284,6 +310,14 @@ export default function Orders() {
       po_number: formData.po_number,
       project_name: formData.project_name,
       order_date: formData.order_date,
+      payment_time: formData.payment_time,
+      goods: goodsRows.map((row) => ({
+        ...row,
+        deadline_days: Number(row.deadline_days) || 0,
+      })),
+      total_amount: totalAmount,
+      tax_amount: taxAmount,
+      grand_total: grandTotal,
       documents,
     };
     const payload = editingOrder
@@ -295,12 +329,6 @@ export default function Orders() {
           pic_name: formData.pic_name,
           pic_email: formData.pic_email,
           pic_phone: formData.pic_phone,
-          delivery_time: formData.delivery_time,
-          payment_time: formData.payment_time,
-          goods: goodsRows,
-          total_amount: totalAmount,
-          tax_amount: taxAmount,
-          grand_total: grandTotal,
           status: 'ongoing',
         } as OrderType);
 
@@ -577,7 +605,7 @@ export default function Orders() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Email</label>
                   <input
@@ -592,15 +620,6 @@ export default function Orders() {
                   <input
                     type="text"
                     value={formData.pic_phone}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Time</label>
-                  <input
-                    type="text"
-                    value={formData.delivery_time}
                     readOnly
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   />
@@ -634,6 +653,9 @@ export default function Orders() {
                           <th className="px-3 py-2 text-left">Unit</th>
                           <th className="px-3 py-2 text-left">Qty</th>
                           <th className="px-3 py-2 text-left">Price</th>
+                          <th className="px-3 py-2 text-left">
+                            Deadline (days) <span className="text-red-500">*</span>
+                          </th>
                           <th className="px-3 py-2 text-left">Subtotal</th>
                         </tr>
                       </thead>
@@ -646,6 +668,16 @@ export default function Orders() {
                             <td className="px-3 py-2">{row.unit || '-'}</td>
                             <td className="px-3 py-2">{row.qty}</td>
                             <td className="px-3 py-2">Rp {Number(row.price || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.deadline_days ?? ''}
+                                onChange={(event) => handleGoodsDeadlineChange(index, event.target.value)}
+                                className="w-24 px-2 py-1 border border-gray-300 rounded-lg"
+                                required
+                              />
+                            </td>
                             <td className="px-3 py-2">
                               Rp {(Number(row.qty || 0) * Number(row.price || 0)).toLocaleString()}
                             </td>
@@ -767,10 +799,6 @@ export default function Orders() {
                   <p className="font-medium text-gray-900">{detailOrder.pic_phone || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Delivery Time</p>
-                  <p className="font-medium text-gray-900">{detailOrder.delivery_time || '-'}</p>
-                </div>
-                <div>
                   <p className="text-gray-500">Payment Time</p>
                   <p className="font-medium text-gray-900">{detailOrder.payment_time || '-'}</p>
                 </div>
@@ -801,6 +829,7 @@ export default function Orders() {
                           <th className="px-3 py-2 text-left">Unit</th>
                           <th className="px-3 py-2 text-left">Qty</th>
                           <th className="px-3 py-2 text-left">Price</th>
+                          <th className="px-3 py-2 text-left">Deadline (days)</th>
                           <th className="px-3 py-2 text-left">Subtotal</th>
                         </tr>
                       </thead>
@@ -813,6 +842,7 @@ export default function Orders() {
                             <td className="px-3 py-2">{row.unit || '-'}</td>
                             <td className="px-3 py-2">{row.qty}</td>
                             <td className="px-3 py-2">Rp {Number(row.price || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2">{row.deadline_days ?? '-'}</td>
                             <td className="px-3 py-2">
                               Rp {(Number(row.qty || 0) * Number(row.price || 0)).toLocaleString()}
                             </td>
