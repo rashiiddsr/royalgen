@@ -1,33 +1,35 @@
 import { useAuth } from '../../contexts/AuthContext';
+import { useI18n } from '../../contexts/I18nContext';
 import { Users, Package, FileText, Receipt, TrendingUp, ArrowUpRight } from 'lucide-react';
 
 export default function DashboardHome() {
   const { profile } = useAuth();
+  const { t } = useI18n();
 
   const stats = [
     {
-      name: 'Total Suppliers',
+      name: t('Total Suppliers'),
       value: '0',
       icon: Users,
       gradient: 'from-blue-500 to-cyan-500',
       bgGradient: 'from-blue-50 to-cyan-50'
     },
     {
-      name: 'Total Goods',
+      name: t('Total Goods'),
       value: '0',
       icon: Package,
       gradient: 'from-emerald-500 to-teal-500',
       bgGradient: 'from-emerald-50 to-teal-50'
     },
     {
-      name: 'Active RFQs',
+      name: t('Active RFQs'),
       value: '0',
       icon: FileText,
       gradient: 'from-amber-500 to-orange-500',
       bgGradient: 'from-amber-50 to-orange-50'
     },
     {
-      name: 'Pending Invoices',
+      name: t('Pending Invoices'),
       value: '0',
       icon: Receipt,
       gradient: 'from-rose-500 to-pink-500',
@@ -39,11 +41,16 @@ export default function DashboardHome() {
     <div>
       <div className="mb-10">
         <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent mb-3">
-          Welcome back, {profile?.full_name}!
+          {t('Welcome back, {name}!', { name: profile?.full_name || t('User') })}
         </h1>
         <p className="text-gray-600 text-lg font-medium">
-          Here's what's happening with your procurement today.
+          {t("Here's what's happening with your procurement today.")}
         </p>
+      </div>
+
+      <div className="mb-10 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5 text-amber-900 shadow-sm">
+        <p className="text-sm font-semibold">{t('Dashboard data is temporarily unavailable.')}</p>
+        <p className="text-sm mt-2">{t('Use the navigation menu to continue working.')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -70,29 +77,29 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8 hover:shadow-2xl transition-all duration-300">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Recent Activity</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t('Recent Activity')}</h2>
             <ArrowUpRight className="h-5 w-5 text-gray-400" />
           </div>
           <div className="space-y-4">
             <div className="flex items-center p-4 bg-gray-50 rounded-xl">
               <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-              <p className="text-gray-600 text-sm font-medium">No recent activity to display.</p>
+              <p className="text-gray-600 text-sm font-medium">{t('No recent activity to display.')}</p>
             </div>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-blue-500 to-emerald-500 rounded-2xl shadow-xl border border-white/50 p-8 text-white hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
-          <h2 className="text-2xl font-bold mb-4">Quick Actions</h2>
+          <h2 className="text-2xl font-bold mb-4">{t('Quick Actions')}</h2>
           <div className="space-y-3">
             <p className="text-white/90 font-medium leading-relaxed">
-              Use the navigation menu to access different modules based on your role.
+              {t('Use the navigation menu to access different modules based on your role.')}
             </p>
             <div className="pt-4">
               <div className="flex items-center space-x-2 text-white/80">
                 <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
                   <Package className="h-4 w-4" />
                 </div>
-                <span className="text-sm font-medium">Manage Inventory</span>
+                <span className="text-sm font-medium">{t('Manage Inventory')}</span>
               </div>
             </div>
           </div>

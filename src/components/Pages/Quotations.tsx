@@ -811,11 +811,19 @@ export default function Quotations() {
                       {goodsRows.map((row, index) => {
                         const query = row.name.trim().toLowerCase();
                         const matches = query
-                          ? activeGoods.filter(
-                              (good) =>
+                          ? activeGoods.filter((good) => {
+                              const description = (good.description || '').toLowerCase();
+                              const sku = (good.sku || '').toLowerCase();
+                              const category = (good.category || '').toLowerCase();
+                              const unit = (good.unit || '').toLowerCase();
+                              return (
                                 good.name.toLowerCase().includes(query) ||
-                                (good.sku || '').toLowerCase().includes(query)
-                            )
+                                sku.includes(query) ||
+                                description.includes(query) ||
+                                category.includes(query) ||
+                                unit.includes(query)
+                              );
+                            })
                           : activeGoods;
                         const limitedMatches = matches.slice(0, 8);
                         const showSuggestions = activeGoodsIndex === index;
@@ -833,12 +841,12 @@ export default function Quotations() {
                                   }}
                                   onFocus={() => setActiveGoodsIndex(index)}
                                   onBlur={() => setTimeout(() => setActiveGoodsIndex(null), 120)}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded-lg"
+                                  className="w-full min-w-[220px] px-2 py-1 border border-gray-300 rounded-lg"
                                   placeholder="Search goods by name or SKU"
                                   required
                                 />
                                 {showSuggestions && (
-                                  <div className="absolute z-10 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto">
+                                  <div className="absolute z-10 mt-2 min-w-[220px] w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto">
                                     {limitedMatches.length === 0 ? (
                                       <div className="px-3 py-2 text-xs text-gray-500">
                                         No goods match your search.
