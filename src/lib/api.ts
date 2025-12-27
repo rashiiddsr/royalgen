@@ -28,6 +28,7 @@ type TableName =
   | 'rfqs'
   | 'quotations'
   | 'sales_orders'
+  | 'delivery_orders'
   | 'invoices'
   | 'financing'
   | 'users'

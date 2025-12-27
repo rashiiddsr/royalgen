@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface OrderDocument {
   name: string;
@@ -15,7 +16,7 @@ interface OrderGood {
   unit?: string;
   qty: number;
   price: number;
-  deadline_days?: number;
+  deadline_days?: number | '';
 }
 
 interface OrderType {
@@ -36,6 +37,8 @@ interface OrderType {
   tax_amount?: number;
   grand_total?: number;
   status: string;
+  created_by?: number | null;
+  last_edited_by?: number | null;
   created_at: string;
   quotations?: QuotationType;
 }
@@ -65,8 +68,10 @@ const EMPTY_FORM = {
 };
 
 export default function Orders() {
+  const { profile } = useAuth();
   const [orders, setOrders] = useState<OrderType[]>([]);
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
+  const [usersById, setUsersById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [detailOrder, setDetailOrder] = useState<OrderType | null>(null);
@@ -146,12 +151,18 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
-      const [orderData, quotationData] = await Promise.all([
+      const [orderData, quotationData, userData] = await Promise.all([
         getRecords<OrderType>('sales_orders'),
         getRecords<QuotationType>('quotations'),
+        getRecords<{ id: string; full_name?: string; email?: string }>('users'),
       ]);
 
       const quotationMap = new Map(quotationData.map((quotation) => [quotation.id, quotation]));
+      const userMap = userData.reduce<Record<string, string>>((acc, user) => {
+        const name = user.full_name || user.email || 'User';
+        acc[String(user.id)] = name;
+        return acc;
+      }, {});
       const mappedOrders = orderData
         .map((order) => ({
           ...order,
@@ -163,6 +174,7 @@ export default function Orders() {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setOrders(mappedOrders);
+      setUsersById(userMap);
       setQuotations(
         quotationData.map((quotation) => ({
           ...quotation,
@@ -201,7 +213,7 @@ export default function Orders() {
     setGoodsRows(
       parseGoods(order.goods).map((row) => ({
         ...row,
-        deadline_days: row.deadline_days ?? 0,
+        deadline_days: row.deadline_days ?? '',
       }))
     );
     setDocuments(parseDocuments(order.documents));
@@ -220,15 +232,15 @@ export default function Orders() {
       pic_phone: quotation?.pic_phone || '',
       payment_time: quotation?.payment_time || '',
     }));
-    const nextGoods = parseGoods(quotation?.goods || []).map((row) => ({
-      good_id: row.good_id,
-      name: row.name,
-      description: row.description,
-      unit: row.unit,
-      qty: row.qty,
-      price: row.price,
-      deadline_days: 0,
-    }));
+      const nextGoods = parseGoods(quotation?.goods || []).map((row) => ({
+        good_id: row.good_id,
+        name: row.name,
+        description: row.description,
+        unit: row.unit,
+        qty: row.qty,
+        price: row.price,
+        deadline_days: '',
+      }));
     setGoodsRows(nextGoods);
   };
 
@@ -280,7 +292,8 @@ export default function Orders() {
     setGoodsRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
-        return { ...row, deadline_days: Number(value) };
+        const deadlineValue = value === '' ? '' : Number(value);
+        return { ...row, deadline_days: deadlineValue };
       })
     );
   };
@@ -291,9 +304,12 @@ export default function Orders() {
       setDocumentsError('Documents are required.');
       return;
     }
-    const invalidDeadline = goodsRows.find(
-      (row) => row.deadline_days === null || row.deadline_days === undefined || Number(row.deadline_days) < 0
-    );
+    const invalidDeadline = goodsRows.find((row) => {
+      if (row.deadline_days === '' || row.deadline_days === null || row.deadline_days === undefined) {
+        return true;
+      }
+      return Number(row.deadline_days) < 0;
+    });
     if (invalidDeadline) {
       alert('Deadline (days) is required for each goods.');
       return;
@@ -319,6 +335,7 @@ export default function Orders() {
       tax_amount: taxAmount,
       grand_total: grandTotal,
       documents,
+      performed_by: profile?.id,
     };
     const payload = editingOrder
       ? basePayload
@@ -330,11 +347,15 @@ export default function Orders() {
           pic_email: formData.pic_email,
           pic_phone: formData.pic_phone,
           status: 'ongoing',
+          created_by: profile?.id,
         } as OrderType);
 
     try {
       if (editingOrder) {
-        await updateRecord<OrderType>('sales_orders', editingOrder.id, payload);
+        await updateRecord<OrderType>('sales_orders', editingOrder.id, {
+          ...payload,
+          performed_by: profile?.id,
+        });
       } else {
         await addRecord<OrderType>('sales_orders', payload);
       }
@@ -350,9 +371,11 @@ export default function Orders() {
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       ongoing: 'bg-blue-100 text-blue-800',
+      'on-delivery': 'bg-purple-100 text-purple-800',
+      'waiting payment': 'bg-amber-100 text-amber-800',
+      done: 'bg-green-100 text-green-800',
       delivery: 'bg-purple-100 text-purple-800',
       payment: 'bg-amber-100 text-amber-800',
-      done: 'bg-green-100 text-green-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -437,6 +460,9 @@ export default function Orders() {
                   Company
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created By
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -450,7 +476,7 @@ export default function Orders() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No sales orders found.</p>
                   </td>
@@ -468,6 +494,9 @@ export default function Orders() {
                       {order.quotations?.quotation_number || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.company_name || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {order.created_by ? usersById[String(order.created_by)] || '-' : '-'}
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
@@ -811,6 +840,14 @@ export default function Orders() {
                   >
                     {detailOrder.status}
                   </span>
+                </div>
+                <div>
+                  <p className="text-gray-500">Last Edited</p>
+                  <p className="font-medium text-gray-900">
+                    {detailOrder.last_edited_by
+                      ? usersById[String(detailOrder.last_edited_by)] || '-'
+                      : '-'}
+                  </p>
                 </div>
               </div>
 

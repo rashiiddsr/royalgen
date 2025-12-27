@@ -33,6 +33,7 @@ const TABLES = [
   'rfqs',
   'quotations',
   'sales_orders',
+  'delivery_orders',
   'invoices',
   'financing',
   'users',
@@ -182,6 +183,17 @@ const logActivity = async ({ performedBy, entityType, entityId, action, descript
     );
   } catch (error) {
     console.error('Activity log error', error);
+  }
+};
+
+const parseJsonArray = (value, fallback = []) => {
+  if (!value) return fallback;
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
   }
 };
 
@@ -810,6 +822,16 @@ app.get('/api/:table', async (req, res) => {
       return res.json(formatted);
     }
 
+    if (table === 'delivery_orders') {
+      const rows = await query('SELECT * FROM `delivery_orders` ORDER BY created_at DESC');
+      const formatted = rows.map((row) => ({
+        ...row,
+        delivery_date: formatDateOnly(row.delivery_date),
+        goods: parseJsonArray(row.goods),
+      }));
+      return res.json(formatted);
+    }
+
     const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
 
     return res.json(rows);
@@ -871,6 +893,18 @@ app.get('/api/:table/:id', async (req, res) => {
         return res.status(404).json({ error: 'Record not found' });
       }
       return res.json({ ...rows[0], order_date: formatDateOnly(rows[0].order_date) });
+    }
+
+    if (table === 'delivery_orders') {
+      const rows = await query('SELECT * FROM `delivery_orders` WHERE id = ? LIMIT 1', [id]);
+      if (!rows.length) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      return res.json({
+        ...rows[0],
+        delivery_date: formatDateOnly(rows[0].delivery_date),
+        goods: parseJsonArray(rows[0].goods),
+      });
     }
 
     const rows = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
@@ -1035,8 +1069,102 @@ app.post('/api/:table', async (req, res) => {
       return res.status(201).json({ ...created, goods: cleanedGoods });
     }
 
+    if (table === 'delivery_orders') {
+      const {
+        goods = [],
+        delivery_date: deliveryDate,
+        sales_order_id: salesOrderId,
+        created_by: createdBy,
+        delivery_number: deliveryNumber,
+        company_name: companyName,
+      } = payload;
+
+      if (!deliveryDate || !salesOrderId || !deliveryNumber) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      const cleanedGoods = Array.isArray(goods)
+        ? goods
+            .filter((item) => Number(item?.qty) > 0)
+            .map((item) => ({
+              good_id: item.good_id || null,
+              name: item.name || null,
+              description: item.description || null,
+              unit: item.unit || null,
+              qty: Number(item.qty) || 0,
+            }))
+        : [];
+
+      if (cleanedGoods.length === 0) {
+        return res.status(400).json({ error: 'Delivery goods are required' });
+      }
+
+      const result = await query('INSERT INTO ?? SET ?', [
+        table,
+        {
+          delivery_number: deliveryNumber,
+          delivery_date: formatDateOnly(deliveryDate),
+          sales_order_id: salesOrderId,
+          company_name: companyName || null,
+          goods: JSON.stringify(cleanedGoods),
+          created_by: createdBy || null,
+        },
+      ]);
+
+      const [created] = await query('SELECT * FROM `delivery_orders` WHERE id = ?', [result.insertId]);
+
+      const [order] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [salesOrderId]);
+      if (order) {
+        const orderGoods = parseJsonArray(order.goods);
+        const deliveries = await query('SELECT goods FROM `delivery_orders` WHERE sales_order_id = ?', [
+          salesOrderId,
+        ]);
+        const shippedMap = {};
+        deliveries.forEach((delivery) => {
+          const items = parseJsonArray(delivery.goods);
+          items.forEach((item) => {
+            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
+            shippedMap[key] = (shippedMap[key] || 0) + (Number(item.qty) || 0);
+          });
+        });
+
+        const allShipped =
+          orderGoods.length > 0 &&
+          orderGoods.every((item) => {
+            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
+            const orderedQty = Number(item.qty) || 0;
+            const shippedQty = shippedMap[key] || 0;
+            return orderedQty > 0 ? shippedQty >= orderedQty : true;
+          });
+
+        const nextStatus = allShipped ? 'waiting payment' : 'on-delivery';
+        await query('UPDATE `sales_orders` SET status = ? WHERE id = ?', [nextStatus, salesOrderId]);
+      }
+
+      await logActivity({
+        performedBy: createdBy,
+        entityType: 'delivery_orders',
+        entityId: result.insertId,
+        action: 'create',
+        description: `Created delivery order ${deliveryNumber}`,
+      });
+
+      return res.status(201).json({
+        ...created,
+        delivery_date: formatDateOnly(created?.delivery_date),
+        goods: cleanedGoods,
+      });
+    }
+
     if (table === 'sales_orders') {
-      const { goods = [], documents = [], status, ...orderPayload } = payload;
+      const {
+        goods = [],
+        documents = [],
+        status,
+        performed_by: performedBy,
+        created_by: createdBy,
+        ...orderPayload
+      } = payload;
       if (orderPayload.order_date) {
         orderPayload.order_date = formatDateOnly(orderPayload.order_date);
       }
@@ -1049,9 +1177,19 @@ app.post('/api/:table', async (req, res) => {
           goods: JSON.stringify(cleanedGoods),
           documents: cleanedDocuments.length ? JSON.stringify(cleanedDocuments) : null,
           status: status || 'ongoing',
+          created_by: createdBy || performedBy || null,
         },
       ]);
       const [created] = await query('SELECT * FROM `sales_orders` WHERE id = ?', [result.insertId]);
+
+      await logActivity({
+        performedBy: createdBy || performedBy,
+        entityType: 'sales_orders',
+        entityId: result.insertId,
+        action: 'create',
+        description: `Created sales order ${orderPayload.order_number || result.insertId}`,
+      });
+
       return res.status(201).json({
         ...created,
         order_date: formatDateOnly(created?.order_date),
@@ -1141,8 +1279,12 @@ app.put('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'delivery_orders') {
+      return res.status(403).json({ error: 'Delivery orders cannot be edited' });
+    }
+
     if (table === 'sales_orders') {
-      const { goods, documents, ...orderUpdates } = req.body || {};
+      const { goods, documents, performed_by: performedBy, ...orderUpdates } = req.body || {};
       const [existing] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [id]);
 
       if (!existing) {
@@ -1152,6 +1294,10 @@ app.put('/api/:table/:id', async (req, res) => {
       const nextUpdates = { ...orderUpdates };
       if (nextUpdates.order_date) {
         nextUpdates.order_date = formatDateOnly(nextUpdates.order_date);
+      }
+
+      if (performedBy) {
+        nextUpdates.last_edited_by = performedBy;
       }
       let cleanedGoods;
       let cleanedDocuments;
@@ -1186,6 +1332,14 @@ app.put('/api/:table/:id', async (req, res) => {
           responseDocuments = [];
         }
       }
+
+      await logActivity({
+        performedBy,
+        entityType: 'sales_orders',
+        entityId: Number(id),
+        action: 'update',
+        description: `Updated sales order ${updated?.order_number || id}`,
+      });
 
       return res.json({
         ...updated,
