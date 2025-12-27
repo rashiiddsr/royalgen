@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, Plus, Search, Truck, X } from 'lucide-react';
-import { addRecord, getRecords, logActivity } from '../../lib/api';
+import { addRecord, getRecords } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface DeliveryGood {
   good_id?: string;
@@ -49,6 +50,7 @@ const EMPTY_FORM = {
 
 export default function DeliveryOrders() {
   const { profile } = useAuth();
+  const { pushNotification } = useNotifications();
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [goodsRows, setGoodsRows] = useState<DeliveryGood[]>([]);
@@ -197,7 +199,9 @@ export default function DeliveryOrders() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const confirmed = window.confirm('Delivery order tidak dapat diedit setelah disimpan. Lanjutkan?');
+    const confirmed = window.confirm(
+      'Delivery orders cannot be edited after saving. Do you want to continue?'
+    );
     if (!confirmed) return;
 
     if (!formData.delivery_date) {
@@ -244,6 +248,10 @@ export default function DeliveryOrders() {
         goods: payloadGoods,
         created_by: profile?.id,
       });
+      pushNotification({
+        title: 'Delivery order created',
+        message: `${formData.delivery_number} has been created.`,
+      });
       setShowModal(false);
       setFormData(EMPTY_FORM);
       await fetchData();
@@ -253,21 +261,8 @@ export default function DeliveryOrders() {
     }
   };
 
-  const openDetail = async (delivery: DeliveryOrder) => {
+  const openDetail = (delivery: DeliveryOrder) => {
     setDetailDelivery(delivery);
-    if (profile?.id) {
-      try {
-        await logActivity({
-          user_id: Number(profile.id),
-          entity_type: 'delivery_orders',
-          entity_id: Number(delivery.id),
-          action: 'view',
-          description: `Viewed delivery order ${delivery.delivery_number}`,
-        });
-      } catch (error) {
-        console.error('Failed to log delivery order view', error);
-      }
-    }
   };
 
   const orderMap = useMemo(

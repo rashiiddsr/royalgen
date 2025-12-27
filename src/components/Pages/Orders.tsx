@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface OrderDocument {
   name: string;
@@ -55,6 +56,14 @@ interface QuotationType {
   goods?: OrderGood[] | string | null;
 }
 
+interface DeliveryOrder {
+  id: string;
+  delivery_number: string;
+  delivery_date?: string;
+  sales_order_id: string;
+  created_at: string;
+}
+
 const EMPTY_FORM = {
   project_name: '',
   po_number: '',
@@ -69,12 +78,15 @@ const EMPTY_FORM = {
 
 export default function Orders() {
   const { profile } = useAuth();
+  const { pushNotification } = useNotifications();
   const [orders, setOrders] = useState<OrderType[]>([]);
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
   const [usersById, setUsersById] = useState<Record<string, string>>({});
+  const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [detailOrder, setDetailOrder] = useState<OrderType | null>(null);
+  const [showDoModal, setShowDoModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<OrderType | null>(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [goodsRows, setGoodsRows] = useState<OrderGood[]>([]);
@@ -151,10 +163,11 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
-      const [orderData, quotationData, userData] = await Promise.all([
+      const [orderData, quotationData, userData, deliveryData] = await Promise.all([
         getRecords<OrderType>('sales_orders'),
         getRecords<QuotationType>('quotations'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
+        getRecords<DeliveryOrder>('delivery_orders'),
       ]);
 
       const quotationMap = new Map(quotationData.map((quotation) => [quotation.id, quotation]));
@@ -174,6 +187,7 @@ export default function Orders() {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setOrders(mappedOrders);
+      setDeliveries(deliveryData);
       setUsersById(userMap);
       setQuotations(
         quotationData.map((quotation) => ({
@@ -356,8 +370,16 @@ export default function Orders() {
           ...payload,
           performed_by: profile?.id,
         });
+        pushNotification({
+          title: 'Sales order updated',
+          message: `${formData.po_number || payload.order_number} has been updated.`,
+        });
       } else {
         await addRecord<OrderType>('sales_orders', payload);
+        pushNotification({
+          title: 'Sales order created',
+          message: `${formData.po_number || payload.order_number} has been created.`,
+        });
       }
       setShowModal(false);
       setEditingOrder(null);
@@ -395,6 +417,12 @@ export default function Orders() {
       );
     });
   }, [orders, searchTerm]);
+
+  const linkedDeliveries = detailOrder
+    ? deliveries
+        .filter((delivery) => String(delivery.sales_order_id) === String(detailOrder.id))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    : [];
 
   const usedQuotationIds = useMemo(
     () => new Set(orders.map((order) => String(order.quotation_id))),
@@ -511,7 +539,10 @@ export default function Orders() {
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
-                        onClick={() => setDetailOrder(order)}
+                        onClick={() => {
+                          setDetailOrder(order);
+                          setShowDoModal(false);
+                        }}
                         className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                         aria-label="View order"
                       >
@@ -785,13 +816,25 @@ export default function Orders() {
                   {detailOrder.po_number || detailOrder.order_number}
                 </h2>
               </div>
-              <button
-                onClick={() => setDetailOrder(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition"
-                aria-label="Close sales order details"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDoModal((prev) => !prev)}
+                  className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                  View DO Linked
+                </button>
+                <button
+                  onClick={() => {
+                    setDetailOrder(null);
+                    setShowDoModal(false);
+                  }}
+                  className="p-2 rounded-full hover:bg-gray-100 transition"
+                  aria-label="Close sales order details"
+                >
+                  <X className="h-5 w-5 text-gray-600" />
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-6 text-sm">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -850,6 +893,36 @@ export default function Orders() {
                   </p>
                 </div>
               </div>
+
+              {showDoModal && (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Linked Delivery Orders</h3>
+                    <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
+                      Waiting payment
+                    </span>
+                  </div>
+                  {linkedDeliveries.length === 0 ? (
+                    <p className="text-sm text-gray-500">No delivery orders linked yet.</p>
+                  ) : (
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      {linkedDeliveries.map((delivery) => (
+                        <li
+                          key={delivery.id}
+                          className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2"
+                        >
+                          <div>
+                            <p className="font-medium text-gray-900">{delivery.delivery_number}</p>
+                            <p className="text-xs text-gray-500">
+                              {delivery.delivery_date || '-'}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Goods</h3>
