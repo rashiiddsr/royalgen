@@ -222,7 +222,6 @@ export default function Quotations() {
     });
     setIncludeTax(false);
     setGoodsRows([{ ...EMPTY_GOOD_ROW }]);
-    setActiveGoodsIndex(null);
     setShowModal(true);
   };
 
