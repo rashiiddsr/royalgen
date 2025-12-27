@@ -28,6 +28,7 @@ app.use('/uploads', express.static(uploadDir));
 
 const TABLES = [
   'suppliers',
+  'clients',
   'goods',
   'goods_suppliers',
   'rfqs',
@@ -1164,6 +1165,28 @@ app.post('/api/:table', async (req, res) => {
       return res.status(201).json(created);
     }
 
+    if (table === 'clients') {
+      const { performed_by: performedBy, ship_addresses: shipAddresses, ...clientPayload } = payload;
+      const normalizedShipAddresses = Array.isArray(shipAddresses)
+        ? JSON.stringify(shipAddresses)
+        : shipAddresses ?? null;
+      const result = await query('INSERT INTO ?? SET ?', [
+        table,
+        { ...clientPayload, ship_addresses: normalizedShipAddresses },
+      ]);
+      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'clients',
+        entityId: result.insertId,
+        action: 'create',
+        description: `Created client ${clientPayload.company_name || result.insertId}`,
+      });
+
+      return res.status(201).json(created);
+    }
+
     if (table === 'rfqs') {
       const { goods = [], attachment_data: attachmentData, performed_by: performedBy, performer_role: performerRole, ...rfqPayload } = payload;
       let attachmentUrl = null;
@@ -1494,6 +1517,29 @@ app.put('/api/:table/:id', async (req, res) => {
   try {
     if (table === 'delivery_orders') {
       return res.status(403).json({ error: 'Delivery orders cannot be edited' });
+    }
+
+    if (table === 'clients') {
+      const { performed_by: performedBy, ship_addresses: shipAddresses, ...clientUpdates } = req.body || {};
+      const normalizedShipAddresses = Array.isArray(shipAddresses)
+        ? JSON.stringify(shipAddresses)
+        : shipAddresses;
+      const nextUpdates = { ...clientUpdates };
+      if (shipAddresses !== undefined) {
+        nextUpdates.ship_addresses = normalizedShipAddresses;
+      }
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, nextUpdates, id]);
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'clients',
+        entityId: Number(id),
+        action: 'update',
+        description: `Updated client ${updated?.company_name || id}`,
+      });
+
+      return res.json(updated);
     }
 
     if (table === 'settings') {
