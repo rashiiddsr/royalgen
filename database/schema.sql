@@ -129,6 +129,20 @@ CREATE TABLE IF NOT EXISTS `sales_orders` (
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
   `status` VARCHAR(50) DEFAULT 'ongoing',
+  `created_by` INT DEFAULT NULL,
+  `last_edited_by` INT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Delivery Orders
+CREATE TABLE IF NOT EXISTS `delivery_orders` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `delivery_number` VARCHAR(120) NOT NULL,
+  `delivery_date` DATE NOT NULL,
+  `sales_order_id` INT NOT NULL,
+  `company_name` VARCHAR(255) DEFAULT NULL,
+  `goods` JSON DEFAULT NULL,
+  `created_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

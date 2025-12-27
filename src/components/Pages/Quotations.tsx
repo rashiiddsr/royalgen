@@ -8,9 +8,9 @@ interface QuotationGood {
   name: string;
   description: string;
   unit: string;
-  qty: number;
-  price: number;
-  delivery_time: number;
+  qty: number | '';
+  price: number | '';
+  delivery_time: number | '';
 }
 
 interface QuotationType {
@@ -63,9 +63,9 @@ const EMPTY_GOOD_ROW: QuotationGood = {
   name: '',
   description: '',
   unit: '',
-  qty: 0,
-  price: 0,
-  delivery_time: 0,
+  qty: '',
+  price: '',
+  delivery_time: '',
 };
 
 export default function Quotations() {
@@ -263,7 +263,7 @@ export default function Quotations() {
           name: selectedGood?.name || '',
           description: selectedGood?.description || '',
           unit: selectedGood?.unit || '',
-          qty: minimumQty > 0 ? minimumQty : row.qty,
+          qty: minimumQty > 0 ? minimumQty : row.qty || '',
         };
       })
     );
@@ -274,7 +274,11 @@ export default function Quotations() {
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const updatedValue =
-          field === 'qty' || field === 'price' || field === 'delivery_time' ? Number(value) : value;
+          field === 'qty' || field === 'price' || field === 'delivery_time'
+            ? value === ''
+              ? ''
+              : Number(value)
+            : value;
         return { ...row, [field]: updatedValue } as QuotationGood;
       })
     );
@@ -307,11 +311,24 @@ export default function Quotations() {
       return;
     }
 
-    const invalidDeliveryTime = goodsRows.find(
-      (row) => row.delivery_time === null || row.delivery_time === undefined || Number(row.delivery_time) < 0
-    );
+    const invalidDeliveryTime = goodsRows.find((row) => {
+      if (row.delivery_time === '' || row.delivery_time === null || row.delivery_time === undefined) {
+        return true;
+      }
+      return Number(row.delivery_time) < 0;
+    });
     if (invalidDeliveryTime) {
       alert('Delivery time per goods must be filled out.');
+      return;
+    }
+    const invalidQuantity = goodsRows.find((row) => row.qty === '' || row.qty === null || row.qty === undefined);
+    if (invalidQuantity) {
+      alert('Quantity must be filled out.');
+      return;
+    }
+    const invalidPrice = goodsRows.find((row) => row.price === '' || row.price === null || row.price === undefined);
+    if (invalidPrice) {
+      alert('Price must be filled out.');
       return;
     }
 

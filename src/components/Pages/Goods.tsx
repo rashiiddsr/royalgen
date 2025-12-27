@@ -425,31 +425,39 @@ export default function Goods() {
                       )}
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
-                      {filteredSuppliers.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-600">{suppliers.length === 0 ? 'No suppliers available. Add suppliers first.' : 'No suppliers match your search.'}</div>
-                      ) : (
-                        filteredSuppliers.map((supplier) => (
-                          <button
-                            key={supplier.id}
-                            type="button"
-                            onClick={() =>
-                              setSelectedSuppliers((prev) =>
-                                prev.includes(String(supplier.id))
-                                  ? prev
-                                  : [...prev, String(supplier.id)]
-                              )
-                            }
-                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left"
-                          >
-                            <span className="text-sm text-gray-800">{supplier.name}</span>
-                            {selectedSuppliers.includes(String(supplier.id)) && (
-                              <span className="text-xs text-blue-600 font-semibold">Linked</span>
-                            )}
-                          </button>
-                        ))
-                      )}
-                    </div>
+                    {supplierSearch.trim() ? (
+                      <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                        {filteredSuppliers.length === 0 ? (
+                          <div className="p-3 text-sm text-gray-600">
+                            {suppliers.length === 0
+                              ? 'No suppliers available. Add suppliers first.'
+                              : 'No suppliers match your search.'}
+                          </div>
+                        ) : (
+                          filteredSuppliers.map((supplier) => (
+                            <button
+                              key={supplier.id}
+                              type="button"
+                              onClick={() =>
+                                setSelectedSuppliers((prev) =>
+                                  prev.includes(String(supplier.id))
+                                    ? prev
+                                    : [...prev, String(supplier.id)]
+                                )
+                              }
+                              className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left"
+                            >
+                              <span className="text-sm text-gray-800">{supplier.name}</span>
+                              {selectedSuppliers.includes(String(supplier.id)) && (
+                                <span className="text-xs text-blue-600 font-semibold">Linked</span>
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Type to search suppliers.</p>
+                    )}
                     <p className="text-xs text-gray-500 mt-1">Search and select multiple suppliers for this good.</p>
                   </div>
                 </div>

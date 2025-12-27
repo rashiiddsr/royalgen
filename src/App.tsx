@@ -8,6 +8,7 @@ import Goods from './components/Pages/Goods';
 import RFQ from './components/Pages/RFQ';
 import Quotations from './components/Pages/Quotations';
 import Orders from './components/Pages/Orders';
+import DeliveryOrders from './components/Pages/DeliveryOrders';
 import Invoices from './components/Pages/Invoices';
 import Financing from './components/Pages/Financing';
 import Users from './components/Pages/Users';
@@ -54,6 +55,8 @@ function App() {
         return <Quotations />;
       case 'orders':
         return <Orders />;
+      case 'delivery-orders':
+        return <DeliveryOrders />;
       case 'invoices':
         return <Invoices />;
       case 'financing':
