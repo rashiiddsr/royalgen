@@ -1339,12 +1339,6 @@ app.post('/api/:table', async (req, res) => {
         attachmentUrl = saveBase64File(attachmentData, 'rfq');
       }
 
-      const rawDeadlineDays = rfqPayload.deadline_days;
-      const resolvedDeadlineDays =
-        rawDeadlineDays === undefined || rawDeadlineDays === null || rawDeadlineDays === ''
-          ? 30
-          : Number(rawDeadlineDays);
-
       const cleanedGoods = Array.isArray(goods)
         ? goods.map((item) => ({
             type: item.type || (item.good_id ? 'existing' : 'other'),
@@ -1360,7 +1354,6 @@ app.post('/api/:table', async (req, res) => {
           performed_by: performedBy || null,
           goods: JSON.stringify(cleanedGoods),
           attachment_url: attachmentUrl,
-          deadline_days: Number.isNaN(resolvedDeadlineDays) ? 30 : resolvedDeadlineDays,
         },
       ]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
@@ -1988,6 +1981,9 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(404).json({ error: 'Record not found' });
       }
 
+      if (existing.status === 'process') {
+        return res.status(403).json({ error: 'RFQ is already in process and cannot be edited' });
+      }
       const allowedRoles = ['superadmin', 'admin', 'manager'];
       const isPrivileged = performerRole && allowedRoles.includes(performerRole);
       const isRequester =
@@ -1998,20 +1994,12 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(403).json({ error: 'Not authorized to edit this RFQ' });
       }
 
-      const requestedStatus = rfqUpdates.status;
-      const isRejectRequest = ['reject', 'rejected'].includes(requestedStatus);
-      const canRejectInProcess = existing.status === 'process' && isRejectRequest && ['superadmin', 'manager'].includes(performerRole);
-      if (existing.status === 'process' && !canRejectInProcess) {
-        return res.status(403).json({ error: 'RFQ is already in process and cannot be edited' });
-      }
-
       let attachmentUrl = existing.attachment_url;
       if (attachmentData) {
         attachmentUrl = saveBase64File(attachmentData, `rfq-${id}`);
       }
 
-      const hasGoodsPayload = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
-      const cleanedGoods = hasGoodsPayload && Array.isArray(goods)
+      const cleanedGoods = Array.isArray(goods)
         ? goods.map((item) => ({
             type: item.type || (item.good_id ? 'existing' : 'other'),
             good_id: item.good_id || null,
@@ -2019,21 +2007,7 @@ app.put('/api/:table/:id', async (req, res) => {
           }))
         : JSON.parse(existing.goods || '[]');
 
-      const nextUpdates = canRejectInProcess ? { status: requestedStatus } : { ...rfqUpdates };
-      if (Object.prototype.hasOwnProperty.call(nextUpdates, 'deadline_days')) {
-        const rawDeadlineDays = nextUpdates.deadline_days;
-        const resolvedDeadlineDays =
-          rawDeadlineDays === undefined || rawDeadlineDays === null || rawDeadlineDays === ''
-            ? 30
-            : Number(rawDeadlineDays);
-        nextUpdates.deadline_days = Number.isNaN(resolvedDeadlineDays) ? 30 : resolvedDeadlineDays;
-      }
-
-      await query('UPDATE ?? SET ? WHERE id = ?', [
-        table,
-        { ...nextUpdates, goods: JSON.stringify(cleanedGoods), attachment_url: attachmentUrl },
-        id,
-      ]);
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, { ...rfqUpdates, goods: JSON.stringify(cleanedGoods), attachment_url: attachmentUrl }, id]);
       const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
 
       await logActivity({

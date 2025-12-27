@@ -98,7 +98,6 @@ CREATE TABLE IF NOT EXISTS `rfqs` (
   `pic_phone` VARCHAR(100) NOT NULL,
   `goods` JSON DEFAULT NULL,
   `attachment_url` VARCHAR(500) DEFAULT NULL,
-  `deadline_days` INT DEFAULT 30,
   `status` VARCHAR(50) DEFAULT 'draft',
   `performed_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
