@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search } from 'lucide-react';
@@ -277,14 +277,13 @@ export default function Quotations() {
             unit: '',
           };
         }
-        const minimumQty = Number(selectedGood?.minimum_order_quantity) || 0;
         return {
           ...row,
           good_id: String(selectedGood.id),
           name: selectedGood?.name || '',
           description: selectedGood?.description || '',
           unit: selectedGood?.unit || '',
-          qty: minimumQty > 0 ? minimumQty : row.qty || '',
+          qty: row.qty ?? '',
         };
       })
     );
@@ -486,6 +485,19 @@ export default function Quotations() {
     }
     return [];
   };
+
+  const calculatedTotals = useMemo(() => {
+    const rawTotal = goodsRows.reduce(
+      (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
+      0
+    );
+    const taxAmount = includeTax
+      ? (rawTotal * taxRate) / (100 + taxRate)
+      : (rawTotal * taxRate) / 100;
+    const totalAmount = includeTax ? rawTotal - taxAmount : rawTotal;
+    const grandTotal = includeTax ? rawTotal : rawTotal + taxAmount;
+    return { rawTotal, taxAmount, totalAmount, grandTotal };
+  }, [goodsRows, includeTax, taxRate]);
 
   const activeGoods = goods.filter((good) => good.status === 'active');
   const availableRfqs = rfqs.filter(
@@ -914,6 +926,21 @@ export default function Quotations() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">
+                <div className="flex items-center justify-between">
+                  <span>Total (before tax)</span>
+                  <span>Rp {formatRupiah(Number(calculatedTotals.totalAmount) || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Tax ({taxRate}%)</span>
+                  <span>Rp {formatRupiah(Number(calculatedTotals.taxAmount) || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between font-semibold text-gray-900 dark:text-slate-100">
+                  <span>Grand Total</span>
+                  <span>Rp {formatRupiah(Number(calculatedTotals.grandTotal) || 0)}</span>
                 </div>
               </div>
 

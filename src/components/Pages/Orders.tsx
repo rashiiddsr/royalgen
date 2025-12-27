@@ -362,7 +362,6 @@ export default function Orders() {
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
     );
-    const selectedQuotation = quotations.find((item) => String(item.id) === String(formData.quotation_id));
     const taxAmount =
       selectedQuotation && selectedQuotation.tax_amount !== undefined
         ? Number(selectedQuotation.tax_amount) || 0
@@ -492,6 +491,32 @@ export default function Orders() {
       (!usedQuotationIds.has(String(quotation.id)) ||
         String(quotation.id) === String(formData.quotation_id))
   );
+  const selectedQuotation = useMemo(
+    () => quotations.find((item) => String(item.id) === String(formData.quotation_id)),
+    [quotations, formData.quotation_id]
+  );
+  const orderTotals = useMemo(() => {
+    if (editingOrder) {
+      return resolveOrderTotals(goodsRows, editingOrder);
+    }
+    const subtotal = goodsRows.reduce(
+      (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
+      0
+    );
+    const resolvedSubtotal =
+      selectedQuotation && selectedQuotation.total_amount !== undefined
+        ? Number(selectedQuotation.total_amount) || subtotal
+        : subtotal;
+    const tax =
+      selectedQuotation && selectedQuotation.tax_amount !== undefined
+        ? Number(selectedQuotation.tax_amount) || 0
+        : 0;
+    const grand =
+      selectedQuotation && selectedQuotation.grand_total !== undefined
+        ? Number(selectedQuotation.grand_total) || resolvedSubtotal + tax
+        : resolvedSubtotal + tax;
+    return { subtotal: resolvedSubtotal, tax, grand };
+  }, [editingOrder, goodsRows, selectedQuotation]);
 
   if (loading) {
     return (
@@ -820,6 +845,21 @@ export default function Orders() {
                     </table>
                   </div>
                 )}
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                <div className="flex items-center justify-between">
+                  <span>Total (before tax)</span>
+                  <span>{formatCurrency(Number(orderTotals.subtotal) || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Tax</span>
+                  <span>{formatCurrency(Number(orderTotals.tax) || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between font-semibold text-gray-900">
+                  <span>Grand Total</span>
+                  <span>{formatCurrency(Number(orderTotals.grand) || 0)}</span>
+                </div>
               </div>
 
               <div>
