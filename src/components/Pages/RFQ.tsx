@@ -80,14 +80,14 @@ export default function RFQ() {
   const isValidPhone = (value: string) => value === '-' || /^\+62\d{6,}$/.test(value);
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      draft: 'bg-amber-100 text-amber-800',
-      process: 'bg-blue-100 text-blue-800',
-      approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
-      canceled: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-gray-100 text-gray-800',
+      draft: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
+      process: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
+      approved: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      rejected: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
+      canceled: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
+      cancelled: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
   const canEditRfq = (rfq: RFQType) => {
     if (!profile) return false;
@@ -366,7 +366,7 @@ export default function RFQ() {
                 </tr>
               ) : (
                 filteredRfqs.map((rfq) => (
-                  <tr key={rfq.id} className="hover:bg-gray-50">
+                  <tr key={rfq.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="font-semibold">{rfq.rfq_number}</div>
                     </td>
@@ -578,7 +578,7 @@ export default function RFQ() {
                                 prev.includes(String(good.id)) ? prev : [...prev, String(good.id)]
                               );
                             }}
-                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left"
+                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left dark:hover:bg-slate-800/60"
                           >
                             <span className="text-sm text-gray-800">{good.name}</span>
                             {selectedGoods.includes(String(good.id)) && (
@@ -667,7 +667,7 @@ export default function RFQ() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
                   Cancel
                 </button>

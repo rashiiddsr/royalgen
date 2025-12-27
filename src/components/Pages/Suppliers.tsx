@@ -282,27 +282,27 @@ export default function Suppliers() {
                 </tr>
               ) : (
                 filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50">
+                  <tr key={supplier.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{supplier.name}</div>
-                      <div className="text-sm text-gray-500">{supplier.tax_id}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-slate-100">{supplier.name}</div>
+                      <div className="text-sm text-gray-500 dark:text-slate-400">{supplier.tax_id}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{supplier.contact_person}</div>
-                      <div className="text-sm text-gray-500">{supplier.email}</div>
-                      <div className="text-sm text-gray-500">{supplier.phone}</div>
+                      <div className="text-sm text-gray-900 dark:text-slate-100">{supplier.contact_person}</div>
+                      <div className="text-sm text-gray-500 dark:text-slate-400">{supplier.email}</div>
+                      <div className="text-sm text-gray-500 dark:text-slate-400">{supplier.phone}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{supplier.city}</div>
-                      <div className="text-sm text-gray-500">{supplier.country}</div>
+                      <div className="text-sm text-gray-900 dark:text-slate-100">{supplier.city}</div>
+                      <div className="text-sm text-gray-500 dark:text-slate-400">{supplier.country}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{supplier.payment_terms}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">{supplier.payment_terms}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           supplier.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100'
                         }`}
                       >
                         {supplier.status}
@@ -494,7 +494,7 @@ export default function Suppliers() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
                   Cancel
                 </button>
@@ -572,8 +572,8 @@ export default function Suppliers() {
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                     detailSupplier.status === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
+                      ? 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100'
                   }`}
                 >
                   {detailSupplier.status}
@@ -583,7 +583,7 @@ export default function Suppliers() {
                 <button
                   type="button"
                   onClick={() => setShowGoodsModal((prev) => !prev)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20"
                 >
                   View Goods Linked
                 </button>

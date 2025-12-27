@@ -56,7 +56,7 @@ export default function ActivityLog({ showHeader = true }: ActivityLogProps) {
         ) : (
           <ul className="divide-y divide-gray-100">
             {logs.map((log) => (
-              <li key={log.id} className="p-4 flex items-start gap-3 hover:bg-gray-50">
+              <li key={log.id} className="p-4 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-slate-800/60">
                 <div className="mt-1 text-blue-600">
                   <Clock3 className="h-5 w-5" />
                 </div>

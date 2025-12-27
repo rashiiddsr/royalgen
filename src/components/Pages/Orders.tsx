@@ -417,14 +417,14 @@ export default function Orders() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      ongoing: 'bg-blue-100 text-blue-800',
-      'on-delivery': 'bg-purple-100 text-purple-800',
-      'waiting payment': 'bg-amber-100 text-amber-800',
-      done: 'bg-green-100 text-green-800',
-      delivery: 'bg-purple-100 text-purple-800',
-      payment: 'bg-amber-100 text-amber-800',
+      ongoing: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
+      'on-delivery': 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
+      'waiting payment': 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
+      done: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      delivery: 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
+      payment: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
 
   const filteredOrders = useMemo(() => {
@@ -538,7 +538,7 @@ export default function Orders() {
                 </tr>
               ) : (
                 filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
+                  <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
                         {order.po_number || order.order_number}
@@ -817,7 +817,7 @@ export default function Orders() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
                   Cancel
                 </button>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { applyTheme, ThemePreference } from '../../lib/theme';
 
 interface CompanySetting {
   id?: string;
@@ -11,9 +10,7 @@ interface CompanySetting {
   tax_rate: number | '';
   email: string;
   phone: string;
-  theme: ThemePreference;
   logo_url?: string | null;
-  language: 'indonesia' | 'english';
 }
 
 const EMPTY_SETTING: CompanySetting = {
@@ -24,9 +21,7 @@ const EMPTY_SETTING: CompanySetting = {
   tax_rate: 11,
   email: 'royalgeneralindonesia@gmail.com',
   phone: '+6282170179410',
-  theme: 'system',
   logo_url: null,
-  language: 'english',
 };
 
 const normalizePhoneInput = (value: string) => {
@@ -64,9 +59,7 @@ export default function Settings() {
             tax_rate: current.tax_rate ?? EMPTY_SETTING.tax_rate,
             email: current.email || EMPTY_SETTING.email,
             phone: normalizePhoneInput(current.phone || EMPTY_SETTING.phone),
-            theme: current.theme || 'system',
             logo_url: current.logo_url || null,
-            language: current.language || 'english',
           });
           if (current.logo_url) {
             setLogoPreview(`${apiRoot}${current.logo_url}`);
@@ -104,7 +97,6 @@ export default function Settings() {
       const requiredFields = [
         formData.company_name.trim(),
         formData.company_address.trim(),
-        formData.tax_id.trim(),
         formData.email.trim(),
         normalizedPhone.trim(),
       ];
@@ -131,8 +123,6 @@ export default function Settings() {
         tax_rate: formData.tax_rate === '' ? 0 : Number(formData.tax_rate),
         email: formData.email,
         phone: normalizedPhone,
-        theme: formData.theme,
-        language: formData.language,
         performed_by: profile?.id,
       };
 
@@ -154,7 +144,6 @@ export default function Settings() {
           setLogoPreview(`${apiRoot}${saved.logo_url}`);
         }
       }
-      applyTheme(formData.theme);
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Failed to save settings', error);
@@ -203,14 +192,13 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tax ID <span className="text-red-500">*</span>
+              Tax ID
             </label>
             <input
               type="text"
               value={formData.tax_id}
               onChange={(event) => setFormData((prev) => ({ ...prev, tax_id: event.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-              required
             />
           </div>
         </div>
@@ -228,7 +216,7 @@ export default function Settings() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tax Rate (%) <span className="text-red-500">*</span>
@@ -260,26 +248,9 @@ export default function Settings() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Theme <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.theme}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, theme: event.target.value as ThemePreference }))
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-              required
-            >
-              <option value="system">System Default</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Phone <span className="text-red-500">*</span>
@@ -300,22 +271,6 @@ export default function Settings() {
               />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Language <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.language}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, language: event.target.value as CompanySetting['language'] }))
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-              required
-            >
-              <option value="indonesia">Indonesia</option>
-              <option value="english">English</option>
-            </select>
-          </div>
         </div>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
@@ -324,7 +279,9 @@ export default function Settings() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo</label>
             <input type="file" accept="image/*" onChange={handleLogoChange} />
-            <p className="text-xs text-gray-500 mt-1">Upload a company logo (optional).</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Upload a company logo (optional). Recommended size: 500 x 500 px.
+            </p>
           </div>
           {logoPreview && (
             <div className="flex items-center justify-center border border-dashed border-gray-200 rounded-lg p-3 bg-gray-50">

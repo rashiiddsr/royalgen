@@ -58,13 +58,13 @@ export default function Goods() {
   const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
   const getCategoryBadge = (category: Good['category']) => {
     const styles: Record<Good['category'], string> = {
-      consumable: 'bg-sky-100 text-sky-800',
-      instrument: 'bg-purple-100 text-purple-800',
-      electrical: 'bg-amber-100 text-amber-800',
-      piping: 'bg-emerald-100 text-emerald-800',
-      other: 'bg-gray-100 text-gray-800',
+      consumable: 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200',
+      instrument: 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
+      electrical: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
+      piping: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      other: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
     };
-    return styles[category] || 'bg-gray-100 text-gray-800';
+    return styles[category] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
 
   useEffect(() => {
@@ -122,9 +122,13 @@ export default function Goods() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
+      if (formData.price === '') {
+        alert('Price is required.');
+        return;
+      }
       const payload: GoodFormData = {
         ...formData,
-        price: formData.price === '' ? 0 : Number(formData.price),
+        price: Number(formData.price),
         minimum_order_quantity:
           formData.minimum_order_quantity === '' ? 1 : Number(formData.minimum_order_quantity),
         performed_by: profile?.id,
@@ -273,7 +277,7 @@ export default function Goods() {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-900 dark:divide-slate-800">
               {filteredGoods.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
@@ -282,19 +286,19 @@ export default function Goods() {
                 </tr>
               ) : (
                 filteredGoods.map((good) => (
-                  <tr key={good.id} className="hover:bg-gray-50">
+                  <tr key={good.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Package className="h-6 w-6 text-blue-600" />
+                        <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center dark:bg-blue-500/20">
+                          <Package className="h-6 w-6 text-blue-600 dark:text-blue-300" />
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{good.name}</div>
-                          <div className="text-sm text-gray-500">SKU: {good.sku}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-slate-100">{good.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">SKU: {good.sku}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full capitalize ${getCategoryBadge(
                           good.category,
@@ -303,19 +307,19 @@ export default function Goods() {
                         {good.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">
                       <div>Rp {formatRupiah(Number(good.price) || 0)}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-slate-400">
                         MOQ: {good.minimum_order_quantity}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{good.unit}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">{good.unit}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           good.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                            ? 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'
                         }`}
                       >
                         {good.status}
@@ -454,7 +458,7 @@ export default function Goods() {
                                     : [...prev, String(supplier.id)]
                                 )
                               }
-                              className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left"
+                              className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left dark:hover:bg-slate-800/60"
                             >
                               <span className="text-sm text-gray-800">{supplier.name}</span>
                               {selectedSuppliers.includes(String(supplier.id)) && (
@@ -516,7 +520,7 @@ export default function Goods() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price (Rp)
+                    Price (Rp) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -528,6 +532,7 @@ export default function Goods() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="0"
                     step="0.01"
+                    required
                   />
                 </div>
 
@@ -570,8 +575,8 @@ export default function Goods() {
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           formData.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                            ? 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'
                         }`}
                       >
                         {formData.status}
@@ -589,7 +594,7 @@ export default function Goods() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
                   Cancel
                 </button>
@@ -654,8 +659,8 @@ export default function Goods() {
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                     detailGood.status === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
+                      ? 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'
                   }`}
                 >
                   {detailGood.status}

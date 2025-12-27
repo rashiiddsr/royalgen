@@ -240,7 +240,7 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
               </thead>
               <tbody className="divide-y">
                 {progressRows.map((row, index) => (
-                  <tr key={`${row.name}-${index}`} className="hover:bg-gray-50">
+                  <tr key={`${row.name}-${index}`} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-3 py-2">{index + 1}</td>
                     <td className="px-3 py-2">{row.name}</td>
                     <td className="px-3 py-2">{row.unit}</td>
