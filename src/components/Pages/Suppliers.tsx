@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { addRecord, deleteRecordWithContext, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, Search, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -49,6 +49,7 @@ export default function Suppliers() {
     status: 'active',
   });
   const { profile } = useAuth();
+  const canDeactivateSupplier = ['superadmin', 'manager'].includes(profile?.role ?? '');
 
   const normalizePhoneInput = (value: string) => {
     const trimmed = value.trim();
@@ -64,8 +65,7 @@ export default function Suppliers() {
   const isValidPhone = (value: string) => value === '-' || /^\+62\d{6,}$/.test(value);
 
   const canManageStatus =
-    !!editingSupplier && ['admin', 'superadmin', 'manager'].includes(profile?.role ?? '');
-  const canDeleteSupplier = profile?.role === 'superadmin';
+    !!editingSupplier && ['superadmin', 'manager'].includes(profile?.role ?? '');
 
   useEffect(() => {
     fetchSuppliers();
@@ -142,19 +142,23 @@ export default function Suppliers() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!canDeleteSupplier) {
-      alert('Only the superadmin can delete suppliers.');
+  const handleDeactivate = async (id: string) => {
+    if (!profile || !['superadmin', 'manager'].includes(profile.role)) {
+      alert('Only managers can inactivate suppliers.');
       return;
     }
-    if (!confirm('Are you sure you want to delete this supplier?')) return;
+    if (!confirm('Mark this supplier as inactive?')) return;
 
     try {
-      await deleteRecordWithContext('suppliers', id, { performed_by: profile?.id });
+      await updateRecord<Supplier>('suppliers', id, {
+        status: 'inactive',
+        performed_by: profile?.id,
+        performer_role: profile?.role,
+      });
       fetchSuppliers();
     } catch (error) {
-      console.error('Error deleting supplier:', error);
-      alert(error instanceof Error ? error.message : 'Failed to delete supplier.');
+      console.error('Error updating supplier status:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update supplier.');
     }
   };
 
@@ -322,14 +326,18 @@ export default function Suppliers() {
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      {canDeleteSupplier && (
-                        <button
-                          onClick={() => handleDelete(supplier.id)}
-                          className="inline-flex items-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDeactivate(supplier.id)}
+                        disabled={!canDeactivateSupplier || supplier.status === 'inactive'}
+                        className={`inline-flex items-center p-2 rounded-lg transition ${
+                          !canDeactivateSupplier || supplier.status === 'inactive'
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-red-600 hover:bg-red-50'
+                        }`}
+                        aria-label="Inactivate supplier"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
