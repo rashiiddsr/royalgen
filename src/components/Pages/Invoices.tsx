@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Edit2, Eye, Receipt, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface InvoiceGood {
   no: number;
@@ -62,6 +63,7 @@ const formatRupiah = (value: number) =>
 
 export default function Invoices() {
   const { profile } = useAuth();
+  const { suppressNotification } = useNotifications();
   const [invoices, setInvoices] = useState<InvoiceType[]>([]);
   const [ordersById, setOrdersById] = useState<Record<string, OrderType>>({});
   const [clientsById, setClientsById] = useState<Record<string, ClientType>>({});
@@ -150,6 +152,7 @@ export default function Invoices() {
     if (!confirmed) return;
 
     try {
+      suppressNotification('invoice_paid', String(invoice.id));
       await updateRecord<InvoiceType>('invoices', invoice.id, {
         status: 'paid',
         performed_by: profile?.id,
