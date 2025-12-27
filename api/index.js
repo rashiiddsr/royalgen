@@ -209,12 +209,132 @@ const parseJsonArray = (value, fallback = []) => {
   }
 };
 
+const romanMonths = [
+  'I',
+  'II',
+  'III',
+  'IV',
+  'V',
+  'VI',
+  'VII',
+  'VIII',
+  'IX',
+  'X',
+  'XI',
+  'XII',
+];
+
+const formatInvoiceNumber = (sequence, date = new Date()) => {
+  const padded = String(sequence).padStart(4, '0');
+  const monthRoman = romanMonths[date.getMonth()] || romanMonths[0];
+  const year = date.getFullYear();
+  return `${padded}/RGI/INV/${monthRoman}/${year}`;
+};
+
+const getNextInvoiceSequence = async (year) => {
+  const [row] = await query(
+    'SELECT COUNT(*) as count FROM invoices WHERE YEAR(COALESCE(invoice_date, created_at)) = ?',
+    [year]
+  );
+  return Number(row?.count || 0) + 1;
+};
+
+const buildInvoiceGoods = (orderGoods) =>
+  orderGoods.map((item, index) => {
+    const qty = Number(item.qty) || 0;
+    const price = Number(item.price) || 0;
+    return {
+      no: index + 1,
+      goods: item.name || null,
+      description: item.description || null,
+      unit: item.unit || null,
+      qty,
+      price,
+      subtotal: qty * price,
+    };
+  });
+
+const resolveInvoiceTotals = (order, invoiceGoods) => {
+  const subtotal =
+    order?.total_amount !== undefined && order?.total_amount !== null
+      ? Number(order.total_amount) || 0
+      : invoiceGoods.reduce((sum, item) => sum + (Number(item.subtotal) || 0), 0);
+  const taxAmount =
+    order?.tax_amount !== undefined && order?.tax_amount !== null ? Number(order.tax_amount) || 0 : 0;
+  const grandTotal =
+    order?.grand_total !== undefined && order?.grand_total !== null
+      ? Number(order.grand_total) || subtotal + taxAmount
+      : subtotal + taxAmount;
+  return { subtotal, taxAmount, grandTotal };
+};
+
+const createInvoiceForOrder = async (order, performedBy) => {
+  if (!order?.id) return null;
+  const [existingInvoice] = await query(
+    'SELECT id FROM invoices WHERE sales_order_id = ? LIMIT 1',
+    [order.id]
+  );
+  if (existingInvoice) return null;
+
+  const orderGoods = parseJsonArray(order.goods);
+  const invoiceGoods = buildInvoiceGoods(orderGoods);
+  const now = new Date();
+  const invoiceDate = formatDateOnly(now);
+  const sequence = await getNextInvoiceSequence(now.getFullYear());
+  const invoiceNumber = formatInvoiceNumber(sequence, now);
+  const { subtotal, taxAmount, grandTotal } = resolveInvoiceTotals(order, invoiceGoods);
+
+  let client = null;
+  if (order.client_id) {
+    const [clientRow] = await query('SELECT * FROM `clients` WHERE id = ? LIMIT 1', [
+      order.client_id,
+    ]);
+    client = clientRow || null;
+  }
+
+  let quotation = null;
+  if (order.quotation_id) {
+    const [quotationRow] = await query('SELECT * FROM `quotations` WHERE id = ? LIMIT 1', [
+      order.quotation_id,
+    ]);
+    quotation = quotationRow || null;
+  }
+
+  const invoicePayload = {
+    invoice_number: invoiceNumber,
+    sales_order_id: order.id,
+    client_id: order.client_id || null,
+    company_name: client?.company_name || order.company_name || null,
+    billing_address: client?.address || null,
+    payment_time: quotation?.payment_time || order.payment_time || null,
+    invoice_date: invoiceDate,
+    goods: JSON.stringify(invoiceGoods),
+    total_amount: subtotal,
+    tax_amount: taxAmount,
+    grand_total: grandTotal,
+    status: 'overdue',
+    paid_date: null,
+  };
+
+  const result = await query('INSERT INTO `invoices` SET ?', [invoicePayload]);
+
+  await logActivity({
+    performedBy,
+    entityType: 'invoices',
+    entityId: result.insertId,
+    action: 'create',
+    description: `Auto-created invoice ${invoiceNumber}`,
+  });
+
+  return result.insertId;
+};
+
 const attachSuppliersToGoods = async (goodsRows) => {
   if (!goodsRows.length) return goodsRows;
 
   const goodsIds = goodsRows.map((good) => good.id);
   const supplierRows = await query(
-    `SELECT gs.good_id, s.id, s.name
+    `SELECT gs.good_id, s.id, s.name, s.status
      FROM goods_suppliers gs
      JOIN suppliers s ON gs.supplier_id = s.id
      WHERE gs.good_id IN (?)`,
@@ -225,7 +345,7 @@ const attachSuppliersToGoods = async (goodsRows) => {
     if (!acc[row.good_id]) {
       acc[row.good_id] = [];
     }
-    acc[row.good_id].push({ id: row.id, name: row.name });
+    acc[row.good_id].push({ id: row.id, name: row.name, status: row.status });
     return acc;
   }, {});
 
@@ -1018,6 +1138,17 @@ app.get('/api/:table', async (req, res) => {
       return res.json(formatted);
     }
 
+    if (table === 'invoices') {
+      const rows = await query('SELECT * FROM `invoices` ORDER BY created_at DESC');
+      const formatted = rows.map((row) => ({
+        ...row,
+        invoice_date: formatDateOnly(row.invoice_date),
+        paid_date: formatDateOnly(row.paid_date),
+        goods: parseJsonArray(row.goods),
+      }));
+      return res.json(formatted);
+    }
+
     const rows = await query(`SELECT * FROM \`${table}\` ORDER BY created_at DESC`);
 
     return res.json(rows);
@@ -1089,6 +1220,19 @@ app.get('/api/:table/:id', async (req, res) => {
       return res.json({
         ...rows[0],
         delivery_date: formatDateOnly(rows[0].delivery_date),
+        goods: parseJsonArray(rows[0].goods),
+      });
+    }
+
+    if (table === 'invoices') {
+      const rows = await query('SELECT * FROM `invoices` WHERE id = ? LIMIT 1', [id]);
+      if (!rows.length) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      return res.json({
+        ...rows[0],
+        invoice_date: formatDateOnly(rows[0].invoice_date),
+        paid_date: formatDateOnly(rows[0].paid_date),
         goods: parseJsonArray(rows[0].goods),
       });
     }
@@ -1172,7 +1316,7 @@ app.post('/api/:table', async (req, res) => {
         : shipAddresses ?? null;
       const result = await query('INSERT INTO ?? SET ?', [
         table,
-        { ...clientPayload, ship_addresses: normalizedShipAddresses },
+        { status: 'active', ...clientPayload, ship_addresses: normalizedShipAddresses },
       ]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
 
@@ -1392,6 +1536,10 @@ app.post('/api/:table', async (req, res) => {
       });
     }
 
+    if (table === 'invoices') {
+      return res.status(403).json({ error: 'Invoices are generated automatically' });
+    }
+
     if (table === 'sales_orders') {
       const {
         goods = [],
@@ -1520,7 +1668,16 @@ app.put('/api/:table/:id', async (req, res) => {
     }
 
     if (table === 'clients') {
-      const { performed_by: performedBy, ship_addresses: shipAddresses, ...clientUpdates } = req.body || {};
+      const {
+        performed_by: performedBy,
+        performer_role: performerRole,
+        ship_addresses: shipAddresses,
+        ...clientUpdates
+      } = req.body || {};
+      const isPrivileged = performerRole && ['superadmin', 'manager'].includes(performerRole);
+      if (Object.prototype.hasOwnProperty.call(clientUpdates, 'status') && !isPrivileged) {
+        return res.status(403).json({ error: 'Only managers can update client status' });
+      }
       const normalizedShipAddresses = Array.isArray(shipAddresses)
         ? JSON.stringify(shipAddresses)
         : shipAddresses;
@@ -1638,6 +1795,10 @@ app.put('/api/:table/:id', async (req, res) => {
           action: 'status',
           description: `Updated sales order status to ${requestedStatus}`,
         });
+      }
+
+      if (isStatusChange && requestedStatus === 'waiting payment') {
+        await createInvoiceForOrder(updated, performedBy);
       }
 
       return res.json({
@@ -1890,7 +2051,11 @@ app.put('/api/:table/:id', async (req, res) => {
     }
 
     if (table === 'suppliers') {
-      const { performed_by: performedBy, ...supplierUpdates } = req.body || {};
+      const { performed_by: performedBy, performer_role: performerRole, ...supplierUpdates } = req.body || {};
+      const isPrivileged = performerRole && ['superadmin', 'manager'].includes(performerRole);
+      if (Object.prototype.hasOwnProperty.call(supplierUpdates, 'status') && !isPrivileged) {
+        return res.status(403).json({ error: 'Only managers can update supplier status' });
+      }
       await query('UPDATE ?? SET ? WHERE id = ?', [table, supplierUpdates, id]);
       const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
 
@@ -1902,6 +2067,69 @@ app.put('/api/:table/:id', async (req, res) => {
         description: `Updated supplier ${supplierUpdates.name || updated?.name}`,
       });
       return res.json(updated);
+    }
+
+    if (table === 'invoices') {
+      const { payment_time: paymentTime, billing_address: billingAddress, status, performed_by: performedBy } = req.body || {};
+      const [existingInvoice] = await query('SELECT * FROM `invoices` WHERE id = ? LIMIT 1', [id]);
+      if (!existingInvoice) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+
+      const updates = {};
+      if (paymentTime !== undefined) {
+        updates.payment_time = paymentTime;
+      }
+      if (billingAddress !== undefined) {
+        updates.billing_address = billingAddress;
+      }
+      if (status !== undefined) {
+        if (existingInvoice.status !== 'overdue' || status !== 'paid') {
+          return res.status(403).json({ error: 'Invoice status can only be updated from overdue to paid' });
+        }
+        updates.status = 'paid';
+        updates.paid_date = formatDateOnly(new Date());
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No valid fields to update' });
+      }
+
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
+      const [updated] = await query('SELECT * FROM `invoices` WHERE id = ? LIMIT 1', [id]);
+
+      await logActivity({
+        performedBy,
+        entityType: 'invoices',
+        entityId: Number(id),
+        action: 'update',
+        description: `Updated invoice ${updated?.invoice_number || id}`,
+      });
+
+      if (status === 'paid') {
+        if (updated?.sales_order_id) {
+          await query('UPDATE `sales_orders` SET status = ? WHERE id = ?', ['done', updated.sales_order_id]);
+          const [order] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [
+            updated.sales_order_id,
+          ]);
+          if (order?.quotation_id) {
+            await query('UPDATE `quotations` SET status = ? WHERE id = ?', ['success', order.quotation_id]);
+            const [quotation] = await query('SELECT * FROM `quotations` WHERE id = ? LIMIT 1', [
+              order.quotation_id,
+            ]);
+            if (quotation?.rfq_id) {
+              await query('UPDATE `rfqs` SET status = ? WHERE id = ?', ['success', quotation.rfq_id]);
+            }
+          }
+        }
+      }
+
+      return res.json({
+        ...updated,
+        invoice_date: formatDateOnly(updated?.invoice_date),
+        paid_date: formatDateOnly(updated?.paid_date),
+        goods: parseJsonArray(updated?.goods),
+      });
     }
 
     if (table === 'users') {
@@ -2025,6 +2253,10 @@ app.delete('/api/:table/:id', async (req, res) => {
       return res.status(403).json({ error: 'Goods cannot be deleted' });
     }
 
+    if (table === 'clients') {
+      return res.status(403).json({ error: 'Clients cannot be deleted' });
+    }
+
     if (table === 'users') {
       const [target] = await query('SELECT role FROM ?? WHERE id = ? LIMIT 1', [table, id]);
       if (target?.role === 'superadmin') {
@@ -2032,20 +2264,7 @@ app.delete('/api/:table/:id', async (req, res) => {
       }
     }
     if (table === 'suppliers') {
-      const [linked] = await query(
-        'SELECT COUNT(*) as count FROM goods_suppliers WHERE supplier_id = ?',
-        [id]
-      );
-      if (Number(linked?.count || 0) > 0) {
-        return res.status(400).json({ error: 'Supplier is linked to goods and cannot be deleted' });
-      }
-      await logActivity({
-        performedBy,
-        entityType: 'suppliers',
-        entityId: id,
-        action: 'delete',
-        description: `Deleted supplier ${id}`,
-      });
+      return res.status(403).json({ error: 'Suppliers cannot be deleted' });
     }
 
     await query('DELETE FROM ?? WHERE id = ?', [table, id]);
