@@ -344,7 +344,7 @@ export default function RFQ() {
           placeholder="Search RFQs by number, company, goods, or requester..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
       </div>
 
@@ -400,7 +400,7 @@ export default function RFQ() {
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => setDetailRfq(rfq)}
-                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition dark:text-blue-300 dark:hover:bg-blue-500/10"
                         aria-label="View RFQ details"
                       >
                         <Eye className="h-4 w-4" />
@@ -409,8 +409,8 @@ export default function RFQ() {
                         onClick={() => openModal(rfq)}
                         className={`inline-flex items-center p-2 rounded-lg transition ${
                           canEditRfq(rfq)
-                            ? 'text-emerald-600 hover:bg-emerald-50'
-                            : 'text-gray-300 cursor-not-allowed'
+                            ? 'text-emerald-600 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10'
+                            : 'text-gray-300 cursor-not-allowed dark:text-slate-600'
                         }`}
                         aria-label="Edit RFQ"
                         disabled={!canEditRfq(rfq)}
@@ -437,7 +437,7 @@ export default function RFQ() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-slate-100"
                 aria-label="Close RFQ modal"
               >
                 ✕
@@ -454,7 +454,7 @@ export default function RFQ() {
                     type="text"
                     value={formData.rfq_number}
                     onChange={(e) => setFormData({ ...formData, rfq_number: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     required
                   />
                 </div>
@@ -466,7 +466,7 @@ export default function RFQ() {
                     type="text"
                     value={formData.company_name}
                     onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     required
                   />
                 </div>
@@ -478,7 +478,7 @@ export default function RFQ() {
                     type="text"
                     value={formData.pic_name}
                     onChange={(e) => setFormData({ ...formData, pic_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     required
                   />
                 </div>
@@ -493,7 +493,7 @@ export default function RFQ() {
                       setFormData({ ...formData, pic_email: e.target.value });
                       if (contactError) setContactError('');
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     placeholder="email@company.com or -"
                     required
                   />
@@ -502,7 +502,7 @@ export default function RFQ() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     PIC Phone <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
+                  <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden dark:border-slate-700">
                     <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">+62</span>
                     <input
                       type="tel"
@@ -515,7 +515,7 @@ export default function RFQ() {
                         });
                         if (contactError) setContactError('');
                       }}
-                      className="w-full px-3 py-2 outline-none"
+                      className="w-full px-3 py-2 outline-none bg-white dark:bg-slate-900 dark:text-slate-100"
                       placeholder="81234567890"
                       required
                     />
@@ -537,7 +537,7 @@ export default function RFQ() {
                         value={goodsSearch}
                         onChange={(e) => setGoodsSearch(e.target.value)}
                         placeholder="Search goods"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                     </div>
 
@@ -617,7 +617,7 @@ export default function RFQ() {
                           type="text"
                           value={item}
                           onChange={(e) => updateOtherGood(index, e.target.value)}
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                           placeholder="Specify other good"
                         />
                         {otherGoods.length > 1 && (
@@ -708,7 +708,7 @@ export default function RFQ() {
               </div>
               <button
                 onClick={() => setDetailRfq(null)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-slate-100"
                 aria-label="Close RFQ details"
               >
                 ✕

@@ -64,6 +64,14 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   }, [currentPage]);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const handleChange = () => setSidebarOpen(mediaQuery.matches);
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (notificationRef.current && !notificationRef.current.contains(target)) {
@@ -130,7 +138,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
       />
 
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-72 bg-white/80 backdrop-blur-xl border-r border-gray-200/50 z-40 transition-transform lg:translate-x-0 shadow-2xl dark:bg-slate-900/80 dark:border-slate-800 ${
+        className={`fixed top-0 left-0 bottom-0 w-72 bg-white/80 backdrop-blur-xl border-r border-gray-200/50 z-40 transition-transform shadow-2xl dark:bg-slate-900/80 dark:border-slate-800 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -182,10 +190,18 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
         </div>
       </aside>
 
-      <main className="lg:ml-72 pt-16 lg:pt-0">
+      <main className={`pt-16 lg:pt-0 transition-all ${sidebarOpen ? 'lg:ml-72' : 'lg:ml-0'}`}>
         <div className="p-6 lg:p-10">
           <div className="flex justify-end mb-4">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen((prev) => !prev)}
+                className="hidden lg:inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Toggle navigation menu"
+              >
+                {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
               <div className="relative" ref={notificationRef}>
                 <button
                   type="button"

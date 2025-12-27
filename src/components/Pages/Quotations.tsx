@@ -520,7 +520,7 @@ export default function Quotations() {
             placeholder="Search quotations by number, RFQ, company, goods, or creator..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
       </div>
@@ -601,7 +601,7 @@ export default function Quotations() {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => setDetailQuotation(quotation)}
-                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition dark:text-blue-300 dark:hover:bg-blue-500/10"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -609,7 +609,7 @@ export default function Quotations() {
                         ['waiting', 'renegotiation', 'negotiation'].includes(quotation.status) && (
                           <button
                             onClick={() => setStatusQuotation(quotation)}
-                            className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                            className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition dark:text-emerald-300 dark:hover:bg-emerald-500/10"
                             title="Update status"
                           >
                             <CheckCircle className="h-4 w-4" />
@@ -619,8 +619,8 @@ export default function Quotations() {
                         onClick={() => openEditModal(quotation)}
                         className={`inline-flex items-center p-2 rounded-lg transition ${
                           canEditQuotation(quotation)
-                            ? 'text-gray-600 hover:bg-gray-100'
-                            : 'text-gray-300 cursor-not-allowed'
+                            ? 'text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800/60'
+                            : 'text-gray-300 cursor-not-allowed dark:text-slate-600'
                         }`}
                         disabled={!canEditQuotation(quotation)}
                       >
@@ -647,10 +647,10 @@ export default function Quotations() {
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-2 rounded-full hover:bg-gray-100 transition"
+                className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
                 aria-label="Close quotation modal"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
               </button>
             </div>
 
@@ -664,7 +664,7 @@ export default function Quotations() {
                     type="text"
                     value={formData.quotation_number}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
                 <div>
@@ -674,8 +674,8 @@ export default function Quotations() {
                   <select
                     value={formData.rfq_id}
                     onChange={(event) => handleRfqChange(event.target.value)}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                      editingQuotation ? 'bg-gray-50 cursor-not-allowed' : ''
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${
+                      editingQuotation ? 'bg-gray-50 cursor-not-allowed dark:bg-slate-800' : ''
                     }`}
                     required={!editingQuotation}
                     disabled={!!editingQuotation}
@@ -697,7 +697,7 @@ export default function Quotations() {
                     type="text"
                     value={formData.company_name}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
                 <div>
@@ -706,7 +706,7 @@ export default function Quotations() {
                     type="text"
                     value={formData.pic_name}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
                 <div>
@@ -715,7 +715,7 @@ export default function Quotations() {
                     type="email"
                     value={formData.pic_email}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
               </div>
@@ -727,7 +727,7 @@ export default function Quotations() {
                     type="text"
                     value={formData.pic_phone}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
                 <div>
@@ -741,13 +741,13 @@ export default function Quotations() {
                     onChange={(event) =>
                       setFormData((prev) => ({ ...prev, payment_time: event.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     required
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Include Tax</p>
                   <p className="text-xs text-gray-500">
@@ -763,11 +763,11 @@ export default function Quotations() {
                   />
                   <span
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                      includeTax ? 'bg-emerald-500' : 'bg-gray-300'
+                      includeTax ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-700'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition dark:bg-slate-100 ${
                         includeTax ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -825,7 +825,9 @@ export default function Quotations() {
                               );
                             })
                           : [];
-                        const limitedMatches = matches.slice(0, 8);
+                        const sortedMatches = [...matches].sort((a, b) => a.name.localeCompare(b.name));
+                        const limitedMatches = sortedMatches.slice(0, 12);
+                        const hasMoreMatches = sortedMatches.length > limitedMatches.length;
                         const showSuggestions = activeGoodsIndex === index && query.length > 0;
 
                         return (
@@ -841,98 +843,105 @@ export default function Quotations() {
                                   }}
                                   onFocus={() => setActiveGoodsIndex(index)}
                                   onBlur={() => setTimeout(() => setActiveGoodsIndex(null), 120)}
-                                  className="w-40 max-w-full px-2 py-1 border border-gray-300 rounded-lg"
+                                  className="w-40 max-w-full px-2 py-1 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                                   placeholder="Search goods by name or SKU"
                                   required
                                 />
                                 {showSuggestions && (
-                                  <div className="absolute z-10 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto">
+                                  <div className="absolute z-10 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
                                     {limitedMatches.length === 0 ? (
-                                      <div className="px-3 py-2 text-xs text-gray-500">
+                                      <div className="px-3 py-2 text-xs text-gray-500 dark:text-slate-400">
                                         No goods match your search.
                                       </div>
                                     ) : (
-                                      limitedMatches.map((good) => (
-                                        <button
-                                          key={good.id}
-                                          type="button"
-                                          onMouseDown={() => {
-                                            handleGoodSelect(index, good.name);
-                                            setActiveGoodsIndex(null);
-                                          }}
-                                          className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/60"
-                                        >
-                                          <div className="text-sm font-medium text-gray-900">
-                                            {good.name}
+                                      <>
+                                        {limitedMatches.map((good) => (
+                                          <button
+                                            key={good.id}
+                                            type="button"
+                                            onMouseDown={() => {
+                                              handleGoodSelect(index, good.name);
+                                              setActiveGoodsIndex(null);
+                                            }}
+                                            className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/60"
+                                          >
+                                            <div className="text-sm font-medium text-gray-900 dark:text-slate-100">
+                                              {good.name}
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-slate-400">
+                                              {good.sku ? `SKU ${good.sku} · ` : ''}
+                                              {good.unit || '-'} · MOQ {good.minimum_order_quantity || 0}
+                                            </div>
+                                          </button>
+                                        ))}
+                                        {hasMoreMatches && (
+                                          <div className="px-3 py-2 text-xs text-gray-500 dark:text-slate-400">
+                                            Too many results. Refine your search to see fewer goods.
                                           </div>
-                                          <div className="text-xs text-gray-500">
-                                            {good.sku ? `SKU ${good.sku} · ` : ''}
-                                            {good.unit || '-'} · MOQ {good.minimum_order_quantity || 0}
-                                          </div>
-                                        </button>
-                                      ))
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 )}
                               </div>
                             </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={row.description}
-                              readOnly
-                              className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-gray-50"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={row.unit}
-                              readOnly
-                              className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-gray-50"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={
-                                Number(
-                                  goods.find((good) => String(good.id) === String(row.good_id))
-                                    ?.minimum_order_quantity
-                                ) || 0
-                              }
-                              value={row.qty}
-                              onChange={(event) =>
-                                handleGoodsRowChange(index, 'qty', event.target.value)
-                              }
-                              className="w-full px-2 py-1 border border-gray-300 rounded-lg"
-                              required
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={row.price}
-                              onChange={(event) =>
-                                handleGoodsRowChange(index, 'price', event.target.value)
-                              }
-                              className="w-full px-2 py-1 border border-gray-300 rounded-lg"
-                              required
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={row.delivery_time}
-                              onChange={(event) =>
-                                handleGoodsRowChange(index, 'delivery_time', event.target.value)
-                              }
-                              className="w-full px-2 py-1 border border-gray-300 rounded-lg"
-                              required
-                            />
-                          </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={row.description}
+                                readOnly
+                                className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={row.unit}
+                                readOnly
+                                className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min={
+                                  Number(
+                                    goods.find((good) => String(good.id) === String(row.good_id))
+                                      ?.minimum_order_quantity
+                                  ) || 0
+                                }
+                                value={row.qty}
+                                onChange={(event) =>
+                                  handleGoodsRowChange(index, 'qty', event.target.value)
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                required
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.price}
+                                onChange={(event) =>
+                                  handleGoodsRowChange(index, 'price', event.target.value)
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                required
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.delivery_time}
+                                onChange={(event) =>
+                                  handleGoodsRowChange(index, 'delivery_time', event.target.value)
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                required
+                              />
+                            </td>
                           <td className="px-3 py-2">
                             <button
                               type="button"
@@ -980,10 +989,10 @@ export default function Quotations() {
               </div>
               <button
                 onClick={() => setStatusQuotation(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition"
+                className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
                 aria-label="Close status modal"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
               </button>
             </div>
             <div className="p-6 space-y-4">
@@ -1027,10 +1036,10 @@ export default function Quotations() {
               </div>
               <button
                 onClick={() => setDetailQuotation(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition"
+                className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
                 aria-label="Close quotation details"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
               </button>
             </div>
             <div className="p-6 space-y-6">
@@ -1158,10 +1167,10 @@ export default function Quotations() {
               </div>
               <button
                 onClick={() => setLinkedRfq(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition"
+                className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
                 aria-label="Close RFQ details"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
               </button>
             </div>
             <div className="p-6 space-y-6 text-sm">
