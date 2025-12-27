@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getRecord, getRecords } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
+import { useI18n } from '../../contexts/I18nContext';
 
 interface OrderGood {
   good_id?: string;
@@ -71,6 +72,7 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<SalesOrder | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useI18n();
 
   useEffect(() => {
     const fetchProgress = async () => {
@@ -164,7 +166,7 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600">Loading progress...</div>
+        <div className="text-gray-600">{t('Loading progress...')}</div>
       </div>
     );
   }
@@ -172,7 +174,7 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
   if (!order) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600">Sales order not found.</div>
+        <div className="text-gray-600">{t('Sales order not found.')}</div>
       </div>
     );
   }
@@ -183,13 +185,13 @@ export default function OrderProgress({ orderId }: { orderId: string }) {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Order Progress</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{t('Order Progress')}</h1>
               <p className="text-sm text-gray-500 mt-1">
-                {order.po_number || order.order_number} · {order.project_name || 'Project'}
+                {order.po_number || order.order_number} · {order.project_name || t('Project')}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500">Overall Progress</p>
+              <p className="text-xs text-gray-500">{t('Overall Progress')}</p>
               <p className="text-lg font-semibold text-gray-900">{overallProgress.toFixed(1)}%</p>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
+import { useI18n } from './contexts/I18nContext';
 import { applyTheme, ThemePreference } from './lib/theme';
 import { getThemePreference, setThemePreference as persistThemePreference } from './lib/userPreferences';
 import Login from './components/Auth/Login';
@@ -19,6 +20,7 @@ import OrderProgress from './components/Pages/OrderProgress';
 
 function App() {
   const { user, profile, loading } = useAuth();
+  const { t } = useI18n();
   const progressOrderId =
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search).get('progress_order')
@@ -57,7 +59,7 @@ function App() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{t('Loading...')}</p>
         </div>
       </div>
     );
