@@ -29,6 +29,10 @@ interface RFQType {
 interface GoodOption {
   id: string;
   name: string;
+  sku?: string | null;
+  description?: string | null;
+  category?: string | null;
+  unit?: string | null;
 }
 
 interface ClientOption {
@@ -147,7 +151,16 @@ export default function RFQ() {
               'Unknown user',
           })),
       );
-      setGoods(goodsData.map((good) => ({ id: good.id, name: (good as any).name || '' })));
+      setGoods(
+        goodsData.map((good) => ({
+          id: good.id,
+          name: (good as any).name || '',
+          sku: (good as any).sku || '',
+          description: (good as any).description || '',
+          category: (good as any).category || '',
+          unit: (good as any).unit || '',
+        }))
+      );
       setClients(clientData);
     } catch (error) {
       console.error('Error fetching RFQs or goods:', error);
@@ -342,12 +355,17 @@ export default function RFQ() {
   const filteredGoods = goods.filter((good) => {
     const query = goodsSearch.trim().toLowerCase();
     if (!query) return true;
+    const name = (good.name || '').toLowerCase();
+    const sku = (good.sku || '').toLowerCase();
+    const description = (good.description || '').toLowerCase();
+    const category = (good.category || '').toLowerCase();
+    const unit = (good.unit || '').toLowerCase();
     return (
-      good.name.toLowerCase().includes(query) ||
-      good.sku.toLowerCase().includes(query) ||
-      good.description.toLowerCase().includes(query) ||
-      good.category.toLowerCase().includes(query) ||
-      good.unit.toLowerCase().includes(query)
+      name.includes(query) ||
+      sku.includes(query) ||
+      description.includes(query) ||
+      category.includes(query) ||
+      unit.includes(query)
     );
   });
   const shouldShowGoodsList = goodsSearch.trim().length > 0;

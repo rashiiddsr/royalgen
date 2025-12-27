@@ -104,7 +104,6 @@ export default function Quotations() {
     status: 'waiting',
   });
   const [goodsRows, setGoodsRows] = useState<QuotationGood[]>([{ ...EMPTY_GOOD_ROW }]);
-  const [activeGoodsIndex, setActiveGoodsIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchQuotations();
@@ -244,7 +243,6 @@ export default function Quotations() {
     });
     setIncludeTax(quotation.include_tax === undefined ? false : Boolean(quotation.include_tax));
     setGoodsRows(parsedGoods.length ? parsedGoods : [{ ...EMPTY_GOOD_ROW }]);
-    setActiveGoodsIndex(null);
     setShowModal(true);
   };
 
@@ -356,12 +354,15 @@ export default function Quotations() {
       return;
     }
 
-    const totalAmount = goodsRows.reduce(
+    const rawTotal = goodsRows.reduce(
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
     );
-    const taxAmount = includeTax ? 0 : (totalAmount * taxRate) / 100;
-    const grandTotal = totalAmount + taxAmount;
+    const taxAmount = includeTax
+      ? (rawTotal * taxRate) / (100 + taxRate)
+      : (rawTotal * taxRate) / 100;
+    const totalAmount = includeTax ? rawTotal - taxAmount : rawTotal;
+    const grandTotal = includeTax ? rawTotal : rawTotal + taxAmount;
 
     const commonPayload = {
       goods: goodsRows.map((row) => ({
@@ -815,80 +816,32 @@ export default function Quotations() {
                     </thead>
                     <tbody className="divide-y">
                       {goodsRows.map((row, index) => {
-                        const query = row.name.trim().toLowerCase();
-                        const matches = query
-                          ? activeGoods.filter((good) => {
-                              const description = (good.description || '').toLowerCase();
-                              const sku = (good.sku || '').toLowerCase();
-                              const category = (good.category || '').toLowerCase();
-                              const unit = (good.unit || '').toLowerCase();
-                              return (
-                                good.name.toLowerCase().includes(query) ||
-                                sku.includes(query) ||
-                                description.includes(query) ||
-                                category.includes(query) ||
-                                unit.includes(query)
-                              );
-                            })
-                          : [];
-                        const sortedMatches = [...matches].sort((a, b) => a.name.localeCompare(b.name));
-                        const limitedMatches = sortedMatches.slice(0, 12);
-                        const hasMoreMatches = sortedMatches.length > limitedMatches.length;
-                        const showSuggestions = activeGoodsIndex === index && query.length > 0;
-
                         return (
                           <tr key={`${row.good_id}-${index}`}>
                             <td className="px-3 py-2">
                               <div className="relative">
                                 <input
-                                  type="search"
+                                  type="text"
                                   value={row.name}
                                   onChange={(event) => {
-                                    setActiveGoodsIndex(index);
                                     handleGoodSelect(index, event.target.value);
                                   }}
-                                  onFocus={() => setActiveGoodsIndex(index)}
-                                  onBlur={() => setTimeout(() => setActiveGoodsIndex(null), 120)}
-                                  className="w-40 max-w-full px-2 py-1 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                                  placeholder="Search goods by name or SKU"
+                                  list={`goods-options-${index}`}
+                                  className="w-44 max-w-full px-2 py-1 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                  placeholder="Search goods"
                                   required
                                 />
-                                {showSuggestions && (
-                                  <div className="absolute z-10 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                                    {limitedMatches.length === 0 ? (
-                                      <div className="px-3 py-2 text-xs text-gray-500 dark:text-slate-400">
-                                        No goods match your search.
-                                      </div>
-                                    ) : (
-                                      <>
-                                        {limitedMatches.map((good) => (
-                                          <button
-                                            key={good.id}
-                                            type="button"
-                                            onMouseDown={() => {
-                                              handleGoodSelect(index, good.name);
-                                              setActiveGoodsIndex(null);
-                                            }}
-                                            className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/60"
-                                          >
-                                            <div className="text-sm font-medium text-gray-900 dark:text-slate-100">
-                                              {good.name}
-                                            </div>
-                                            <div className="text-xs text-gray-500 dark:text-slate-400">
-                                              {good.sku ? `SKU ${good.sku} · ` : ''}
-                                              {good.unit || '-'} · MOQ {good.minimum_order_quantity || 0}
-                                            </div>
-                                          </button>
-                                        ))}
-                                        {hasMoreMatches && (
-                                          <div className="px-3 py-2 text-xs text-gray-500 dark:text-slate-400">
-                                            Too many results. Refine your search to see fewer goods.
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                )}
+                                <datalist id={`goods-options-${index}`}>
+                                  {activeGoods.map((good) => (
+                                    <option
+                                      key={good.id}
+                                      value={good.name}
+                                    >
+                                      {good.sku ? `SKU ${good.sku} · ` : ''}
+                                      {good.unit || '-'} · MOQ {good.minimum_order_quantity || 0}
+                                    </option>
+                                  ))}
+                                </datalist>
                               </div>
                             </td>
                             <td className="px-3 py-2">
