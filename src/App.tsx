@@ -53,6 +53,17 @@ function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [themePreference]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleDashboardNavigate = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+      if (!customEvent.detail) return;
+      setCurrentPage(customEvent.detail);
+    };
+    window.addEventListener('app:navigate', handleDashboardNavigate as EventListener);
+    return () => window.removeEventListener('app:navigate', handleDashboardNavigate as EventListener);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
