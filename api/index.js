@@ -1339,6 +1339,12 @@ app.post('/api/:table', async (req, res) => {
         attachmentUrl = saveBase64File(attachmentData, 'rfq');
       }
 
+      const rawDeadlineDays = rfqPayload.deadline_days;
+      const resolvedDeadlineDays =
+        rawDeadlineDays === undefined || rawDeadlineDays === null || rawDeadlineDays === ''
+          ? 30
+          : Number(rawDeadlineDays);
+
       const cleanedGoods = Array.isArray(goods)
         ? goods.map((item) => ({
             type: item.type || (item.good_id ? 'existing' : 'other'),
@@ -1354,6 +1360,7 @@ app.post('/api/:table', async (req, res) => {
           performed_by: performedBy || null,
           goods: JSON.stringify(cleanedGoods),
           attachment_url: attachmentUrl,
+          deadline_days: Number.isNaN(resolvedDeadlineDays) ? 30 : resolvedDeadlineDays,
         },
       ]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
@@ -1823,10 +1830,6 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(404).json({ error: 'Record not found' });
       }
 
-      if (existing.status === 'process') {
-        return res.status(403).json({ error: 'Processed quotations cannot be edited' });
-      }
-
       if (existing.status === 'rejected') {
         return res.status(403).json({ error: 'Rejected quotations cannot be edited' });
       }
@@ -1841,8 +1844,8 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(403).json({ error: 'Not authorized to edit this quotation' });
       }
 
-      const hasGoodsUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
-      const cleanedGoods = hasGoodsUpdate
+      let hasGoodsUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
+      let cleanedGoods = hasGoodsUpdate
         ? Array.isArray(goods)
           ? goods.map((item) => ({
               good_id: item.good_id || null,
@@ -1857,19 +1860,31 @@ app.put('/api/:table/:id', async (req, res) => {
         : JSON.parse(existing.goods || '[]');
 
       const editableFields = ['payment_time', 'total_amount', 'tax_amount', 'grand_total', 'include_tax'];
-      const sanitizedUpdates = Object.fromEntries(
+      let sanitizedUpdates = Object.fromEntries(
         Object.entries(quotationUpdates || {}).filter(([key]) => editableFields.includes(key))
       );
-      const nextUpdates = { ...sanitizedUpdates };
+      let nextUpdates = { ...sanitizedUpdates };
       if (hasGoodsUpdate) {
         nextUpdates.goods = JSON.stringify(cleanedGoods);
       }
 
       const requestedStatus = quotationUpdates.status;
       const isStatusChange = requestedStatus && requestedStatus !== existing.status;
+      const isRejectRequest = requestedStatus === 'reject' || requestedStatus === 'rejected';
+      const canRejectProcessed = existing.status === 'process' && isStatusChange && isRejectRequest && isPrivileged;
       const isOtherUpdate =
         hasGoodsUpdate ||
         Object.keys(sanitizedUpdates).length > 0;
+
+      if (existing.status === 'process' && !canRejectProcessed) {
+        return res.status(403).json({ error: 'Processed quotations cannot be edited' });
+      }
+      if (canRejectProcessed) {
+        hasGoodsUpdate = false;
+        cleanedGoods = JSON.parse(existing.goods || '[]');
+        sanitizedUpdates = {};
+        nextUpdates = { status: requestedStatus };
+      }
 
       if (isStatusChange && !isPrivileged) {
         return res.status(403).json({ error: 'Only managers can update status' });
@@ -1981,9 +1996,6 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(404).json({ error: 'Record not found' });
       }
 
-      if (existing.status === 'process') {
-        return res.status(403).json({ error: 'RFQ is already in process and cannot be edited' });
-      }
       const allowedRoles = ['superadmin', 'admin', 'manager'];
       const isPrivileged = performerRole && allowedRoles.includes(performerRole);
       const isRequester =
@@ -1994,12 +2006,17 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(403).json({ error: 'Not authorized to edit this RFQ' });
       }
 
+      if (existing.status === 'process') {
+        return res.status(403).json({ error: 'RFQ is already in process and cannot be edited' });
+      }
+
       let attachmentUrl = existing.attachment_url;
       if (attachmentData) {
         attachmentUrl = saveBase64File(attachmentData, `rfq-${id}`);
       }
 
-      const cleanedGoods = Array.isArray(goods)
+      const hasGoodsPayload = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
+      const cleanedGoods = hasGoodsPayload && Array.isArray(goods)
         ? goods.map((item) => ({
             type: item.type || (item.good_id ? 'existing' : 'other'),
             good_id: item.good_id || null,
@@ -2007,7 +2024,21 @@ app.put('/api/:table/:id', async (req, res) => {
           }))
         : JSON.parse(existing.goods || '[]');
 
-      await query('UPDATE ?? SET ? WHERE id = ?', [table, { ...rfqUpdates, goods: JSON.stringify(cleanedGoods), attachment_url: attachmentUrl }, id]);
+      const nextUpdates = { ...rfqUpdates };
+      if (Object.prototype.hasOwnProperty.call(nextUpdates, 'deadline_days')) {
+        const rawDeadlineDays = nextUpdates.deadline_days;
+        const resolvedDeadlineDays =
+          rawDeadlineDays === undefined || rawDeadlineDays === null || rawDeadlineDays === ''
+            ? 30
+            : Number(rawDeadlineDays);
+        nextUpdates.deadline_days = Number.isNaN(resolvedDeadlineDays) ? 30 : resolvedDeadlineDays;
+      }
+
+      await query('UPDATE ?? SET ? WHERE id = ?', [
+        table,
+        { ...nextUpdates, goods: JSON.stringify(cleanedGoods), attachment_url: attachmentUrl },
+        id,
+      ]);
       const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
 
       await logActivity({
