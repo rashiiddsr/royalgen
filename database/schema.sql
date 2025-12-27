@@ -189,11 +189,11 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `company_name` VARCHAR(255) NOT NULL DEFAULT 'PT Royal General Indonesia',
   `company_address` TEXT NOT NULL DEFAULT 'Jl. Desa Harapan No. 47 RT/RW 004/001 Kel. Air Jamban, Kec. Mandau, Kab. Bengkalis, Prov. Riau 28784',
   `tax_id` VARCHAR(150) DEFAULT NULL,
-  `tax_rate` DECIMAL(5,2) NOT NULL DEFAULT 11,
+  `tax_rate` DECIMAL(5,2) NOT NULL DEFAULT 11.00,
   `email` VARCHAR(255) NOT NULL DEFAULT 'royalgeneralindonesia@gmail.com',
   `phone` VARCHAR(50) NOT NULL DEFAULT '+6282170179410',
-  `bank_name` VARCHAR(150) NOT NULL DEFAULT 'Bank',
-  `bank_account` VARCHAR(150) NOT NULL DEFAULT '0000000000',
+  `bank_name` VARCHAR(150) NOT NULL DEFAULT 'BANK RIAU KEPRI SYARIAH',
+  `bank_account` VARCHAR(150) NOT NULL DEFAULT '107-0801-020',
   `logo_url` VARCHAR(500) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
