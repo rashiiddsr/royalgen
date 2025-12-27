@@ -39,11 +39,16 @@ export default function DashboardHome() {
     <div>
       <div className="mb-10">
         <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent mb-3">
-          Welcome back, {profile?.full_name}!
+          Welcome back, {profile?.full_name || 'User'}!
         </h1>
         <p className="text-gray-600 text-lg font-medium">
           Here's what's happening with your procurement today.
         </p>
+      </div>
+
+      <div className="mb-10 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5 text-amber-900 shadow-sm">
+        <p className="text-sm font-semibold">Dashboard data is temporarily unavailable.</p>
+        <p className="text-sm mt-2">Use the navigation menu to continue working.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

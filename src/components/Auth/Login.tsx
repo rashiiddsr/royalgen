@@ -100,10 +100,12 @@ export default function Login() {
               if (result.profile?.id) {
                 sessionStorage.setItem(setupSessionKey, JSON.stringify(result.profile));
               }
-              setError('Akun Anda perlu setup username dan password sebelum login dengan Google.');
+              setError(
+                'Account setup required. Please create a username and password before signing in with Google.'
+              );
             }
           } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to sign in with Google');
+            setError(err instanceof Error ? err.message : 'Failed to sign in with Google.');
           }
         },
       });
@@ -162,7 +164,7 @@ export default function Login() {
         localStorage.removeItem('mysql_saved_credentials');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      setError(err instanceof Error ? err.message : 'Failed to sign in.');
     } finally {
       setLoading(false);
     }
@@ -182,11 +184,11 @@ export default function Login() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to request reset password');
+        throw new Error(data?.error || 'Failed to request password reset.');
       }
-      setMessage('Jika email terdaftar, link reset password sudah dikirim.');
+      setMessage('If the email exists, a reset link has been sent.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to request reset password');
+      setError(err instanceof Error ? err.message : 'Failed to request password reset.');
     } finally {
       setLoading(false);
     }
@@ -197,7 +199,7 @@ export default function Login() {
     setError('');
     setMessage('');
     if (resetPassword !== resetConfirm) {
-      setError('Password dan konfirmasi tidak sama.');
+      setError('Password and confirmation do not match.');
       return;
     }
     setLoading(true);
@@ -210,14 +212,14 @@ export default function Login() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to reset password');
+        throw new Error(data?.error || 'Failed to reset password.');
       }
-      setMessage('Password berhasil diubah. Silakan login kembali.');
+      setMessage('Password updated. Please sign in again.');
       setMode('login');
       setResetPassword('');
       setResetConfirm('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
+      setError(err instanceof Error ? err.message : 'Failed to reset password.');
     } finally {
       setLoading(false);
     }
@@ -228,11 +230,11 @@ export default function Login() {
     setError('');
     setMessage('');
     if (setupPassword !== setupConfirm) {
-      setError('Password dan konfirmasi tidak sama.');
+      setError('Password and confirmation do not match.');
       return;
     }
     if (!pendingProfile?.id || !setupCurrentPassword) {
-      setError('Sesi setup tidak valid, silakan login ulang.');
+      setError('Setup session is invalid. Please sign in again.');
       setMode('login');
       sessionStorage.removeItem(setupSessionKey);
       return;
@@ -252,7 +254,7 @@ export default function Login() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to complete setup');
+        throw new Error(data?.error || 'Failed to complete setup.');
       }
 
       const loginResult = await signIn(setupUsername, setupPassword);
@@ -263,7 +265,7 @@ export default function Login() {
         setSetupCurrentPassword('');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to complete setup');
+      setError(err instanceof Error ? err.message : 'Failed to complete setup.');
     } finally {
       setLoading(false);
     }
@@ -304,7 +306,7 @@ export default function Login() {
             {mode === 'login' && 'Sign in with your system account'}
             {mode === 'forgot' && 'Enter your email to receive reset instructions'}
             {mode === 'reset' && 'Set a new password for your account'}
-            {mode === 'setup' && 'Buat username dan password baru untuk akun Anda'}
+            {mode === 'setup' && 'Create a new username and password for your account'}
           </p>
 
           {error && (
@@ -356,9 +358,9 @@ export default function Login() {
                   <input
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
                   Save credentials
                 </label>
                 <button
@@ -486,7 +488,7 @@ export default function Login() {
             <form onSubmit={handleSetup} className="space-y-5">
               <div className="group">
                 <label htmlFor="setup-current-password" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Password Default
+                  Default Password
                 </label>
                 <input
                   id="setup-current-password"
@@ -494,7 +496,7 @@ export default function Login() {
                   value={setupCurrentPassword}
                   onChange={(e) => setSetupCurrentPassword(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200"
-                  placeholder="Masukkan password default Anda"
+                  placeholder="Enter your default password"
                   required
                 />
               </div>
@@ -515,7 +517,7 @@ export default function Login() {
 
               <div className="group">
                 <label htmlFor="setup-password" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Password Baru
+                  New Password
                 </label>
                 <input
                   id="setup-password"
@@ -530,7 +532,7 @@ export default function Login() {
 
               <div className="group">
                 <label htmlFor="setup-confirm" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Konfirmasi Password
+                  Confirm Password
                 </label>
                 <input
                   id="setup-confirm"
@@ -548,7 +550,7 @@ export default function Login() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold py-3.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
-                {loading ? 'Saving...' : 'Simpan Username & Password'}
+                {loading ? 'Saving...' : 'Save Username & Password'}
               </button>
             </form>
           )}

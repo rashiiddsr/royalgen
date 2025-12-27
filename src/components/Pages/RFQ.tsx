@@ -300,9 +300,17 @@ export default function RFQ() {
     );
   });
 
-  const filteredGoods = goods.filter((good) =>
-    good.name.toLowerCase().includes(goodsSearch.toLowerCase())
-  );
+  const filteredGoods = goods.filter((good) => {
+    const query = goodsSearch.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      good.name.toLowerCase().includes(query) ||
+      good.sku.toLowerCase().includes(query) ||
+      good.description.toLowerCase().includes(query) ||
+      good.category.toLowerCase().includes(query) ||
+      good.unit.toLowerCase().includes(query)
+    );
+  });
   const shouldShowGoodsList = goodsSearch.trim().length > 0;
 
   if (loading) {
@@ -568,24 +576,30 @@ export default function RFQ() {
                           {goods.length === 0 ? 'No goods available.' : 'No goods match your search.'}
                         </div>
                       ) : (
-                        filteredGoods.map((good) => (
-                          <button
-                            key={good.id}
-                            type="button"
-                            onClick={() => {
-                              if (goodsError) setGoodsError('');
-                              setSelectedGoods((prev) =>
-                                prev.includes(String(good.id)) ? prev : [...prev, String(good.id)]
-                              );
-                            }}
-                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left dark:hover:bg-slate-800/60"
-                          >
-                            <span className="text-sm text-gray-800">{good.name}</span>
-                            {selectedGoods.includes(String(good.id)) && (
-                              <span className="text-xs text-blue-600 font-semibold">Selected</span>
-                            )}
-                          </button>
-                        ))
+                          filteredGoods.map((good) => (
+                            <button
+                              key={good.id}
+                              type="button"
+                              onClick={() => {
+                                if (goodsError) setGoodsError('');
+                                setSelectedGoods((prev) =>
+                                  prev.includes(String(good.id)) ? prev : [...prev, String(good.id)]
+                                );
+                              }}
+                              className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-gray-50 text-left dark:hover:bg-slate-800/60"
+                            >
+                              <div>
+                                <span className="text-sm text-gray-800 font-medium">{good.name}</span>
+                                <p className="text-xs text-gray-500">
+                                  {good.sku ? `SKU ${good.sku} · ` : ''}
+                                  {good.unit || '-'}
+                                </p>
+                              </div>
+                              {selectedGoods.includes(String(good.id)) && (
+                                <span className="text-xs text-blue-600 font-semibold">Selected</span>
+                              )}
+                            </button>
+                          ))
                       )}
                     </div>
                     {goodsError && <p className="text-xs text-red-600">{goodsError}</p>}

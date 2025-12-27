@@ -202,11 +202,17 @@ export default function Goods() {
     }
   };
 
-  const filteredGoods = goods.filter(good =>
-    good.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    good.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    good.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredGoods = goods.filter((good) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      good.name.toLowerCase().includes(query) ||
+      good.sku.toLowerCase().includes(query) ||
+      good.category.toLowerCase().includes(query) ||
+      good.description.toLowerCase().includes(query) ||
+      good.unit.toLowerCase().includes(query)
+    );
+  });
 
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(supplierSearch.toLowerCase())
@@ -294,7 +300,9 @@ export default function Goods() {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-slate-100">{good.name}</div>
-                          <div className="text-sm text-gray-500 dark:text-slate-400">SKU: {good.sku}</div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">
+                            {`SKU: ${good.sku}`}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -308,9 +316,9 @@ export default function Goods() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">
-                      <div>Rp {formatRupiah(Number(good.price) || 0)}</div>
+                      <div>{`Rp ${formatRupiah(Number(good.price) || 0)}`}</div>
                       <div className="text-xs text-gray-500 dark:text-slate-400">
-                        MOQ: {good.minimum_order_quantity}
+                        {`MOQ: ${good.minimum_order_quantity}`}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-slate-100">{good.unit}</td>
@@ -328,14 +336,14 @@ export default function Goods() {
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => openDetails(good)}
-                        className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                        className="inline-flex items-center p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition dark:hover:bg-amber-500/10"
                         aria-label="View details"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => openModal(good)}
-                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition dark:hover:bg-slate-800/60"
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
@@ -471,7 +479,9 @@ export default function Goods() {
                     ) : (
                       <p className="text-sm text-gray-500">Type to search suppliers.</p>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">Search and select multiple suppliers for this good.</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Search and select multiple suppliers for this good.
+                    </p>
                   </div>
                 </div>
 
@@ -616,7 +626,7 @@ export default function Goods() {
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Goods Details</h3>
-                <p className="text-sm text-gray-600">SKU {detailGood.sku}</p>
+                <p className="text-sm text-gray-600">{`SKU ${detailGood.sku}`}</p>
               </div>
               <button
                 onClick={() => setDetailGood(null)}
@@ -648,7 +658,7 @@ export default function Goods() {
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Price</p>
-                <p>Rp {formatRupiah(Number(detailGood.price) || 0)}</p>
+                <p>{`Rp ${formatRupiah(Number(detailGood.price) || 0)}`}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Minimum Order</p>
@@ -686,7 +696,9 @@ export default function Goods() {
                       >
                         <span className="font-medium text-gray-900">{supplier.name}</span>
                         {supplier.status && (
-                          <span className="text-xs text-gray-500">Status: {supplier.status}</span>
+                          <span className="text-xs text-gray-500">
+                            Status: {supplier.status}
+                          </span>
                         )}
                       </li>
                     ))}

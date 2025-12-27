@@ -313,7 +313,9 @@ app.post('/api/auth/complete-setup', async (req, res) => {
   const { user_id: userId, current_password: currentPassword, username, password } = req.body || {};
 
   if (!userId || !currentPassword || !username || !password) {
-    return res.status(400).json({ error: 'User, current password, username, and new password are required' });
+    return res
+      .status(400)
+      .json({ error: 'User, current password, username, and new password are required' });
   }
 
   try {
@@ -590,7 +592,10 @@ const getRfqById = async (id) => {
 };
 
 const formatCurrency = (value) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(value || 0));
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'IDR',
+  }).format(Number(value || 0));
 
 const formatStatusLabel = (status) => {
   const map = {
@@ -623,38 +628,38 @@ const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel
         .join('')
     : `
         <tr>
-          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">Tidak ada item</td>
+          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">No items</td>
         </tr>
       `;
 
   return `
-    <p>Halo Tim,</p>
-    <p>Berikut update quotation dengan status <strong>${formatStatusLabel(statusLabel)}</strong>.</p>
-    <h3>Informasi Quotation</h3>
+    <p>Hello Team,</p>
+    <p>Here is the quotation update with status <strong>${formatStatusLabel(statusLabel)}</strong>.</p>
+    <h3>Quotation Information</h3>
     <table style="border-collapse:collapse;width:100%;max-width:720px;">
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Nomor Quotation</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.quotation_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Quotation Number</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.quotation_number || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Status</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatStatusLabel(statusLabel)}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Perusahaan</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.company_name || rfq?.company_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Company</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.company_name || rfq?.company_name || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Project</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.project_name || rfq?.project_name || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_name || rfq?.pic_name || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Email PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_email || rfq?.pic_email || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Telepon PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_phone || rfq?.pic_phone || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC Phone</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.pic_phone || rfq?.pic_phone || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Payment Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${quotation.payment_time || '-'}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.total_amount)}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PPN</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.tax_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Tax</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.tax_amount)}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Grand Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(quotation.grand_total)}</td></tr>
       <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">RFQ</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${rfq?.rfq_number || quotation.rfq_id || '-'}</td></tr>
-      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Diajukan oleh</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || 'User'} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Submitted by</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || 'User'} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
     </table>
-    <h3>Item Barang</h3>
+    <h3>Goods Items</h3>
     <table style="border-collapse:collapse;width:100%;max-width:720px;">
       <thead>
         <tr>
           <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">No</th>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Nama</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Name</th>
           <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
           <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
-          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Harga</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Price</th>
           <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Delivery Time (days)</th>
         </tr>
       </thead>
@@ -662,11 +667,18 @@ const buildQuotationEmailHtml = ({ quotation, goods, requester, rfq, statusLabel
         ${goodsRows}
       </tbody>
     </table>
-    <p>Terima kasih.</p>
+    <p>Thank you.</p>
   `;
 };
 
-const sendQuotationNotification = async ({ quotation, goods, statusLabel, recipients, requester, rfq }) => {
+const sendQuotationNotification = async ({
+  quotation,
+  goods,
+  statusLabel,
+  recipients,
+  requester,
+  rfq,
+}) => {
   try {
     const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
     if (!uniqueRecipients.length) return;
@@ -714,10 +726,10 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         to: user.email,
         subject: 'Reset Password - RGI NexaProc',
         html: `
-          <p>Halo ${user.full_name || 'User'},</p>
-          <p>Klik tautan berikut untuk mengganti password Anda:</p>
+          <p>Hello ${user.full_name || 'User'},</p>
+          <p>Click the link below to reset your password:</p>
           <p><a href="${resetLink}">${resetLink}</a></p>
-          <p>Tautan ini berlaku selama 1 jam.</p>
+          <p>This link is valid for 1 hour.</p>
         `,
       });
     }
@@ -794,7 +806,10 @@ app.get('/api/:table', async (req, res) => {
 
         const mappedGoods = goods.map((item) => ({
           ...item,
-          display_name: item.type === 'existing' ? goodsMap[item.good_id] || item.name || 'Existing good' : item.name,
+          display_name:
+            item.type === 'existing'
+              ? goodsMap[item.good_id] || item.name || 'Existing good'
+              : item.name,
         }));
 
         return { ...row, goods: mappedGoods };

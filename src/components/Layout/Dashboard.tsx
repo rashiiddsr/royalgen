@@ -20,9 +20,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { getRecords } from '../../lib/api';
 import { ThemePreference } from '../../lib/theme';
-import { getLanguagePreference, LanguagePreference, setLanguagePreference } from '../../lib/userPreferences';
 
 interface DashboardProps {
   children: ReactNode;
@@ -37,10 +35,6 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [languagePreference, setLanguagePreferenceState] = useState<LanguagePreference>(() =>
-    getLanguagePreference()
-  );
-  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
   const notificationRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
@@ -63,20 +57,6 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   const filteredNavigation = navigation.filter(item =>
     profile?.role && item.roles.includes(profile.role)
   );
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const settings = await getRecords<{ logo_url?: string | null }>('settings');
-        const logoUrl = settings[0]?.logo_url;
-        setCompanyLogoUrl(logoUrl ? `${apiRoot}${logoUrl}` : null);
-      } catch (error) {
-        console.error('Failed to fetch company logo', error);
-      }
-    };
-
-    fetchSettings();
-  }, [apiRoot]);
 
   useEffect(() => {
     setNotificationsOpen(false);
@@ -106,11 +86,6 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
     }
   };
 
-  const handleLanguageChange = (value: LanguagePreference) => {
-    setLanguagePreferenceState(value);
-    setLanguagePreference(value);
-  };
-
   const avatarContent = profile?.photo_url ? (
     <img src={`${apiRoot}${profile.photo_url}`} alt="Avatar" className="h-full w-full object-cover" />
   ) : (
@@ -129,11 +104,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg blur opacity-50"></div>
             <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-2 rounded-lg overflow-hidden">
-              {companyLogoUrl ? (
-                <img src={companyLogoUrl} alt="RGI logo" className="h-5 w-5 object-contain" />
-              ) : (
-                <Building2 className="h-5 w-5 text-white" />
-              )}
+              <Building2 className="h-5 w-5 text-white" />
             </div>
           </div>
           <div className="ml-3">
@@ -169,11 +140,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-2xl blur-lg opacity-50"></div>
                 <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-3 rounded-2xl overflow-hidden">
-                  {companyLogoUrl ? (
-                    <img src={companyLogoUrl} alt="RGI logo" className="h-8 w-8 object-contain" />
-                  ) : (
-                    <Building2 className="h-8 w-8 text-white" />
-                  )}
+                  <Building2 className="h-8 w-8 text-white" />
                 </div>
               </div>
               <div className="ml-4">
@@ -324,19 +291,6 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                           <option value="system">System Default</option>
                           <option value="light">Light</option>
                           <option value="dark">Dark</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">
-                          Language
-                        </label>
-                        <select
-                          value={languagePreference}
-                          onChange={(event) => handleLanguageChange(event.target.value as LanguagePreference)}
-                          className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                          <option value="indonesia">Indonesia</option>
-                          <option value="english">English</option>
                         </select>
                       </div>
                     </div>
