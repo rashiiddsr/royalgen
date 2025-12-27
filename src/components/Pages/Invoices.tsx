@@ -137,13 +137,13 @@ export default function Invoices() {
 
   const getStatusColor = (status: string) => {
     const colors = {
-      draft: 'bg-gray-100 text-gray-800',
-      sent: 'bg-blue-100 text-blue-800',
-      paid: 'bg-green-100 text-green-800',
-      overdue: 'bg-red-100 text-red-800',
-      cancelled: 'bg-gray-100 text-gray-800',
+      draft: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
+      sent: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
+      paid: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      overdue: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
+      cancelled: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
     };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
 
   if (loading) {
@@ -224,7 +224,7 @@ export default function Invoices() {
                 </tr>
               ) : (
                 invoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
+                  <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
                         {invoice.invoice_number}

@@ -355,7 +355,7 @@ export default function DeliveryOrders() {
                 filteredDeliveries.map((delivery) => {
                   const order = orderMap.get(String(delivery.sales_order_id));
                   return (
-                    <tr key={delivery.id} className="hover:bg-gray-50">
+                    <tr key={delivery.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
                         {delivery.delivery_number}
                       </td>
@@ -515,7 +515,7 @@ export default function DeliveryOrders() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
                   Cancel
                 </button>

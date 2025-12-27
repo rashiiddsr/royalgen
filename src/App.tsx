@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
-import { getRecords } from './lib/api';
 import { applyTheme, ThemePreference } from './lib/theme';
+import { getThemePreference, setThemePreference as persistThemePreference } from './lib/userPreferences';
 import Login from './components/Auth/Login';
 import Dashboard from './components/Layout/Dashboard';
 import DashboardHome from './components/Pages/DashboardHome';
@@ -27,7 +27,7 @@ function App() {
     if (typeof window === 'undefined') return 'dashboard';
     return localStorage.getItem('currentPage') || 'dashboard';
   });
-  const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => getThemePreference());
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -36,23 +36,7 @@ function App() {
   }, [currentPage, progressOrderId]);
 
   useEffect(() => {
-    if (!user) return;
-    const fetchTheme = async () => {
-      try {
-        const settings = await getRecords<{ theme?: ThemePreference }>('settings');
-        const nextTheme = settings[0]?.theme || 'system';
-        setThemePreference(nextTheme);
-        applyTheme(nextTheme);
-      } catch (error) {
-        console.error('Failed to fetch theme setting', error);
-        applyTheme(themePreference);
-      }
-    };
-
-    fetchTheme();
-  }, [user]);
-
-  useEffect(() => {
+    persistThemePreference(themePreference);
     applyTheme(themePreference);
   }, [themePreference]);
 
@@ -117,7 +101,12 @@ function App() {
   };
 
   return (
-    <Dashboard currentPage={currentPage} onNavigate={setCurrentPage}>
+    <Dashboard
+      currentPage={currentPage}
+      onNavigate={setCurrentPage}
+      themePreference={themePreference}
+      onThemeChange={setThemePreference}
+    >
       {renderPage()}
     </Dashboard>
   );

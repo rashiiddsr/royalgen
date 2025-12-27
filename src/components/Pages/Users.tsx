@@ -170,7 +170,7 @@ export default function Users() {
                 users
                   .filter((user) => user.role !== 'superadmin')
                   .map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-600 font-semibold">

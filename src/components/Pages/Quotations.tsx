@@ -399,17 +399,17 @@ export default function Quotations() {
 
   const getStatusColor = (status: string) => {
     const colors = {
-      waiting: 'bg-yellow-100 text-yellow-800',
-      negotiation: 'bg-blue-100 text-blue-800',
-      renegotiation: 'bg-purple-100 text-purple-800',
-      process: 'bg-emerald-100 text-emerald-800',
-      active: 'bg-green-100 text-green-800',
-      draft: 'bg-gray-100 text-gray-800',
-      submitted: 'bg-blue-100 text-blue-800',
-      approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
+      waiting: 'bg-yellow-100 text-yellow-800 dark:bg-amber-500/20 dark:text-amber-200',
+      negotiation: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
+      renegotiation: 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
+      process: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      active: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      draft: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
+      submitted: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
+      approved: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      rejected: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
     };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
 
   const getStatusLabel = (status: string, round?: number) => {
@@ -563,7 +563,7 @@ export default function Quotations() {
                 </tr>
               ) : (
                 filteredQuotations.map((quotation) => (
-                  <tr key={quotation.id} className="hover:bg-gray-50">
+                  <tr key={quotation.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
                         {quotation.quotation_number}
@@ -852,7 +852,7 @@ export default function Quotations() {
                                             handleGoodSelect(index, good.name);
                                             setActiveGoodsIndex(null);
                                           }}
-                                          className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                                          className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/60"
                                         >
                                           <div className="text-sm font-medium text-gray-900">
                                             {good.name}
@@ -946,7 +946,7 @@ export default function Quotations() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
                 >
                   Cancel
                 </button>
