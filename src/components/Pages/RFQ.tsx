@@ -101,14 +101,16 @@ export default function RFQ() {
     const colors: Record<string, string> = {
       draft: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
       process: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
-      success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
-      expired: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
+      approved: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+      rejected: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
+      canceled: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
+      cancelled: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
     };
     return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
   const canEditRfq = (rfq: RFQType) => {
     if (!profile) return false;
-    if (rfq.status !== 'draft') return false;
+    if (rfq.status === 'process') return false;
     if (editableRoles.includes(profile.role)) return true;
     if (!rfq.performed_by || !profile.id) return false;
     return String(rfq.performed_by) === String(profile.id);
@@ -132,23 +134,6 @@ export default function RFQ() {
         getRecords<ClientOption>('clients'),
       ]);
 
-      const now = Date.now();
-      const expiredDrafts = rfqData.filter((item) => {
-        if (item.status !== 'draft') return false;
-        const createdAt = new Date(item.created_at).getTime();
-        const daysSince = (now - createdAt) / (1000 * 60 * 60 * 24);
-        return daysSince > 30;
-      });
-      if (expiredDrafts.length > 0) {
-        await Promise.all(
-          expiredDrafts.map((item) =>
-            updateRecord<RFQType>('rfqs', item.id, {
-              status: 'expired',
-            })
-          )
-        );
-      }
-
       const userMap = userData.reduce<Record<string, string>>((acc, user) => {
         const name = user.full_name || user.email || 'User';
         acc[String(user.id)] = name;
@@ -160,11 +145,6 @@ export default function RFQ() {
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .map((item) => ({
             ...item,
-            status:
-              item.status === 'draft' &&
-              (now - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24) > 30
-                ? 'expired'
-                : item.status,
             requester_name:
               item.requester_name ||
               (item.performed_by ? userMap[String(item.performed_by)] : null) ||
@@ -376,14 +356,28 @@ export default function RFQ() {
     const query = goodsSearch.trim().toLowerCase();
     if (!query) return true;
     const name = (good.name || '').toLowerCase();
-    return name.includes(query);
+    const sku = (good.sku || '').toLowerCase();
+    const description = (good.description || '').toLowerCase();
+    const category = (good.category || '').toLowerCase();
+    const unit = (good.unit || '').toLowerCase();
+    return (
+      name.includes(query) ||
+      sku.includes(query) ||
+      description.includes(query) ||
+      category.includes(query) ||
+      unit.includes(query)
+    );
   });
   const shouldShowGoodsList = goodsSearch.trim().length > 0;
   const activeClients = clients.filter((client) => (client.status || 'active') === 'active');
   const filteredClients = activeClients.filter((client) => {
     const query = clientSearch.trim().toLowerCase();
     if (!query) return true;
-    return client.company_name.toLowerCase().includes(query);
+    return (
+      client.company_name.toLowerCase().includes(query) ||
+      client.email.toLowerCase().includes(query) ||
+      client.phone.toLowerCase().includes(query)
+    );
   });
   const shouldShowClientList = clientSearch.trim().length > 0;
 
@@ -543,7 +537,7 @@ export default function RFQ() {
                         type="text"
                         value={clientSearch}
                         onChange={(e) => setClientSearch(e.target.value)}
-                        placeholder="Search company name"
+                        placeholder="Search company"
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                         required={!formData.client_id}
                       />
@@ -571,7 +565,7 @@ export default function RFQ() {
                     )}
                     <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
                       {!shouldShowClientList ? (
-                        <div className="p-3 text-sm text-gray-600">Type to search company name.</div>
+                        <div className="p-3 text-sm text-gray-600">Type to search clients.</div>
                       ) : filteredClients.length === 0 ? (
                         <div className="p-3 text-sm text-gray-600">
                           {activeClients.length === 0
@@ -588,6 +582,7 @@ export default function RFQ() {
                           >
                             <div>
                               <span className="text-sm text-gray-800 font-medium">{client.company_name}</span>
+                              <p className="text-xs text-gray-500">{client.email || '-'}</p>
                             </div>
                             {String(formData.client_id) === String(client.id) && (
                               <span className="text-xs text-blue-600 font-semibold">Selected</span>
@@ -664,7 +659,7 @@ export default function RFQ() {
                         type="text"
                         value={goodsSearch}
                         onChange={(e) => setGoodsSearch(e.target.value)}
-                        placeholder="Search goods by name"
+                        placeholder="Search goods"
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                     </div>
@@ -698,7 +693,7 @@ export default function RFQ() {
 
                     <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
                       {!shouldShowGoodsList ? (
-                        <div className="p-3 text-sm text-gray-600">Type to search goods by name.</div>
+                        <div className="p-3 text-sm text-gray-600">Type to search goods.</div>
                       ) : filteredGoods.length === 0 ? (
                         <div className="p-3 text-sm text-gray-600">
                           {goods.length === 0 ? 'No goods available.' : 'No goods match your search.'}
@@ -718,6 +713,10 @@ export default function RFQ() {
                             >
                               <div>
                                 <span className="text-sm text-gray-800 font-medium">{good.name}</span>
+                                <p className="text-xs text-gray-500">
+                                  {good.sku ? `SKU ${good.sku} · ` : ''}
+                                  {good.unit || '-'}
+                                </p>
                               </div>
                               {selectedGoods.includes(String(good.id)) && (
                                 <span className="text-xs text-blue-600 font-semibold">Selected</span>
