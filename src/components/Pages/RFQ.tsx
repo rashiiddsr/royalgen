@@ -13,6 +13,7 @@ interface RFQGoodItem {
 interface RFQType {
   id: string;
   rfq_number: string;
+  client_id?: string | null;
   company_name: string;
   pic_name: string;
   pic_email: string;
@@ -30,6 +31,16 @@ interface GoodOption {
   name: string;
 }
 
+interface ClientOption {
+  id: string;
+  company_name: string;
+  address: string;
+  phone: string;
+  email: string;
+  tax_id?: string | null;
+  ship_addresses?: string[] | string | null;
+}
+
 interface UserOption {
   id: string;
   full_name?: string;
@@ -38,6 +49,7 @@ interface UserOption {
 
 const DEFAULT_FORM = {
   rfq_number: '',
+  client_id: '',
   company_name: '',
   pic_name: '',
   pic_email: '',
@@ -52,6 +64,7 @@ export default function RFQ() {
   );
   const [rfqs, setRfqs] = useState<RFQType[]>([]);
   const [goods, setGoods] = useState<GoodOption[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -108,10 +121,11 @@ export default function RFQ() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [rfqData, goodsData, userData] = await Promise.all([
+      const [rfqData, goodsData, userData, clientData] = await Promise.all([
         getRecords<RFQType>('rfqs'),
         getRecords<GoodOption>('goods'),
         getRecords<UserOption>('users'),
+        getRecords<ClientOption>('clients'),
       ]);
 
       const userMap = userData.reduce<Record<string, string>>((acc, user) => {
@@ -132,6 +146,7 @@ export default function RFQ() {
           })),
       );
       setGoods(goodsData.map((good) => ({ id: good.id, name: (good as any).name || '' })));
+      setClients(clientData);
     } catch (error) {
       console.error('Error fetching RFQs or goods:', error);
     } finally {
@@ -159,6 +174,15 @@ export default function RFQ() {
     reader.readAsDataURL(file);
   };
 
+  const handleClientChange = (clientId: string) => {
+    const client = clients.find((item) => String(item.id) === String(clientId));
+    setFormData((prev) => ({
+      ...prev,
+      client_id: clientId,
+      company_name: client?.company_name || '',
+    }));
+  };
+
   const updateOtherGood = (index: number, value: string) => {
     setOtherGoods((prev) => prev.map((item, idx) => (idx === index ? value : item)));
     if (goodsError) setGoodsError('');
@@ -183,8 +207,14 @@ export default function RFQ() {
     if (rfq) {
       if (!canEditRfq(rfq)) return;
       setEditingRfq(rfq);
+      const matchedClient = clients.find(
+        (client) =>
+          String(client.id) === String(rfq.client_id) ||
+          client.company_name.toLowerCase() === rfq.company_name.toLowerCase()
+      );
       setFormData({
         rfq_number: rfq.rfq_number,
+        client_id: rfq.client_id || matchedClient?.id || '',
         company_name: rfq.company_name,
         pic_name: rfq.pic_name,
         pic_email: rfq.pic_email,
@@ -213,6 +243,10 @@ export default function RFQ() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      if (!formData.client_id) {
+        setContactError('Company is required.');
+        return;
+      }
       const emailValue = formData.pic_email.trim();
       const phoneValue = normalizePhoneInput(formData.pic_phone);
       if (emailValue === '-' && phoneValue === '-') {
@@ -258,6 +292,7 @@ export default function RFQ() {
         ...formData,
         pic_email: emailValue,
         pic_phone: phoneValue,
+        client_id: formData.client_id,
         goods: goodsPayload,
         attachment_data: attachmentData,
         performed_by: profile?.id,
@@ -462,13 +497,19 @@ export default function RFQ() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Company Name <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={formData.company_name}
-                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                  <select
+                    value={formData.client_id}
+                    onChange={(event) => handleClientChange(event.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     required
-                  />
+                  >
+                    <option value="">Select company</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.company_name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
