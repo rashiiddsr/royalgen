@@ -7,6 +7,8 @@ import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import net from 'net';
 import tls from 'tls';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,6 +17,7 @@ const __dirname = path.dirname(__filename);
 loadEnv();
 
 const app = express();
+const server = http.createServer(app);
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 4000);
 const uploadDir = path.join(__dirname, 'uploads');
 
@@ -25,6 +28,34 @@ if (!fs.existsSync(uploadDir)) {
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/uploads', express.static(uploadDir));
+
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
+
+const CHAT_ROLES = new Set(['superadmin', 'admin', 'manager', 'staff']);
+
+const canJoinRoom = (role, room) => {
+  if (!role || !CHAT_ROLES.has(role)) return false;
+  if (role === 'superadmin') return true;
+  if (room === 'shared') return true;
+  if (room.startsWith('role:')) {
+    const [, roomRole] = room.split(':');
+    return roomRole === role;
+  }
+  return false;
+};
+
+const buildMessagePayload = ({ room, message, sender }) => ({
+  id: crypto.randomUUID(),
+  room,
+  message,
+  sender,
+  created_at: new Date().toISOString(),
+});
 
 const TABLES = [
   'suppliers',
@@ -2306,6 +2337,71 @@ app.delete('/api/:table/:id', async (req, res) => {
   }
 });
 
-app.listen(port, '0.0.0.0', () => {
+io.on('connection', (socket) => {
+  socket.on('register', (payload = {}, callback) => {
+    const { user_id: userId, role, name } = payload;
+    if (!userId || !role || !CHAT_ROLES.has(role)) {
+      if (callback) callback({ ok: false, error: 'Invalid user payload' });
+      return;
+    }
+    socket.data.user = { id: userId, role, name: name || null };
+    if (callback) callback({ ok: true });
+  });
+
+  socket.on('join_room', (payload = {}, callback) => {
+    const { room } = payload;
+    const user = socket.data.user;
+    if (!user) {
+      if (callback) callback({ ok: false, error: 'User not registered' });
+      return;
+    }
+    if (!room || typeof room !== 'string') {
+      if (callback) callback({ ok: false, error: 'Room is required' });
+      return;
+    }
+    if (!canJoinRoom(user.role, room)) {
+      if (callback) callback({ ok: false, error: 'Not authorized to join room' });
+      return;
+    }
+    socket.join(room);
+    if (callback) callback({ ok: true });
+  });
+
+  socket.on('leave_room', (payload = {}, callback) => {
+    const { room } = payload;
+    if (!room || typeof room !== 'string') {
+      if (callback) callback({ ok: false, error: 'Room is required' });
+      return;
+    }
+    socket.leave(room);
+    if (callback) callback({ ok: true });
+  });
+
+  socket.on('chat_message', (payload = {}, callback) => {
+    const { room, message } = payload;
+    const user = socket.data.user;
+    if (!user) {
+      if (callback) callback({ ok: false, error: 'User not registered' });
+      return;
+    }
+    if (!room || typeof room !== 'string' || !message || typeof message !== 'string') {
+      if (callback) callback({ ok: false, error: 'Room and message are required' });
+      return;
+    }
+    if (!canJoinRoom(user.role, room)) {
+      if (callback) callback({ ok: false, error: 'Not authorized to send message' });
+      return;
+    }
+    const payloadToSend = buildMessagePayload({
+      room,
+      message,
+      sender: { id: user.id, role: user.role, name: user.name },
+    });
+    io.to(room).emit('chat_message', payloadToSend);
+    if (callback) callback({ ok: true, message: payloadToSend });
+  });
+});
+
+server.listen(port, '0.0.0.0', () => {
   console.log(`RGI NexaProc API listening on port ${port}`);
 });
