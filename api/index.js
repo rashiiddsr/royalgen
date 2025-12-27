@@ -35,7 +35,7 @@ const TABLES = [
   'sales_orders',
   'delivery_orders',
   'invoices',
-  'financing',
+  'settings',
   'users',
   'activity_logs',
 ];
@@ -85,6 +85,17 @@ const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') 
       return null;
     })
     .filter(Boolean);
+};
+
+const normalizeSettingsPayload = (payload = {}, id) => {
+  const { logo_data: logoData, logo_url: logoUrl, ...rest } = payload;
+  const nextPayload = { ...rest };
+  if (logoData && typeof logoData === 'string') {
+    nextPayload.logo_url = saveBase64File(logoData, id ? `company-logo-${id}` : 'company-logo');
+  } else if (logoUrl !== undefined) {
+    nextPayload.logo_url = logoUrl;
+  }
+  return nextPayload;
 };
 
 const formatDateOnly = (value) => {
@@ -940,6 +951,13 @@ app.post('/api/:table', async (req, res) => {
       return res.status(201).json(created);
     }
 
+    if (table === 'settings') {
+      const settingsPayload = normalizeSettingsPayload(payload);
+      const result = await query('INSERT INTO ?? SET ?', [table, settingsPayload]);
+      const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+      return res.status(201).json(created);
+    }
+
     if (table === 'goods') {
       const { suppliers = [], performed_by: performedBy, ...goodPayload } = payload;
       const result = await query('INSERT INTO ?? SET ?', [table, goodPayload]);
@@ -1283,6 +1301,13 @@ app.put('/api/:table/:id', async (req, res) => {
       return res.status(403).json({ error: 'Delivery orders cannot be edited' });
     }
 
+    if (table === 'settings') {
+      const settingsUpdates = normalizeSettingsPayload(req.body || {}, id);
+      await query('UPDATE ?? SET ? WHERE id = ?', [table, settingsUpdates, id]);
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+      return res.json(updated);
+    }
+
     if (table === 'sales_orders') {
       const { goods, documents, performed_by: performedBy, ...orderUpdates } = req.body || {};
       const [existing] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [id]);
@@ -1396,7 +1421,7 @@ app.put('/api/:table/:id', async (req, res) => {
           : []
         : JSON.parse(existing.goods || '[]');
 
-      const editableFields = ['payment_time', 'total_amount', 'tax_amount', 'grand_total'];
+      const editableFields = ['payment_time', 'total_amount', 'tax_amount', 'grand_total', 'include_tax'];
       const sanitizedUpdates = Object.fromEntries(
         Object.entries(quotationUpdates || {}).filter(([key]) => editableFields.includes(key))
       );

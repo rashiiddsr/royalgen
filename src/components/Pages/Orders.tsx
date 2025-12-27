@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { formatRupiah } from '../../lib/format';
 import { Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -54,6 +55,10 @@ interface QuotationType {
   payment_time: string;
   status: string;
   goods?: OrderGood[] | string | null;
+  total_amount?: number;
+  tax_amount?: number;
+  grand_total?: number;
+  include_tax?: number | boolean;
 }
 
 interface DeliveryOrder {
@@ -149,6 +154,25 @@ export default function Orders() {
   const formatDateDisplay = (value?: string | null) => {
     if (!value) return '-';
     return formatDateInput(value);
+  };
+
+  const formatCurrency = (value: number) => `Rp ${formatRupiah(value)}`;
+
+  const resolveOrderTotals = (orderGoods: OrderGood[], order?: OrderType) => {
+    const subtotal =
+      order?.total_amount !== undefined && order?.total_amount !== null
+        ? Number(order.total_amount) || 0
+        : orderGoods.reduce(
+            (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
+            0
+          );
+    const tax =
+      order?.tax_amount !== undefined && order?.tax_amount !== null ? Number(order.tax_amount) || 0 : 0;
+    const grand =
+      order?.grand_total !== undefined && order?.grand_total !== null
+        ? Number(order.grand_total) || subtotal + tax
+        : subtotal + tax;
+    return { subtotal, tax, grand };
   };
 
   const resolveDocumentUrl = (doc: OrderDocument) => {
@@ -332,8 +356,19 @@ export default function Orders() {
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
     );
-    const taxAmount = 0;
-    const grandTotal = totalAmount + taxAmount;
+    const selectedQuotation = quotations.find((item) => String(item.id) === String(formData.quotation_id));
+    const taxAmount =
+      selectedQuotation && selectedQuotation.tax_amount !== undefined
+        ? Number(selectedQuotation.tax_amount) || 0
+        : 0;
+    const grandTotal =
+      selectedQuotation && selectedQuotation.grand_total !== undefined
+        ? Number(selectedQuotation.grand_total) || totalAmount + taxAmount
+        : totalAmount + taxAmount;
+    const resolvedTotalAmount =
+      selectedQuotation && selectedQuotation.total_amount !== undefined
+        ? Number(selectedQuotation.total_amount) || totalAmount
+        : totalAmount;
 
     const basePayload = {
       order_number: formData.po_number,
@@ -345,7 +380,7 @@ export default function Orders() {
         ...row,
         deadline_days: Number(row.deadline_days) || 0,
       })),
-      total_amount: totalAmount,
+      total_amount: resolvedTotalAmount,
       tax_amount: taxAmount,
       grand_total: grandTotal,
       documents,
@@ -423,6 +458,8 @@ export default function Orders() {
         .filter((delivery) => String(delivery.sales_order_id) === String(detailOrder.id))
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     : [];
+  const detailGoods = detailOrder ? parseGoods(detailOrder.goods) : [];
+  const detailTotals = detailOrder ? resolveOrderTotals(detailGoods, detailOrder) : null;
 
   const usedQuotationIds = useMemo(
     () => new Set(orders.map((order) => String(order.quotation_id))),
@@ -727,7 +764,7 @@ export default function Orders() {
                             <td className="px-3 py-2">{row.description || '-'}</td>
                             <td className="px-3 py-2">{row.unit || '-'}</td>
                             <td className="px-3 py-2">{row.qty}</td>
-                            <td className="px-3 py-2">Rp {Number(row.price || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2">{formatCurrency(Number(row.price || 0))}</td>
                             <td className="px-3 py-2">
                               <input
                                 type="number"
@@ -739,7 +776,7 @@ export default function Orders() {
                               />
                             </td>
                             <td className="px-3 py-2">
-                              Rp {(Number(row.qty || 0) * Number(row.price || 0)).toLocaleString()}
+                              {formatCurrency((Number(row.qty || 0) * Number(row.price || 0)))}
                             </td>
                           </tr>
                         ))}
@@ -925,8 +962,23 @@ export default function Orders() {
               )}
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Goods</h3>
-                {parseGoods(detailOrder.goods).length === 0 ? (
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900">Goods</h3>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.open(
+                        `${window.location.origin}/?progress_order=${detailOrder.id}`,
+                        '_blank',
+                        'noopener,noreferrer'
+                      )
+                    }
+                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                  >
+                    View Progress
+                  </button>
+                </div>
+                {detailGoods.length === 0 ? (
                   <p className="text-gray-500">No goods listed.</p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -944,17 +996,17 @@ export default function Orders() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {parseGoods(detailOrder.goods).map((row, index) => (
+                        {detailGoods.map((row, index) => (
                           <tr key={`${row.good_id || row.name}-${index}`}>
                             <td className="px-3 py-2">{index + 1}</td>
                             <td className="px-3 py-2">{row.name || '-'}</td>
                             <td className="px-3 py-2">{row.description || '-'}</td>
                             <td className="px-3 py-2">{row.unit || '-'}</td>
                             <td className="px-3 py-2">{row.qty}</td>
-                            <td className="px-3 py-2">Rp {Number(row.price || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2">{formatCurrency(Number(row.price || 0))}</td>
                             <td className="px-3 py-2">{row.deadline_days ?? '-'}</td>
                             <td className="px-3 py-2">
-                              Rp {(Number(row.qty || 0) * Number(row.price || 0)).toLocaleString()}
+                              {formatCurrency((Number(row.qty || 0) * Number(row.price || 0)))}
                             </td>
                           </tr>
                         ))}
@@ -963,6 +1015,25 @@ export default function Orders() {
                   </div>
                 )}
               </div>
+
+              {detailTotals && (
+                <div className="flex justify-end text-sm">
+                  <div className="text-right space-y-1">
+                    <div>
+                      <span className="text-gray-500">Subtotal:</span>{' '}
+                      <span className="font-semibold">{formatCurrency(detailTotals.subtotal)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Tax:</span>{' '}
+                      <span className="font-semibold">{formatCurrency(detailTotals.tax)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Grand Total:</span>{' '}
+                      <span className="font-semibold">{formatCurrency(detailTotals.grand)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Documents</h3>

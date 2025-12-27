@@ -12,17 +12,22 @@ interface Good {
   category: 'consumable' | 'instrument' | 'electrical' | 'piping' | 'other';
   unit: string;
   price: number;
+  stock_quantity: number;
   minimum_order_quantity: number;
   status: string;
   suppliers?: { id: string | number; name: string; status?: string }[];
   created_at: string;
 }
 
-type GoodFormData = Omit<Good, 'id' | 'created_at' | 'suppliers' | 'price' | 'minimum_order_quantity'> & {
+type GoodFormData = Omit<
+  Good,
+  'id' | 'created_at' | 'suppliers' | 'price' | 'minimum_order_quantity' | 'stock_quantity'
+> & {
   performed_by?: string | number;
   suppliers?: (string | number)[];
   price: number | '';
   minimum_order_quantity: number | '';
+  stock_quantity: number | '';
 };
 
 export default function Goods() {
@@ -39,6 +44,7 @@ export default function Goods() {
     category: 'other',
     unit: 'pcs',
     price: '',
+    stock_quantity: '',
     minimum_order_quantity: '',
     status: 'active',
   });
@@ -89,6 +95,7 @@ export default function Goods() {
     category,
     unit: 'pcs',
     price: '',
+    stock_quantity: '',
     minimum_order_quantity: '',
     status: 'active',
   });
@@ -122,6 +129,7 @@ export default function Goods() {
       const payload: GoodFormData = {
         ...formData,
         price: formData.price === '' ? 0 : Number(formData.price),
+        stock_quantity: formData.stock_quantity === '' ? 0 : Number(formData.stock_quantity),
         minimum_order_quantity:
           formData.minimum_order_quantity === '' ? 1 : Number(formData.minimum_order_quantity),
         performed_by: profile?.id,
@@ -173,6 +181,7 @@ export default function Goods() {
         category: good.category,
         unit: good.unit,
         price: good.price,
+        stock_quantity: good.stock_quantity,
         minimum_order_quantity: good.minimum_order_quantity,
         status: good.status,
       });
@@ -264,6 +273,9 @@ export default function Goods() {
                   Price
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Stock
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Unit
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -277,7 +289,7 @@ export default function Goods() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredGoods.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     No goods found. Add your first product to get started.
                   </td>
                 </tr>
@@ -309,6 +321,9 @@ export default function Goods() {
                       <div className="text-xs text-gray-500">
                         MOQ: {good.minimum_order_quantity}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {Number(good.stock_quantity) || 0}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{good.unit}</td>
                     <td className="px-6 py-4">
@@ -521,6 +536,22 @@ export default function Goods() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Stock Quantity
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.stock_quantity}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, stock_quantity: value === '' ? '' : Number(value) });
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Minimum Order Quantity
                   </label>
                   <input
@@ -631,6 +662,10 @@ export default function Goods() {
               <div>
                 <p className="font-semibold text-gray-700">Price</p>
                 <p>Rp {formatRupiah(Number(detailGood.price) || 0)}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700">Stock Quantity</p>
+                <p>{Number(detailGood.stock_quantity) || 0}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Minimum Order</p>

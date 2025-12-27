@@ -10,7 +10,7 @@ import {
   ShoppingCart,
   Truck,
   Receipt,
-  CreditCard,
+  Settings,
   UserCog,
   UserCircle,
   LogOut,
@@ -43,9 +43,9 @@ export default function Dashboard({ children, currentPage, onNavigate }: Dashboa
     { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Delivery Orders', icon: Truck, page: 'delivery-orders', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Invoices', icon: Receipt, page: 'invoices', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: 'Financing', icon: CreditCard, page: 'financing', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Profile', icon: UserCircle, page: 'profile', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'User Management', icon: UserCog, page: 'users', roles: ['superadmin', 'admin', 'manager'] },
+    { name: 'Settings', icon: Settings, page: 'settings', roles: ['superadmin'] },
   ];
 
   const filteredNavigation = navigation.filter(item =>
