@@ -1,73 +1,107 @@
 import { useState, useEffect } from 'react';
-import { addRecord, getRecords } from '../../lib/api';
-import { Plus, Eye, Receipt, X } from 'lucide-react';
+import { getRecords, updateRecord } from '../../lib/api';
+import { CheckCircle, Edit2, Eye, Receipt, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+
+interface InvoiceGood {
+  no: number;
+  goods?: string | null;
+  description?: string | null;
+  unit?: string | null;
+  qty: number;
+  price: number;
+  subtotal: number;
+}
 
 interface InvoiceType {
   id: string;
   invoice_number: string;
-  order_id: string;
-  supplier_id: string;
+  sales_order_id?: string | null;
+  client_id?: string | null;
+  company_name?: string | null;
+  billing_address?: string | null;
+  payment_time?: string | null;
+  invoice_date?: string | null;
   total_amount: number;
   tax_amount: number;
   grand_total: number;
   status: string;
-  due_date: string;
-  paid_date: string | null;
-  payment_method: string | null;
+  paid_date?: string | null;
+  goods?: InvoiceGood[] | null;
   created_at: string;
-  suppliers?: { name: string };
 }
 
-interface Supplier {
-  id: string;
-  name: string;
-}
-
-interface Order {
+interface OrderType {
   id: string;
   order_number: string;
 }
 
+interface ClientType {
+  id: string;
+  company_name: string;
+  address: string;
+  ship_addresses?: string[] | string | null;
+}
+
+const parseShipAddresses = (value?: string[] | string | null) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const formatRupiah = (value: number) =>
+  new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(value || 0);
+
 export default function Invoices() {
+  const { profile } = useAuth();
   const [invoices, setInvoices] = useState<InvoiceType[]>([]);
+  const [ordersById, setOrdersById] = useState<Record<string, OrderType>>({});
+  const [clientsById, setClientsById] = useState<Record<string, ClientType>>({});
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [formData, setFormData] = useState({
-    invoice_number: '',
-    order_id: '',
-    supplier_id: '',
-    total_amount: '',
-    tax_amount: '',
-    due_date: '',
-    status: 'draft',
+  const [detailInvoice, setDetailInvoice] = useState<InvoiceType | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceType | null>(null);
+  const [editForm, setEditForm] = useState({
+    payment_time: '',
+    billing_address: '',
   });
 
   useEffect(() => {
     fetchInvoices();
-    fetchSuppliers();
-    fetchOrders();
   }, []);
 
   const fetchInvoices = async () => {
     try {
-      const [invoiceData, supplierData] = await Promise.all([
+      const [invoiceData, orderData, clientData] = await Promise.all([
         getRecords<InvoiceType>('invoices'),
-        getRecords<Supplier>('suppliers'),
+        getRecords<OrderType>('sales_orders'),
+        getRecords<ClientType>('clients'),
       ]);
 
-      const suppliersById = new Map(supplierData.map((supplier) => [supplier.id, supplier]));
-      const mappedInvoices = invoiceData
-        .map((invoice) => ({
-          ...invoice,
-          suppliers: suppliersById.get(invoice.supplier_id),
-        }))
-        .sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        );
+      const orderMap = orderData.reduce<Record<string, OrderType>>((acc, order) => {
+        acc[String(order.id)] = order;
+        return acc;
+      }, {});
 
-      setInvoices(mappedInvoices);
+      const clientMap = clientData.reduce<Record<string, ClientType>>((acc, client) => {
+        acc[String(client.id)] = client;
+        return acc;
+      }, {});
+
+      setOrdersById(orderMap);
+      setClientsById(clientMap);
+      setInvoices(
+        invoiceData.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        ),
+      );
     } catch (error) {
       console.error('Error fetching invoices:', error);
     } finally {
@@ -75,75 +109,69 @@ export default function Invoices() {
     }
   };
 
-  const fetchSuppliers = async () => {
-    try {
-      const data = await getRecords<Supplier>('suppliers');
-      const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
-      setSuppliers(sorted);
-    } catch (error) {
-      console.error('Error fetching suppliers:', error);
-    }
-  };
-
-  const fetchOrders = async () => {
-    try {
-      const data = await getRecords<Order>('sales_orders');
-      const sorted = [...data].sort(
-        (a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime(),
-      );
-      setOrders(sorted);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const totalAmount = parseFloat(formData.total_amount);
-    const taxAmount = parseFloat(formData.tax_amount);
-    const grandTotal = totalAmount + taxAmount;
-
-    try {
-      await addRecord<InvoiceType>('invoices', {
-        invoice_number: formData.invoice_number,
-        order_id: formData.order_id,
-        supplier_id: formData.supplier_id,
-        total_amount: totalAmount,
-        tax_amount: taxAmount,
-        grand_total: grandTotal,
-        status: formData.status,
-        due_date: formData.due_date,
-        paid_date: null,
-        payment_method: null,
-      } as InvoiceType);
-
-      setShowModal(false);
-      setFormData({
-        invoice_number: '',
-        order_id: '',
-        supplier_id: '',
-        total_amount: '',
-        tax_amount: '',
-        due_date: '',
-        status: 'draft',
-      });
-      fetchInvoices();
-    } catch (error) {
-      console.error('Error creating invoice:', error);
-      alert('Failed to create invoice. Please try again.');
-    }
-  };
-
   const getStatusColor = (status: string) => {
     const colors = {
-      draft: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
-      sent: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
       paid: 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200',
       overdue: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
-      cancelled: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
+  };
+
+  const handleOpenEdit = (invoice: InvoiceType) => {
+    setEditingInvoice(invoice);
+    setEditForm({
+      payment_time: invoice.payment_time || '',
+      billing_address: invoice.billing_address || '',
+    });
+  };
+
+  const handleEditSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingInvoice) return;
+
+    try {
+      await updateRecord<InvoiceType>('invoices', editingInvoice.id, {
+        payment_time: editForm.payment_time,
+        billing_address: editForm.billing_address,
+        performed_by: profile?.id,
+      });
+      setEditingInvoice(null);
+      fetchInvoices();
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      alert('Failed to update invoice.');
+    }
+  };
+
+  const handleMarkPaid = async (invoice: InvoiceType) => {
+    const confirmed = window.confirm(
+      'Mark this invoice as paid? After updating, the invoice becomes read-only.',
+    );
+    if (!confirmed) return;
+
+    try {
+      await updateRecord<InvoiceType>('invoices', invoice.id, {
+        status: 'paid',
+        performed_by: profile?.id,
+      });
+      fetchInvoices();
+      if (detailInvoice?.id === invoice.id) {
+        setDetailInvoice({ ...invoice, status: 'paid' });
+      }
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+      alert('Failed to update invoice status.');
+    }
+  };
+
+  const resolveAddressOptions = (invoice: InvoiceType) => {
+    const client = invoice.client_id ? clientsById[String(invoice.client_id)] : null;
+    const addresses = client ? [client.address, ...parseShipAddresses(client.ship_addresses)] : [];
+    const unique = Array.from(new Set(addresses.filter(Boolean)));
+    if (invoice.billing_address && !unique.includes(invoice.billing_address)) {
+      unique.unshift(invoice.billing_address);
+    }
+    return unique;
   };
 
   if (loading) {
@@ -159,33 +187,7 @@ export default function Invoices() {
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-gray-600 mt-1">Manage invoices and payments</p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Create Invoice
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Total Outstanding</p>
-          <p className="text-2xl font-bold text-gray-900">Rp 0</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Paid This Month</p>
-          <p className="text-2xl font-bold text-green-600">Rp 0</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Overdue</p>
-          <p className="text-2xl font-bold text-red-600">Rp 0</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Draft</p>
-          <p className="text-2xl font-bold text-gray-600">Rp 0</p>
+          <p className="text-gray-600 mt-1">Monitor invoices generated from approved sales orders</p>
         </div>
       </div>
 
@@ -198,13 +200,13 @@ export default function Invoices() {
                   Invoice
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Supplier
+                  Company
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Due Date
+                  Payment Time
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -230,44 +232,70 @@ export default function Invoices() {
                         {invoice.invoice_number}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {new Date(invoice.created_at).toLocaleDateString()}
+                        {invoice.invoice_date
+                          ? new Date(invoice.invoice_date).toLocaleDateString()
+                          : new Date(invoice.created_at).toLocaleDateString()}
                       </div>
+                      {invoice.sales_order_id && ordersById[String(invoice.sales_order_id)] && (
+                        <div className="text-xs text-gray-500">
+                          SO: {ordersById[String(invoice.sales_order_id)].order_number}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {invoice.suppliers?.name || 'N/A'}
+                      {invoice.company_name || '-'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
-                        Rp {invoice.grand_total.toLocaleString()}
+                        Rp {formatRupiah(Number(invoice.grand_total) || 0)}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Tax: Rp {invoice.tax_amount.toLocaleString()}
+                        Tax: Rp {formatRupiah(Number(invoice.tax_amount) || 0)}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {invoice.due_date
-                          ? new Date(invoice.due_date).toLocaleDateString()
-                          : 'N/A'}
-                      </div>
-                      {invoice.paid_date && (
-                        <div className="text-xs text-gray-500">
-                          Paid: {new Date(invoice.paid_date).toLocaleDateString()}
-                        </div>
-                      )}
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {invoice.payment_time || '-'}
                     </td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                          invoice.status
+                          invoice.status,
                         )}`}
                       >
                         {invoice.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <button
+                        onClick={() => setDetailInvoice(invoice)}
+                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        aria-label="View invoice"
+                      >
                         <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleOpenEdit(invoice)}
+                        disabled={invoice.status === 'paid'}
+                        className={`inline-flex items-center p-2 rounded-lg transition ${
+                          invoice.status === 'paid'
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-emerald-600 hover:bg-emerald-50'
+                        }`}
+                        aria-label="Edit invoice"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleMarkPaid(invoice)}
+                        disabled={invoice.status !== 'overdue'}
+                        className={`inline-flex items-center p-2 rounded-lg transition ${
+                          invoice.status !== 'overdue'
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-purple-600 hover:bg-purple-50'
+                        }`}
+                        aria-label="Mark invoice paid"
+                      >
+                        <CheckCircle className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
@@ -278,168 +306,169 @@ export default function Invoices() {
         </div>
       </div>
 
-      {showModal && (
+      {detailInvoice && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Create Invoice</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Invoice Details</h2>
+                <p className="text-sm text-gray-600">{detailInvoice.invoice_number}</p>
+              </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => setDetailInvoice(null)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div className="p-6 space-y-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-500">Company</p>
+                  <p className="font-medium text-gray-900">{detailInvoice.company_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Invoice Date</p>
+                  <p className="font-medium text-gray-900">
+                    {detailInvoice.invoice_date
+                      ? new Date(detailInvoice.invoice_date).toLocaleDateString()
+                      : '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Billing Address</p>
+                  <p className="font-medium text-gray-900">{detailInvoice.billing_address || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Payment Time</p>
+                  <p className="font-medium text-gray-900">{detailInvoice.payment_time || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Status</p>
+                  <p className="font-medium text-gray-900">{detailInvoice.status}</p>
+                </div>
+                {detailInvoice.paid_date && (
+                  <div>
+                    <p className="text-gray-500">Paid Date</p>
+                    <p className="font-medium text-gray-900">
+                      {new Date(detailInvoice.paid_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Invoice Number
-                </label>
+                <p className="font-semibold text-gray-700">Goods</p>
+                {detailInvoice.goods && detailInvoice.goods.length > 0 ? (
+                  <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">No</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Goods</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Description</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Unit</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Qty</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Price</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {detailInvoice.goods.map((item) => (
+                          <tr key={item.no}>
+                            <td className="px-3 py-2">{item.no}</td>
+                            <td className="px-3 py-2">{item.goods || '-'}</td>
+                            <td className="px-3 py-2">{item.description || '-'}</td>
+                            <td className="px-3 py-2">{item.unit || '-'}</td>
+                            <td className="px-3 py-2 text-right">{item.qty}</td>
+                            <td className="px-3 py-2 text-right">Rp {formatRupiah(item.price)}</td>
+                            <td className="px-3 py-2 text-right">Rp {formatRupiah(item.subtotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-gray-600 mt-1">No goods listed.</p>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between gap-6">
+                    <span className="text-gray-500">Subtotal</span>
+                    <span className="font-medium text-gray-900">Rp {formatRupiah(detailInvoice.total_amount)}</span>
+                  </div>
+                  <div className="flex justify-between gap-6">
+                    <span className="text-gray-500">Tax</span>
+                    <span className="font-medium text-gray-900">Rp {formatRupiah(detailInvoice.tax_amount)}</span>
+                  </div>
+                  <div className="flex justify-between gap-6">
+                    <span className="text-gray-700 font-semibold">Grand Total</span>
+                    <span className="font-semibold text-gray-900">Rp {formatRupiah(detailInvoice.grand_total)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Edit Invoice</h2>
+                <p className="text-sm text-gray-600">{editingInvoice.invoice_number}</p>
+              </div>
+              <button
+                onClick={() => setEditingInvoice(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Time</label>
                 <input
                   type="text"
-                  required
-                  value={formData.invoice_number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, invoice_number: e.target.value })
-                  }
+                  value={editForm.payment_time}
+                  onChange={(e) => setEditForm({ ...editForm, payment_time: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="INV-2024-001"
+                  placeholder="30 days after invoice"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sales Order
-                </label>
-                <select
-                  required
-                  value={formData.order_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, order_id: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Order</option>
-                  {orders.map((order) => (
-                    <option key={order.id} value={order.id}>
-                      {order.order_number}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Supplier
-                </label>
-                <select
-                  required
-                  value={formData.supplier_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, supplier_id: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Supplier</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Amount (Rp)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={formData.total_amount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, total_amount: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="1000000"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tax Amount (Rp)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={formData.tax_amount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, tax_amount: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="110000"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Grand Total (Rp)
-                </label>
-                <div className="px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 font-semibold">
-                  {formData.total_amount && formData.tax_amount
-                    ? (
-                        parseFloat(formData.total_amount) +
-                        parseFloat(formData.tax_amount)
-                      ).toLocaleString()
-                    : '0'}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Due Date
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Billing Address</label>
                 <input
-                  type="date"
+                  type="text"
+                  list="billing-address-options"
+                  value={editForm.billing_address}
+                  onChange={(e) => setEditForm({ ...editForm, billing_address: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Select or enter billing address"
                   required
-                  value={formData.due_date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, due_date: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, status: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="sent">Sent</option>
-                  <option value="paid">Paid</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+                <datalist id="billing-address-options">
+                  {resolveAddressOptions(editingInvoice).map((address) => (
+                    <option key={address} value={address} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-gray-500 mt-1">
+                  Choose from the main address or ship addresses of the company.
+                </p>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => setEditingInvoice(null)}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
                   Cancel
@@ -448,7 +477,7 @@ export default function Invoices() {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  Create Invoice
+                  Save Changes
                 </button>
               </div>
             </form>
