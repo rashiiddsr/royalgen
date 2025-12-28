@@ -226,7 +226,7 @@ export default function Invoices() {
     const taxRate = Number(settings?.tax_rate) || 0;
     const totalTagihan = Number(invoice.grand_total) || 0;
     const paymentTimeLine = invoice.payment_time
-      ? `Tempo pembayaran: ${escapeHtml(invoice.payment_time)} setelah tanggal invoice.`
+      ? `Tempo pembayaran: ${escapeHtml(invoice.payment_time)} hari setelah tanggal invoice.`
       : 'Tempo pembayaran: -';
     const rowsHtml = goodsList
       .map((row, index) => {
