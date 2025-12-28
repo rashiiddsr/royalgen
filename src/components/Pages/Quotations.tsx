@@ -276,7 +276,7 @@ export default function Quotations() {
             .totals-row { display: flex; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
             .totals-row:last-child { border-bottom: none; background: var(--accent-soft); font-weight: 600; }
             .signature { margin-top: 36px; display: flex; justify-content: flex-end; text-align: right; font-size: 13px; }
-            .signature .name { margin-top: 52px; font-weight: 600; }
+            .signature .name { margin-top: 68px; font-weight: 600; }
           </style>
         </head>
         <body>
