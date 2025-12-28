@@ -392,6 +392,28 @@ const createInvoiceForOrder = async (order, performedBy) => {
     description: `Auto-created invoice ${invoiceNumber}`,
   });
 
+  try {
+    const [invoice] = await query('SELECT * FROM `invoices` WHERE id = ? LIMIT 1', [result.insertId]);
+    const roleEmails = await getRoleEmails(['superadmin', 'manager']);
+    const invoiceDocuments = resolveDocumentUrls(invoice, [
+      'invoice_document_url',
+      'invoice_pdf_url',
+      'invoice_document',
+    ]);
+    const attachments = buildEmailAttachments(
+      invoiceDocuments,
+      `invoice-${invoice?.invoice_number || result.insertId}`
+    );
+    await sendInvoiceNotification({
+      invoice: invoice || invoicePayload,
+      order,
+      recipients: roleEmails,
+      attachments,
+    });
+  } catch (error) {
+    console.error('Invoice notification error', error);
+  }
+
   return result.insertId;
 };
 
@@ -692,7 +714,131 @@ const wrapSmtpLines = (content, maxLength = 998) => {
     .join('\r\n');
 };
 
-const sendSmtpMail = async ({ to, subject, html }) => {
+const normalizeDocumentList = (documents) => {
+  if (!documents) return [];
+  if (Array.isArray(documents)) return documents.filter(Boolean);
+  if (typeof documents === 'string') return parseJsonArray(documents);
+  if (typeof documents === 'object') return [documents];
+  return [];
+};
+
+const resolveUploadFilePath = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  if (url.startsWith('/uploads/')) {
+    return path.join(uploadDir, url.replace('/uploads/', ''));
+  }
+  if (url.startsWith('uploads/')) {
+    return path.join(uploadDir, url.replace('uploads/', ''));
+  }
+  if (url.startsWith('http')) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.pathname.startsWith('/uploads/')) {
+        return path.join(uploadDir, parsed.pathname.replace('/uploads/', ''));
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const resolveMimeType = (filename) => {
+  const extension = path.extname(filename || '').toLowerCase();
+  const map = {
+    '.pdf': 'application/pdf',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.doc': 'application/msword',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  };
+  return map[extension] || 'application/octet-stream';
+};
+
+const resolveDocumentUrls = (record = {}, fallbackKeys = []) => {
+  const documents = normalizeDocumentList(record.documents);
+  if (documents.length) return documents;
+  const keys = ['document_url', 'documentUrl', 'pdf_url', ...fallbackKeys];
+  for (const key of keys) {
+    const url = record?.[key];
+    if (url) {
+      return [{ name: record.document_name || record.name || 'document', url }];
+    }
+  }
+  return [];
+};
+
+const buildEmailAttachments = (documents, defaultName) => {
+  const normalizedDocs = normalizeDocumentList(documents);
+  return normalizedDocs
+    .map((doc) => {
+      if (!doc?.url) return null;
+      const filePath = resolveUploadFilePath(doc.url);
+      if (!filePath || !fs.existsSync(filePath)) {
+        console.warn('Attachment file not found', doc.url);
+        return null;
+      }
+      const content = fs.readFileSync(filePath);
+      const fallbackName = defaultName || path.basename(filePath);
+      const resolvedName = doc.name || fallbackName;
+      const extension = path.extname(filePath);
+      const filename = path.extname(resolvedName) ? resolvedName : `${resolvedName}${extension}`;
+      return {
+        filename,
+        contentType: resolveMimeType(filename),
+        content,
+      };
+    })
+    .filter(Boolean);
+};
+
+const chunkBase64 = (input, size = 76) => {
+  const base64 = Buffer.isBuffer(input) ? input.toString('base64') : Buffer.from(input).toString('base64');
+  const chunks = [];
+  for (let i = 0; i < base64.length; i += size) {
+    chunks.push(base64.slice(i, i + size));
+  }
+  return chunks.join('\r\n');
+};
+
+const buildMimeBody = ({ html, attachments }) => {
+  const normalizedAttachments = Array.isArray(attachments) ? attachments.filter(Boolean) : [];
+  if (!normalizedAttachments.length) {
+    return {
+      contentType: 'text/html; charset="UTF-8"',
+      body: wrapSmtpLines(html),
+    };
+  }
+  const boundary = `----=_RGI_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+  const parts = [
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    wrapSmtpLines(html),
+  ];
+  normalizedAttachments.forEach((attachment) => {
+    const safeName = String(attachment.filename || 'attachment').replace(/"/g, '');
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${attachment.contentType || 'application/octet-stream'}; name="${safeName}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${safeName}"`,
+      '',
+      chunkBase64(attachment.content)
+    );
+  });
+  parts.push(`--${boundary}--`);
+  return {
+    contentType: `multipart/mixed; boundary="${boundary}"`,
+    body: parts.join('\r\n'),
+  };
+};
+
+const sendSmtpMail = async ({ to, subject, html, attachments }) => {
   const host = process.env.MAIL_HOST;
   const port = Number(process.env.MAIL_PORT || 0);
   const encryption = process.env.MAIL_ENCRYPTION;
@@ -738,7 +884,7 @@ const sendSmtpMail = async ({ to, subject, html }) => {
 
   const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : host;
   const messageId = `<${Date.now()}.${crypto.randomBytes(16).toString('hex')}@${senderDomain || 'localhost'}>`;
-  const safeHtml = wrapSmtpLines(html);
+  const { contentType, body } = buildMimeBody({ html, attachments });
   const message = [
     `From: ${senderName} <${senderEmail}>`,
     `To: <${to}>`,
@@ -746,9 +892,9 @@ const sendSmtpMail = async ({ to, subject, html }) => {
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: ${messageId}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/html; charset="UTF-8"',
+    `Content-Type: ${contentType}`,
     '',
-    safeHtml,
+    body,
     '.',
   ].join('\r\n');
 
@@ -865,6 +1011,7 @@ const sendQuotationNotification = async ({
   recipients,
   requester,
   rfq,
+  attachments,
 }) => {
   try {
     const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
@@ -877,6 +1024,7 @@ const sendQuotationNotification = async ({
           to: email,
           subject,
           html,
+          attachments,
         })
       )
     );
@@ -897,6 +1045,8 @@ const formatOrderStatusLabel = (status) => {
 };
 
 const buildDeliveryApprovalEmailHtml = ({ order, orderGoods, deliveries, requester }) => {
+  const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
+  const progressLink = `${appBaseUrl}/?progress_order=${order.id}`;
   const goodsRows = orderGoods.length
     ? orderGoods
         .map(
@@ -1021,6 +1171,7 @@ const buildDeliveryApprovalEmailHtml = ({ order, orderGoods, deliveries, request
       </tbody>
     </table>
     <p>Please review and approve to move the status to waiting payment.</p>
+    <p>Order progress link: <a href="${progressLink}">${progressLink}</a></p>
   `;
 };
 
@@ -1041,6 +1192,244 @@ const sendDeliveryApprovalNotification = async ({ order, orderGoods, deliveries,
     );
   } catch (error) {
     console.error('Delivery approval notification error', error);
+  }
+};
+
+const buildDeliveryOrderEmailHtml = ({ delivery, order, orderGoods, requester }) => {
+  const goodsRows = orderGoods.length
+    ? orderGoods
+        .map(
+          (item, index) => `
+            <tr>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${index + 1}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.name || item.description || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
+            </tr>
+          `
+        )
+        .join('')
+    : `
+        <tr>
+          <td colspan="4" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">No items</td>
+        </tr>
+      `;
+
+  return `
+    <p>Hello Team,</p>
+    <p>A delivery order has been created and shipped. The PDF document is attached.</p>
+    <h3>Delivery Order Information</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Delivery Number</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${delivery.delivery_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Delivery Date</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${delivery.delivery_date || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Sales Order</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order?.order_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Company</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${delivery.company_name || order?.company_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Ship Address</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${delivery.ship_address || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Notes</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${delivery.notes || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Submitted by</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || 'User'} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
+    </table>
+    <h3>Delivery Goods</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <thead>
+        <tr>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">No</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Name</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${goodsRows}
+      </tbody>
+    </table>
+    <p>Thank you.</p>
+  `;
+};
+
+const sendDeliveryOrderNotification = async ({
+  delivery,
+  order,
+  orderGoods,
+  recipients,
+  requester,
+  attachments,
+}) => {
+  try {
+    const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
+    if (!uniqueRecipients.length) return;
+    const subject = `Delivery Order ${delivery.delivery_number || delivery.id}`;
+    const html = buildDeliveryOrderEmailHtml({ delivery, order, orderGoods, requester });
+    await Promise.allSettled(
+      uniqueRecipients.map((email) =>
+        sendSmtpMail({
+          to: email,
+          subject,
+          html,
+          attachments,
+        })
+      )
+    );
+  } catch (error) {
+    console.error('Delivery order notification error', error);
+  }
+};
+
+const buildSalesOrderEmailHtml = ({ order, orderGoods, requester }) => {
+  const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
+  const progressLink = `${appBaseUrl}/?progress_order=${order.id}`;
+  const goodsRows = orderGoods.length
+    ? orderGoods
+        .map(
+          (item, index) => `
+            <tr>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${index + 1}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.name || item.description || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.price)}</td>
+            </tr>
+          `
+        )
+        .join('')
+    : `
+        <tr>
+          <td colspan="5" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">No items</td>
+        </tr>
+      `;
+
+  return `
+    <p>Hello Team,</p>
+    <p>A new sales order has been created.</p>
+    <h3>Sales Order Information</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Sales Order</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.order_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PO Number</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.po_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Project</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.project_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Company</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.company_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.pic_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC Email</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.pic_email || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">PIC Phone</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.pic_phone || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Payment Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order.payment_time || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(order.total_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Tax</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(order.tax_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Grand Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(order.grand_total)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Submitted by</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${requester?.full_name || 'User'} ${requester?.email ? `(${requester.email})` : ''}</td></tr>
+    </table>
+    <h3>Sales Order Goods</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <thead>
+        <tr>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">No</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Name</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${goodsRows}
+      </tbody>
+    </table>
+    <p>Order progress link: <a href="${progressLink}">${progressLink}</a></p>
+  `;
+};
+
+const sendSalesOrderNotification = async ({ order, orderGoods, recipients, requester }) => {
+  try {
+    const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
+    if (!uniqueRecipients.length) return;
+    const subject = `New Sales Order ${order.order_number || order.id}`;
+    const html = buildSalesOrderEmailHtml({ order, orderGoods, requester });
+    await Promise.allSettled(
+      uniqueRecipients.map((email) =>
+        sendSmtpMail({
+          to: email,
+          subject,
+          html,
+        })
+      )
+    );
+  } catch (error) {
+    console.error('Sales order notification error', error);
+  }
+};
+
+const buildInvoiceEmailHtml = ({ invoice, order }) => {
+  const invoiceGoods = parseJsonArray(invoice.goods);
+  const goodsRows = invoiceGoods.length
+    ? invoiceGoods
+        .map(
+          (item, index) => `
+            <tr>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${index + 1}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.goods || item.name || item.description || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.unit || '-'}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${item.qty ?? 0}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.price)}</td>
+              <td style="padding:8px;border:1px solid #e2e8f0;">${formatCurrency(item.subtotal)}</td>
+            </tr>
+          `
+        )
+        .join('')
+    : `
+        <tr>
+          <td colspan="6" style="padding:8px;border:1px solid #e2e8f0;text-align:center;">No items</td>
+        </tr>
+      `;
+
+  return `
+    <p>Hello Team,</p>
+    <p>An invoice has been generated. The PDF document is attached.</p>
+    <p>Please update the invoice status once the funds have been received.</p>
+    <h3>Invoice Information</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Invoice Number</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${invoice.invoice_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Invoice Date</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${invoice.invoice_date || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Sales Order</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${order?.order_number || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Company</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${invoice.company_name || order?.company_name || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Billing Address</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${invoice.billing_address || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Payment Time</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${invoice.payment_time || '-'}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(invoice.total_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Tax</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(invoice.tax_amount)}</td></tr>
+      <tr><td style="padding:6px 8px;border:1px solid #e2e8f0;">Grand Total</td><td style="padding:6px 8px;border:1px solid #e2e8f0;">${formatCurrency(invoice.grand_total)}</td></tr>
+    </table>
+    <h3>Invoice Goods</h3>
+    <table style="border-collapse:collapse;width:100%;max-width:720px;">
+      <thead>
+        <tr>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">No</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Name</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Unit</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Qty</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Price</th>
+          <th style="padding:8px;border:1px solid #e2e8f0;text-align:left;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${goodsRows}
+      </tbody>
+    </table>
+  `;
+};
+
+const sendInvoiceNotification = async ({ invoice, order, recipients, attachments }) => {
+  try {
+    const uniqueRecipients = Array.from(new Set((recipients || []).filter(Boolean)));
+    if (!uniqueRecipients.length) return;
+    const subject = `Invoice ${invoice.invoice_number || invoice.id}`;
+    const html = buildInvoiceEmailHtml({ invoice, order });
+    await Promise.allSettled(
+      uniqueRecipients.map((email) =>
+        sendSmtpMail({
+          to: email,
+          subject,
+          html,
+          attachments,
+        })
+      )
+    );
+  } catch (error) {
+    console.error('Invoice notification error', error);
   }
 };
 
@@ -1497,6 +1886,15 @@ app.post('/api/:table', async (req, res) => {
         const roleEmails = await getRoleEmails(['superadmin', 'manager']);
         const requesterEmail = requester?.email ? requester.email.toLowerCase() : null;
         const recipients = roleEmails.filter((email) => email.toLowerCase() !== requesterEmail);
+        const quotationDocuments = resolveDocumentUrls(created, [
+          'quotation_document_url',
+          'quotation_pdf_url',
+          'quotation_document',
+        ]);
+        const attachments = buildEmailAttachments(
+          quotationDocuments,
+          `quotation-${created.quotation_number || created.id}`
+        );
         await sendQuotationNotification({
           quotation: created,
           goods: cleanedGoods,
@@ -1504,6 +1902,7 @@ app.post('/api/:table', async (req, res) => {
           recipients,
           requester,
           rfq,
+          attachments,
         });
       }
 
@@ -1566,6 +1965,25 @@ app.post('/api/:table', async (req, res) => {
         const deliveries = await query('SELECT * FROM `delivery_orders` WHERE sales_order_id = ?', [
           salesOrderId,
         ]);
+        const deliveryRecipients = await getRoleEmails(['superadmin', 'manager']);
+        const deliveryRequester = await getUserById(createdBy || order.created_by);
+        const deliveryDocuments = resolveDocumentUrls(created, [
+          'delivery_document_url',
+          'delivery_pdf_url',
+          'delivery_document',
+        ]);
+        const attachments = buildEmailAttachments(
+          deliveryDocuments,
+          `delivery-order-${created.delivery_number || created.id}`
+        );
+        await sendDeliveryOrderNotification({
+          delivery: created,
+          order,
+          orderGoods: cleanedGoods,
+          recipients: deliveryRecipients,
+          requester: deliveryRequester,
+          attachments,
+        });
         const shippedMap = {};
         deliveries.forEach((delivery) => {
           const items = parseJsonArray(delivery.goods);
@@ -1652,6 +2070,19 @@ app.post('/api/:table', async (req, res) => {
         action: 'create',
         description: `Created sales order ${orderPayload.order_number || result.insertId}`,
       });
+
+      try {
+        const roleEmails = await getRoleEmails(['superadmin', 'manager']);
+        const requester = await getUserById(createdBy || performedBy);
+        await sendSalesOrderNotification({
+          order: created,
+          orderGoods: cleanedGoods,
+          recipients: roleEmails,
+          requester,
+        });
+      } catch (error) {
+        console.error('Sales order create notification error', error);
+      }
 
       return res.status(201).json({
         ...created,
@@ -1818,6 +2249,17 @@ app.put('/api/:table/:id', async (req, res) => {
 
         const nextStatus = allShipped ? 'waiting approval' : 'on-delivery';
         await query('UPDATE `sales_orders` SET status = ? WHERE id = ?', [nextStatus, existing.sales_order_id]);
+        if (allShipped && order.status !== 'waiting approval') {
+          const roleEmails = await getRoleEmails(['superadmin', 'manager']);
+          const requester = await getUserById(order.created_by);
+          await sendDeliveryApprovalNotification({
+            order: { ...order, status: nextStatus },
+            orderGoods,
+            deliveries,
+            recipients: roleEmails,
+            requester,
+          });
+        }
       }
 
       await logActivity({
@@ -2111,6 +2553,15 @@ app.put('/api/:table/:id', async (req, res) => {
         shouldNotifyWaiting || shouldAutoRenegotiate || shouldNotifyRenegotiationStatusChange;
 
       if (shouldNotifyWaitingOrRenegotiation) {
+        const quotationDocuments = resolveDocumentUrls(updated, [
+          'quotation_document_url',
+          'quotation_pdf_url',
+          'quotation_document',
+        ]);
+        const attachments = buildEmailAttachments(
+          quotationDocuments,
+          `quotation-${updated?.quotation_number || updated?.id || id}`
+        );
         await sendQuotationNotification({
           quotation: updated,
           goods: cleanedGoods,
@@ -2118,6 +2569,7 @@ app.put('/api/:table/:id', async (req, res) => {
           recipients: roleRecipients,
           requester,
           rfq,
+          attachments,
         });
       }
 
