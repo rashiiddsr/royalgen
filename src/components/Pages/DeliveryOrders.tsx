@@ -222,7 +222,7 @@ export default function DeliveryOrders() {
             .notes li { margin-bottom: 6px; text-align: justify; text-justify: inter-word; }
             .signature { margin-top: 36px; display: flex; justify-content: space-between; gap: 40px; font-size: 13px; }
             .signature .box { width: 45%; text-align: center; border-top: 1px solid var(--border); padding-top: 12px; }
-            .signature .name { margin-top: 50px; font-weight: 600; }
+            .signature .name { margin-top: 66px; font-weight: 600; }
           </style>
         </head>
         <body>
