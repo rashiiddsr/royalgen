@@ -161,7 +161,6 @@ CREATE TABLE IF NOT EXISTS `delivery_orders` (
   `client_id` INT DEFAULT NULL,
   `company_name` VARCHAR(255) DEFAULT NULL,
   `ship_address` TEXT DEFAULT NULL,
-  `notes` TEXT DEFAULT NULL,
   `goods` JSON DEFAULT NULL,
   `created_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
