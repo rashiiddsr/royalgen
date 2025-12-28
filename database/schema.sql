@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `pic_email` VARCHAR(255) DEFAULT NULL,
   `pic_phone` VARCHAR(100) DEFAULT NULL,
   `payment_time` VARCHAR(120) DEFAULT NULL,
+  `offer_validity_days` INT DEFAULT 30,
   `goods` JSON DEFAULT NULL,
   `total_amount` DECIMAL(12,2) DEFAULT 0,
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
