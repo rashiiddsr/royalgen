@@ -187,106 +187,128 @@ export default function DeliveryOrders() {
           <meta charset="utf-8" />
           <title>${escapeHtml(delivery.delivery_number || 'Delivery Order')}.pdf</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; font-size: 16px; }
-            .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 20px; margin-bottom: 16px; }
-            .company { text-align: center; }
-            .company h1 { margin: 8px 0 4px; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
-            .company p { margin: 4px 0; font-size: 13px; color: #374151; }
-            .divider { border-top: 2px solid #111827; margin: 12px 0 16px; }
-            .section { margin-top: 20px; }
-            .section h2 { font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
-            table { width: 100%; border-collapse: collapse; font-size: 15px; }
-            th, td { border: 1.5px solid #111827; padding: 8px; }
-            th { background: #f3f4f6; text-align: left; }
-            .two-col { display: flex; justify-content: space-between; gap: 24px; }
-            .meta { font-size: 15px; }
-            .meta p { margin: 4px 0; }
-            .notes { margin-top: 14px; font-size: 15px; }
-            .notes ol { margin: 8px 0 0 18px; }
+            :root {
+              --ink: #0f172a;
+              --muted: #475569;
+              --border: #e2e8f0;
+              --accent: #0ea5e9;
+              --accent-soft: #e0f2fe;
+              --accent-2: #22c55e;
+            }
+            * { box-sizing: border-box; }
+            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #f1f5f9; font-size: 15px; }
+            .page { padding: 32px; }
+            .card { background: #ffffff; border-radius: 20px; padding: 28px; box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08); }
+            .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 24px; }
+            .brand { display: flex; flex-direction: column; gap: 8px; }
+            .brand h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+            .brand p { margin: 0; font-size: 13px; color: var(--muted); }
+            .banner { margin-top: 18px; padding: 16px 20px; border-radius: 16px; background: linear-gradient(120deg, #0ea5e9, #22c55e); color: #ffffff; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+            .banner h2 { margin: 0; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; }
+            .banner .badge { background: rgba(255, 255, 255, 0.18); padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+            .section { margin-top: 22px; }
+            .section h3 { font-size: 13px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #94a3b8; }
+            .two-col { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+            .meta { flex: 1 1 35%; min-width: 220px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 16px; padding: 16px 18px; font-size: 13px; color: #0c4a6e; }
+            .meta p { margin: 6px 0; }
+            .ship-info { flex: 1 1 55%; min-width: 240px; background: #f8fafc; border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+            .ship-info p { margin: 4px 0; font-size: 14px; color: var(--ink); }
+            table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; margin-top: 10px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
+            th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+            th { background: #f1f5f9; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; }
+            tr:nth-child(even) td { background: #f8fafc; }
+            tr:last-child td { border-bottom: none; }
+            .notes { margin-top: 18px; font-size: 14px; background: #ecfeff; border-radius: 16px; padding: 16px 18px; border: 1px solid #a5f3fc; }
+            .notes ol { margin: 8px 0 0 16px; }
             .notes li { margin-bottom: 6px; }
-            .signature { margin-top: 40px; display: flex; justify-content: space-between; gap: 40px; font-size: 15px; }
-            .signature .box { width: 45%; text-align: center; }
-            .signature .name { margin-top: 60px; font-weight: 600; }
-            .logo { max-height: 90px; object-fit: contain; }
-            .logo-placeholder { width: 90px; height: 90px; border-radius: 12px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
-            .logo-placeholder svg { width: 44px; height: 44px; color: #9ca3af; }
+            .signature { margin-top: 32px; display: flex; justify-content: space-between; gap: 40px; font-size: 14px; }
+            .signature .box { width: 45%; text-align: center; border-top: 2px dashed #cbd5f5; padding-top: 12px; }
+            .signature .name { margin-top: 50px; font-weight: 600; color: var(--accent); }
+            .logo { max-height: 72px; object-fit: contain; }
+            .logo-placeholder { width: 72px; height: 72px; border-radius: 16px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+            .logo-placeholder svg { width: 36px; height: 36px; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div>
-              ${
-                logoSrc
-                  ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
-                  : `<div class="logo-placeholder" aria-label="Company logo">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M3 10.5L12 4l9 6.5"></path>
-                        <path d="M5.5 9.5V20h13V9.5"></path>
-                        <path d="M9 20v-5h6v5"></path>
-                      </svg>
-                    </div>`
-              }
-            </div>
-            <div class="company">
-              <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
-              <p>${escapeHtml(settings?.company_address || '-')}</p>
-              <p>Email: ${escapeHtml(settings?.email || '-')} | Telepon: ${escapeHtml(settings?.phone || '-')}</p>
-              <p>NPWP: ${escapeHtml(settings?.tax_id || '-')}</p>
-            </div>
-          </div>
-          <div class="divider"></div>
-
-          <div class="section">
-            <div class="two-col">
-              <div class="meta">
-                <p><strong>Tanggal :</strong> ${formatShortDate(delivery.delivery_date)}</p>
-                <p><strong>No Delivery :</strong> ${escapeHtml(delivery.delivery_number || '-')}</p>
-                <p><strong>Sales Order :</strong> ${escapeHtml(order?.po_number || order?.order_number || '-')}</p>
+          <div class="page">
+            <div class="card">
+              <div class="header">
+                <div>
+                  ${
+                    logoSrc
+                      ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
+                      : `<div class="logo-placeholder" aria-label="Company logo">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M3 10.5L12 4l9 6.5"></path>
+                            <path d="M5.5 9.5V20h13V9.5"></path>
+                            <path d="M9 20v-5h6v5"></path>
+                          </svg>
+                        </div>`
+                  }
+                </div>
+                <div class="brand">
+                  <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
+                  <p>${escapeHtml(settings?.company_address || '-')}</p>
+                  <p>Email: ${escapeHtml(settings?.email || '-')} | Telepon: ${escapeHtml(settings?.phone || '-')}</p>
+                  <p>NPWP: ${escapeHtml(settings?.tax_id || '-')}</p>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div class="section">
-            <div class="meta">
-              <p><strong>Kepada:</strong></p>
-              <p>${escapeHtml(delivery.company_name || order?.company_name || '-')}</p>
-              <p>${escapeHtml(delivery.ship_address || '-')}</p>
-            </div>
-          </div>
+              <div class="banner">
+                <h2>Delivery Order</h2>
+                <div class="badge">Pengiriman</div>
+              </div>
 
-          <div class="section">
-            <h2>Barang</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 40px;">No</th>
-                  <th>Barang</th>
-                  <th>Deskripsi</th>
-                  <th style="width: 80px;">Unit</th>
-                  <th style="width: 80px; text-align:right;">Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHtml || `<tr><td colspan="5" style="text-align:center;">Tidak ada barang</td></tr>`}
-              </tbody>
-            </table>
-          </div>
+              <div class="section">
+                <div class="two-col">
+                  <div class="meta">
+                    <p><strong>Tanggal :</strong> ${formatShortDate(delivery.delivery_date)}</p>
+                    <p><strong>No Delivery :</strong> ${escapeHtml(delivery.delivery_number || '-')}</p>
+                    <p><strong>Sales Order :</strong> ${escapeHtml(order?.po_number || order?.order_number || '-')}</p>
+                  </div>
+                  <div class="ship-info">
+                    <p><strong>Kepada:</strong></p>
+                    <p>${escapeHtml(delivery.company_name || order?.company_name || '-')}</p>
+                    <p>${escapeHtml(delivery.ship_address || '-')}</p>
+                  </div>
+                </div>
+              </div>
 
-          <div class="section notes">
-            <h2>Catatan</h2>
-            <ol>
-              ${notesList.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}
-            </ol>
-          </div>
+              <div class="section">
+                <h3>Barang</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;">No</th>
+                      <th>Barang</th>
+                      <th>Deskripsi</th>
+                      <th style="width: 80px;">Unit</th>
+                      <th style="width: 80px; text-align:right;">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowsHtml || `<tr><td colspan="5" style="text-align:center;">Tidak ada barang</td></tr>`}
+                  </tbody>
+                </table>
+              </div>
 
-          <div class="signature">
-            <div class="box">
-              <div>Pengirim,</div>
-              <div class="name">....................</div>
-            </div>
-            <div class="box">
-              <div>Penerima,</div>
-              <div class="name">....................</div>
+              <div class="section notes">
+                <h3>Catatan</h3>
+                <ol>
+                  ${notesList.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}
+                </ol>
+              </div>
+
+              <div class="signature">
+                <div class="box">
+                  <div>Pengirim,</div>
+                  <div class="name">....................</div>
+                </div>
+                <div class="box">
+                  <div>Penerima,</div>
+                  <div class="name">....................</div>
+                </div>
+              </div>
             </div>
           </div>
         </body>
