@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
+import { Download, Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -20,6 +20,7 @@ interface DeliveryOrder {
   client_id?: string | null;
   company_name?: string;
   ship_address?: string | null;
+  notes?: string | null;
   goods?: DeliveryGood[] | string | null;
   created_by?: number | null;
   created_at: string;
@@ -53,6 +54,17 @@ interface ClientOption {
   ship_addresses?: string[] | string | null;
 }
 
+interface CompanySetting {
+  id: string;
+  company_name?: string | null;
+  company_address?: string | null;
+  director_name?: string | null;
+  tax_id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  logo_url?: string | null;
+}
+
 const EMPTY_FORM = {
   delivery_number: '',
   delivery_date: '',
@@ -60,6 +72,7 @@ const EMPTY_FORM = {
   client_id: '',
   company_name: '',
   ship_address: '',
+  notes: '',
 };
 
 export default function DeliveryOrders() {
@@ -75,6 +88,8 @@ export default function DeliveryOrders() {
   const [editingDelivery, setEditingDelivery] = useState<DeliveryOrder | null>(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
+  const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
   useEffect(() => {
     fetchData();
@@ -118,13 +133,187 @@ export default function DeliveryOrders() {
     return `${year}-${month}-${day}`;
   };
 
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => {
+      const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      };
+      return map[char] || char;
+    });
+
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
+  const buildDeliveryOrderTemplate = (delivery: DeliveryOrder) => {
+    const settings = companySettings;
+    const order = orderMap.get(String(delivery.sales_order_id));
+    const goodsList = Array.isArray(delivery.goods) ? delivery.goods : [];
+    const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
+    const defaultNotes = [
+      'Harap periksa barang yang diterima sesuai dengan detail yang tercantum di atas.',
+      'Segera laporkan kepada kami jika terdapat ketidaksesuaian atau kerusakan barang dalam waktu 1x24 jam setelah barang diterima.',
+    ];
+    const notesList = [...defaultNotes];
+    if (delivery.notes) {
+      notesList.push(`Catatan tambahan: ${delivery.notes}`);
+    }
+    const rowsHtml = goodsList
+      .map((row, index) => {
+        const qty = Number(row.qty) || 0;
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(row.name || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
+            <td style="text-align:right;">${qty}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <!doctype html>
+      <html lang="id">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(delivery.delivery_number || 'Delivery Order')}.pdf</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; font-size: 16px; }
+            .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 20px; margin-bottom: 16px; }
+            .company { text-align: center; }
+            .company h1 { margin: 8px 0 4px; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+            .company p { margin: 4px 0; font-size: 13px; color: #374151; }
+            .divider { border-top: 2px solid #111827; margin: 12px 0 16px; }
+            .section { margin-top: 20px; }
+            .section h2 { font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
+            table { width: 100%; border-collapse: collapse; font-size: 15px; }
+            th, td { border: 1.5px solid #111827; padding: 8px; }
+            th { background: #f3f4f6; text-align: left; }
+            .two-col { display: flex; justify-content: space-between; gap: 24px; }
+            .meta { font-size: 15px; }
+            .meta p { margin: 4px 0; }
+            .notes { margin-top: 14px; font-size: 15px; }
+            .notes ol { margin: 8px 0 0 18px; }
+            .notes li { margin-bottom: 6px; }
+            .signature { margin-top: 40px; display: flex; justify-content: space-between; gap: 40px; font-size: 15px; }
+            .signature .box { width: 45%; text-align: center; }
+            .signature .name { margin-top: 60px; font-weight: 600; }
+            .logo { max-height: 90px; object-fit: contain; }
+            .logo-placeholder { width: 90px; height: 90px; border-radius: 12px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
+            .logo-placeholder svg { width: 44px; height: 44px; color: #9ca3af; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              ${
+                logoSrc
+                  ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
+                  : `<div class="logo-placeholder" aria-label="Company logo">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M3 10.5L12 4l9 6.5"></path>
+                        <path d="M5.5 9.5V20h13V9.5"></path>
+                        <path d="M9 20v-5h6v5"></path>
+                      </svg>
+                    </div>`
+              }
+            </div>
+            <div class="company">
+              <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
+              <p>${escapeHtml(settings?.company_address || '-')}</p>
+              <p>Email: ${escapeHtml(settings?.email || '-')} | Telepon: ${escapeHtml(settings?.phone || '-')}</p>
+              <p>NPWP: ${escapeHtml(settings?.tax_id || '-')}</p>
+            </div>
+          </div>
+          <div class="divider"></div>
+
+          <div class="section">
+            <div class="two-col">
+              <div class="meta">
+                <p><strong>Tanggal :</strong> ${formatShortDate(delivery.delivery_date)}</p>
+                <p><strong>No Delivery :</strong> ${escapeHtml(delivery.delivery_number || '-')}</p>
+                <p><strong>Sales Order :</strong> ${escapeHtml(order?.po_number || order?.order_number || '-')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="meta">
+              <p><strong>Kepada:</strong></p>
+              <p>${escapeHtml(delivery.company_name || order?.company_name || '-')}</p>
+              <p>${escapeHtml(delivery.ship_address || '-')}</p>
+            </div>
+          </div>
+
+          <div class="section">
+            <h2>Barang</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px;">No</th>
+                  <th>Barang</th>
+                  <th>Deskripsi</th>
+                  <th style="width: 80px;">Unit</th>
+                  <th style="width: 80px; text-align:right;">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml || `<tr><td colspan="5" style="text-align:center;">Tidak ada barang</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section notes">
+            <h2>Catatan</h2>
+            <ol>
+              ${notesList.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}
+            </ol>
+          </div>
+
+          <div class="signature">
+            <div class="box">
+              <div>Pengirim,</div>
+              <div class="name">....................</div>
+            </div>
+            <div class="box">
+              <div>Penerima,</div>
+              <div class="name">....................</div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handleDownloadDeliveryOrder = (delivery: DeliveryOrder) => {
+    const html = buildDeliveryOrderTemplate(delivery);
+    const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const fetchData = async () => {
     try {
-      const [deliveryData, orderData, userData, clientData] = await Promise.all([
+      const [deliveryData, orderData, userData, clientData, settingsData] = await Promise.all([
         getRecords<DeliveryOrder>('delivery_orders'),
         getRecords<SalesOrder>('sales_orders'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
         getRecords<ClientOption>('clients'),
+        getRecords<CompanySetting>('settings'),
       ]);
 
       const userMap = userData.reduce<Record<string, string>>((acc, user) => {
@@ -149,6 +338,7 @@ export default function DeliveryOrders() {
       setSalesOrders(mappedOrders);
       setUsersById(userMap);
       setClients(clientData);
+      setCompanySettings(settingsData[0] || null);
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
     } finally {
@@ -244,6 +434,7 @@ export default function DeliveryOrders() {
       client_id: order?.client_id || '',
       company_name: order?.company_name || client?.company_name || '',
       ship_address: resolvedShipAddresses[0] || '',
+      notes: '',
     }));
     setGoodsRows(filteredRemaining);
   };
@@ -311,6 +502,7 @@ export default function DeliveryOrders() {
           company_name: formData.company_name,
           goods: payloadGoods,
           ship_address: formData.ship_address,
+          notes: formData.notes || null,
           performed_by: profile?.id,
         } as DeliveryOrder);
       } else {
@@ -322,6 +514,7 @@ export default function DeliveryOrders() {
           company_name: formData.company_name,
           ship_address: formData.ship_address,
           goods: payloadGoods,
+          notes: formData.notes || null,
           created_by: profile?.id,
         });
       }
@@ -392,6 +585,7 @@ export default function DeliveryOrders() {
       client_id: order?.client_id || delivery.client_id || '',
       company_name: delivery.company_name || order?.company_name || '',
       ship_address: delivery.ship_address || resolvedAddresses[0] || '',
+      notes: delivery.notes || '',
     });
     setGoodsRows(deliveryGoods);
     setShowModal(true);
@@ -669,6 +863,19 @@ export default function DeliveryOrders() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Catatan (Optional)
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(event) => setFormData((prev) => ({ ...prev, notes: event.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  rows={3}
+                  placeholder="Tambahkan catatan tambahan jika diperlukan"
+                />
+              </div>
+
+              <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Goods to Deliver</h3>
                 {goodsRows.length === 0 ? (
                   <p className="text-sm text-gray-500">
@@ -742,13 +949,22 @@ export default function DeliveryOrders() {
                 <p className="text-sm text-gray-500 font-semibold uppercase">Delivery Order Details</p>
                 <h2 className="text-xl font-bold text-gray-900">{detailDelivery.delivery_number}</h2>
               </div>
-              <button
-                onClick={() => setDetailDelivery(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition"
-                aria-label="Close delivery order details"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownloadDeliveryOrder(detailDelivery)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </button>
+                <button
+                  onClick={() => setDetailDelivery(null)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition"
+                  aria-label="Close delivery order details"
+                >
+                  <X className="h-5 w-5 text-gray-600" />
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-6 text-sm">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -788,6 +1004,11 @@ export default function DeliveryOrders() {
                       : '-'}
                   </p>
                 </div>
+              </div>
+
+              <div>
+                <p className="text-gray-500">Catatan</p>
+                <p className="font-medium text-gray-900">{detailDelivery.notes || '-'}</p>
               </div>
 
               <div>
