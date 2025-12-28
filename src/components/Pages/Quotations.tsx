@@ -237,7 +237,7 @@ export default function Quotations() {
           <meta charset="utf-8" />
           <title>${escapeHtml(quotation.quotation_number || 'Quotation')}.pdf</title>
           <style>
-            body { font-family: "Segoe UI", Arial, sans-serif; margin: 24px; color: #111827; font-size: 14px; }
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; font-size: 16px; }
             .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 20px; margin-bottom: 16px; }
             .company { text-align: center; }
             .company h1 { margin: 8px 0 4px; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -246,20 +246,20 @@ export default function Quotations() {
             .meta { text-align: left; font-size: 13px; }
             .section { margin-top: 20px; }
             .section h2 { font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
-            table { width: 100%; border-collapse: collapse; font-size: 13px; }
+            table { width: 100%; border-collapse: collapse; font-size: 15px; }
             th, td { border: 1.5px solid #111827; padding: 8px; }
             th { background: #f3f4f6; text-align: left; }
             .two-col { display: flex; justify-content: space-between; gap: 24px; }
             .client-info { max-width: 60%; }
-            .client-info p { margin: 4px 0; font-size: 13px; color: #111827; }
+            .client-info p { margin: 4px 0; font-size: 15px; color: #111827; }
             .client-info .label { font-weight: 600; margin-bottom: 6px; }
             .totals { margin-top: 12px; display: flex; justify-content: flex-end; }
             .totals table { width: 280px; border: none; }
             .totals td { border: none; padding: 4px 0; }
             .totals tr:last-child td { font-weight: 700; font-size: 15px; }
-            .signature { margin-top: 32px; text-align: right; font-size: 13px; }
+            .signature { margin-top: 32px; text-align: right; font-size: 15px; }
             .signature .name { margin-top: 56px; font-weight: 600; }
-            .terms { margin-top: 18px; font-size: 13px; color: #111827; }
+            .terms { margin-top: 18px; font-size: 15px; color: #111827; }
             .terms ul { margin: 8px 0 0 16px; }
             .terms li { margin-bottom: 6px; }
             .logo { max-height: 90px; object-fit: contain; }
