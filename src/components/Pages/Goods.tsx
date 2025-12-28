@@ -310,11 +310,8 @@ export default function Goods() {
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-900 dark:divide-slate-800">
               {filteredGoods.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
-                    <div className="flex flex-col items-center">
-                      <Package className="h-10 w-10 text-gray-300 mb-3" />
-                      <p>No goods found. Add your first product to get started.</p>
-                    </div>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No goods found. Add your first product to get started.
                   </td>
                 </tr>
               ) : (
