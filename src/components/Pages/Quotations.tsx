@@ -238,7 +238,8 @@ export default function Quotations() {
           <title>${escapeHtml(quotation.quotation_number || 'Quotation')}.pdf</title>
           <style>
             body { font-family: "Segoe UI", Arial, sans-serif; margin: 24px; color: #111827; }
-            .header { text-align: center; margin-bottom: 12px; }
+            .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 16px; margin-bottom: 12px; }
+            .company { text-align: center; }
             .company h1 { margin: 8px 0 4px; font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
             .company p { margin: 4px 0; font-size: 12px; color: #374151; }
             .meta { text-align: right; font-size: 12px; }
@@ -248,7 +249,7 @@ export default function Quotations() {
             table { width: 100%; border-collapse: collapse; font-size: 12px; }
             th, td { border: 1.5px solid #111827; padding: 8px; }
             th { background: #f3f4f6; text-align: left; }
-            .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+            .two-col { display: flex; justify-content: space-between; gap: 24px; }
             .client-info p { margin: 4px 0; font-size: 12px; color: #111827; }
             .client-info .label { font-weight: 600; margin-bottom: 6px; }
             .totals { margin-top: 12px; display: flex; justify-content: flex-end; }
@@ -260,14 +261,14 @@ export default function Quotations() {
             .terms { margin-top: 18px; font-size: 12px; color: #111827; }
             .terms ul { margin: 8px 0 0 16px; }
             .terms li { margin-bottom: 4px; }
-            .logo { max-height: 60px; object-fit: contain; }
+            .logo { max-height: 70px; object-fit: contain; }
             .logo-placeholder { width: 60px; height: 60px; border-radius: 12px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
             .logo-placeholder svg { width: 32px; height: 32px; color: #9ca3af; }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="company">
+            <div>
               ${
                 logoSrc
                   ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
@@ -279,6 +280,8 @@ export default function Quotations() {
                       </svg>
                     </div>`
               }
+            </div>
+            <div class="company">
               <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
               <p>${escapeHtml(settings?.company_address || '-')}</p>
               <p>Email: ${escapeHtml(settings?.email || '-')} | Phone: ${escapeHtml(settings?.phone || '-')}</p>
@@ -287,7 +290,6 @@ export default function Quotations() {
           </div>
 
           <div class="section">
-            <h2>Client Information</h2>
             <div class="two-col">
               <div class="client-info">
                 <div class="label">To:</div>
@@ -329,12 +331,8 @@ export default function Quotations() {
             <table>
               <tbody>
                 <tr>
-                  <td>Subtotal</td>
-                  <td style="text-align:right;">Rp ${formatRupiah(Number(quotation.total_amount) || 0)}</td>
-                </tr>
-                <tr>
                   <td><strong>Total</strong></td>
-                  <td style="text-align:right;"><strong>Rp ${formatRupiah(Number(quotation.grand_total) || 0)}</strong></td>
+                  <td style="text-align:right;"><strong>Rp ${formatRupiah(Number(quotation.total_amount) || 0)}</strong></td>
                 </tr>
               </tbody>
             </table>
