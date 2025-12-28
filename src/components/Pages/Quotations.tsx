@@ -210,6 +210,7 @@ export default function Quotations() {
     const baseDate = quotation.created_at ? new Date(quotation.created_at) : new Date();
     const validUntil = new Date(baseDate);
     validUntil.setDate(validUntil.getDate() + offerValidityDays);
+    const grandTotal = Number(quotation.grand_total ?? quotation.total_amount) || 0;
     const rowsHtml = goodsList
       .map((row, index) => {
         const qty = Number(row.qty) || 0;
@@ -237,65 +238,85 @@ export default function Quotations() {
           <meta charset="utf-8" />
           <title>${escapeHtml(quotation.quotation_number || 'Quotation')}.pdf</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; font-size: 16px; }
-            .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 20px; margin-bottom: 16px; }
-            .company { text-align: center; }
-            .company h1 { margin: 8px 0 4px; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
-            .company p { margin: 4px 0; font-size: 13px; color: #374151; }
-            .divider { border-top: 2px solid #111827; margin: 12px 0 16px; }
-            .meta { text-align: left; font-size: 13px; }
-            .section { margin-top: 20px; }
-            .section h2 { font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
-            table { width: 100%; border-collapse: collapse; font-size: 15px; }
-            th, td { border: 1.5px solid #111827; padding: 8px; }
-            th { background: #f3f4f6; text-align: left; }
-            .two-col { display: flex; justify-content: space-between; gap: 24px; }
-            .client-info { max-width: 60%; }
-            .client-info p { margin: 4px 0; font-size: 15px; color: #111827; }
-            .client-info .label { font-weight: 600; margin-bottom: 6px; }
-            .totals { margin-top: 12px; display: flex; justify-content: flex-end; }
-            .totals table { width: 280px; border: none; }
-            .totals td { border: none; padding: 4px 0; }
-            .totals tr:last-child td { font-weight: 700; font-size: 15px; }
-            .signature { margin-top: 32px; text-align: right; font-size: 15px; }
-            .signature .name { margin-top: 56px; font-weight: 600; }
-            .terms { margin-top: 18px; font-size: 15px; color: #111827; }
-            .terms ul { margin: 8px 0 0 16px; }
+            :root {
+              --ink: #0f172a;
+              --muted: #6b7280;
+              --border: #e5e7eb;
+              --accent: #2563eb;
+              --accent-soft: #eff6ff;
+            }
+            * { box-sizing: border-box; }
+            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; }
+            .page { padding: 36px 40px 48px; }
+            .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+            .logo-block { display: flex; flex-direction: column; gap: 12px; }
+            .logo { max-height: 64px; object-fit: contain; }
+            .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+            .logo-placeholder svg { width: 32px; height: 32px; }
+            .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+            .quote-title { text-align: right; min-width: 220px; }
+            .quote-title h1 { margin: 0; font-size: 30px; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
+            .quote-meta { margin-top: 10px; display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+            .quote-meta div { display: flex; justify-content: space-between; gap: 16px; }
+            .address-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+            .address-grid h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .address-card { padding: 12px 0; }
+            .address-card p { margin: 4px 0; }
+            .address-card .name { font-weight: 600; color: #111827; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
+            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+            tr:nth-child(even) td { background: #f9fafb; }
+            .summary-grid { margin-top: 24px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 32px; }
+            .terms { font-size: 13px; }
+            .terms h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .terms ol { margin: 0; padding-left: 18px; }
             .terms li { margin-bottom: 6px; }
-            .logo { max-height: 90px; object-fit: contain; }
-            .logo-placeholder { width: 90px; height: 90px; border-radius: 12px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
-            .logo-placeholder svg { width: 44px; height: 44px; color: #9ca3af; }
+            .totals { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+            .totals-row { display: flex; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+            .totals-row:last-child { border-bottom: none; background: var(--accent-soft); font-weight: 600; }
+            .signature { margin-top: 36px; display: flex; justify-content: flex-end; text-align: right; font-size: 13px; }
+            .signature .name { margin-top: 52px; font-weight: 600; }
+            .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); display: flex; justify-content: flex-start; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div>
-              ${
-                logoSrc
-                  ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
-                  : `<div class="logo-placeholder" aria-label="Company logo">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M3 10.5L12 4l9 6.5"></path>
-                        <path d="M5.5 9.5V20h13V9.5"></path>
-                        <path d="M9 20v-5h6v5"></path>
-                      </svg>
-                    </div>`
-              }
+          <div class="page">
+            <div class="top">
+              <div class="logo-block">
+                ${
+                  logoSrc
+                    ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
+                    : `<div class="logo-placeholder" aria-label="Company logo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                          <path d="M3 10.5L12 4l9 6.5"></path>
+                          <path d="M5.5 9.5V20h13V9.5"></path>
+                          <path d="M9 20v-5h6v5"></path>
+                        </svg>
+                      </div>`
+                }
+                <div class="brand-name">${escapeHtml(settings?.company_name || 'Company')}</div>
+              </div>
+              <div class="quote-title">
+                <h1>Quotation</h1>
+                <div class="quote-meta">
+                  <div><span>No</span><strong>${escapeHtml(quotation.quotation_number || '-')}</strong></div>
+                  <div><span>Tanggal</span><strong>${formatShortDate(quotation.created_at)}</strong></div>
+                  <div><span>RFQ#</span><strong>${escapeHtml(quotation.rfqs?.rfq_number || '-')}</strong></div>
+                </div>
+              </div>
             </div>
-            <div class="company">
-              <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
-              <p>${escapeHtml(settings?.company_address || '-')}</p>
-              <p>Email: ${escapeHtml(settings?.email || '-')} | Telepon: ${escapeHtml(settings?.phone || '-')}</p>
-              <p>NPWP: ${escapeHtml(settings?.tax_id || '-')}</p>
-            </div>
-          </div>
-          <div class="divider"></div>
 
-          <div class="section">
-            <div class="two-col">
-              <div class="client-info">
-                <div class="label">Kepada:</div>
-                <p>${escapeHtml(quotation.company_name || '-')}</p>
+            <div class="address-grid">
+              <div class="address-card">
+                <h3>Dari</h3>
+                <p class="name">${escapeHtml(settings?.company_name || 'Company')}</p>
+                <p>${escapeHtml(settings?.company_address || '-')}</p>
+                <p>NPWP ${escapeHtml(settings?.tax_id || '-')}</p>
+              </div>
+              <div class="address-card">
+                <h3>Kepada</h3>
+                <p class="name">${escapeHtml(quotation.company_name || '-')}</p>
                 <p>${escapeHtml(quotation.client_address || '-')}</p>
                 ${
                   quotation.pic_email && quotation.pic_email !== '-'
@@ -308,16 +329,8 @@ export default function Quotations() {
                     : ''
                 }
               </div>
-              <div class="meta">
-                <p><strong>No:</strong> ${escapeHtml(quotation.quotation_number || '-')}</p>
-                <p><strong>Tanggal:</strong> ${formatShortDate(quotation.created_at)}</p>
-                <p><strong>RFQ#:</strong> ${escapeHtml(quotation.rfqs?.rfq_number || '-')}</p>
-              </div>
             </div>
-          </div>
 
-          <div class="section">
-            <h2>Barang & Jasa</h2>
             <table>
               <thead>
                 <tr>
@@ -325,9 +338,9 @@ export default function Quotations() {
                   <th>Barang</th>
                   <th>Deskripsi</th>
                   <th style="width: 60px;">Unit</th>
-                  <th style="width: 70px; text-align:right;">Qty</th>
+                  <th style="width: 56px; text-align:right;">Qty</th>
                   <th style="width: 110px; text-align:right;">Harga</th>
-                  <th style="width: 120px; text-align:center;">Pengiriman (hari)</th>
+                  <th style="width: 90px; text-align:center;">Pengiriman</th>
                   <th style="width: 120px; text-align:right;">Jumlah</th>
                 </tr>
               </thead>
@@ -335,34 +348,34 @@ export default function Quotations() {
                 ${rowsHtml || `<tr><td colspan="8" style="text-align:center;">Tidak ada barang</td></tr>`}
               </tbody>
             </table>
-          </div>
 
-          <div class="totals">
-            <table>
-              <tbody>
-                <tr>
-                  <td><strong>Total</strong></td>
-                  <td style="text-align:right;"><strong>Rp ${formatRupiah(Number(quotation.total_amount) || 0)}</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+            <div class="summary-grid">
+              <div class="terms">
+                <h3>Syarat dan Ketentuan</h3>
+                <ol>
+                  <li>Harga di atas belum termasuk pajak dan dapat dikenakan pajak sesuai ketentuan yang berlaku.</li>
+                  <li>Waktu pembayaran ${
+                    quotation.payment_time ? `${escapeHtml(`${quotation.payment_time}`)} hari` : '-'
+                  } setelah tanggal invoice.</li>
+                  <li>Penawaran ini berlaku hingga ${formatShortDate(validUntil.toISOString())}.</li>
+                  <li>Mohon konfirmasi dengan membalas surat ini atau melampirkan purchase order.</li>
+                </ol>
+              </div>
+              <div class="totals">
+                <div class="totals-row"><span>Total</span><strong>Rp ${formatRupiah(grandTotal)}</strong></div>
+              </div>
+            </div>
 
-          <div class="section terms">
-            <h2>Syarat & Ketentuan</h2>
-            <ul>
-              <li>Harga di atas belum termasuk pajak dan dapat dikenakan pajak sesuai ketentuan yang berlaku.</li>
-              <li>Waktu pembayaran: ${
-                quotation.payment_time ? `${escapeHtml(`${quotation.payment_time}`)} hari` : '-'
-              } setelah tanggal invoice.</li>
-              <li>Penawaran ini berlaku hingga ${formatShortDate(validUntil.toISOString())}.</li>
-              <li>Mohon konfirmasi dengan membalas surat ini atau melampirkan purchase order.</li>
-            </ul>
-          </div>
-          <div class="signature">
-            <div>Hormat kami,</div>
-            <div class="name">${escapeHtml(settings?.director_name || '-')}</div>
-            <div>${escapeHtml(settings?.company_name || '')}</div>
+            <div class="signature">
+              <div>
+                <div>Hormat kami,</div>
+                <div class="name">${escapeHtml(settings?.director_name || '-')}</div>
+                <div>${escapeHtml(settings?.company_name || '')}</div>
+              </div>
+            </div>
+            <div class="footer">
+              <div>Untuk informasi lebih lanjut, email ${escapeHtml(settings?.email || '-')} atau hubungi ${escapeHtml(settings?.phone || '-')}.</div>
+            </div>
           </div>
         </body>
       </html>
