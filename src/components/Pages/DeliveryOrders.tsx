@@ -187,106 +187,118 @@ export default function DeliveryOrders() {
           <meta charset="utf-8" />
           <title>${escapeHtml(delivery.delivery_number || 'Delivery Order')}.pdf</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; font-size: 16px; }
-            .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 20px; margin-bottom: 16px; }
-            .company { text-align: center; }
-            .company h1 { margin: 8px 0 4px; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
-            .company p { margin: 4px 0; font-size: 13px; color: #374151; }
-            .divider { border-top: 2px solid #111827; margin: 12px 0 16px; }
-            .section { margin-top: 20px; }
-            .section h2 { font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
-            table { width: 100%; border-collapse: collapse; font-size: 15px; }
-            th, td { border: 1.5px solid #111827; padding: 8px; }
-            th { background: #f3f4f6; text-align: left; }
-            .two-col { display: flex; justify-content: space-between; gap: 24px; }
-            .meta { font-size: 15px; }
-            .meta p { margin: 4px 0; }
-            .notes { margin-top: 14px; font-size: 15px; }
-            .notes ol { margin: 8px 0 0 18px; }
-            .notes li { margin-bottom: 6px; }
-            .signature { margin-top: 40px; display: flex; justify-content: space-between; gap: 40px; font-size: 15px; }
-            .signature .box { width: 45%; text-align: center; }
-            .signature .name { margin-top: 60px; font-weight: 600; }
-            .logo { max-height: 90px; object-fit: contain; }
-            .logo-placeholder { width: 90px; height: 90px; border-radius: 12px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
-            .logo-placeholder svg { width: 44px; height: 44px; color: #9ca3af; }
+            :root {
+              --ink: #0f172a;
+              --muted: #6b7280;
+              --border: #e5e7eb;
+              --accent: #2563eb;
+              --accent-soft: #eff6ff;
+            }
+            * { box-sizing: border-box; }
+            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; }
+            .page { padding: 36px 40px 48px; }
+            .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+            .logo-block { display: flex; flex-direction: column; gap: 12px; }
+            .logo { max-height: 64px; object-fit: contain; }
+            .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+            .logo-placeholder svg { width: 32px; height: 32px; }
+            .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+            .doc-title { text-align: right; min-width: 220px; }
+            .doc-title h1 { margin: 0; font-size: 30px; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
+            .doc-meta { margin-top: 10px; display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+            .doc-meta div { display: flex; justify-content: space-between; gap: 16px; }
+            .address-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+            .address-grid h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .address-card { padding: 12px 0; }
+            .address-card p { margin: 4px 0; }
+            .address-card .name { font-weight: 600; color: #111827; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
+            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+            tr:nth-child(even) td { background: #f9fafb; }
+            .notes { margin-top: 24px; font-size: 13px; }
+            .notes h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .notes ol { margin: 0; padding-left: 18px; }
+            .notes li { margin-bottom: 6px; text-align: justify; text-justify: inter-word; }
+            .signature { margin-top: 36px; display: flex; justify-content: space-between; gap: 40px; font-size: 13px; }
+            .signature .box { width: 45%; text-align: center; border-top: 1px solid var(--border); padding-top: 12px; }
+            .signature .name { margin-top: 50px; font-weight: 600; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div>
-              ${
-                logoSrc
-                  ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
-                  : `<div class="logo-placeholder" aria-label="Company logo">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M3 10.5L12 4l9 6.5"></path>
-                        <path d="M5.5 9.5V20h13V9.5"></path>
-                        <path d="M9 20v-5h6v5"></path>
-                      </svg>
-                    </div>`
-              }
-            </div>
-            <div class="company">
-              <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
-              <p>${escapeHtml(settings?.company_address || '-')}</p>
-              <p>Email: ${escapeHtml(settings?.email || '-')} | Telepon: ${escapeHtml(settings?.phone || '-')}</p>
-              <p>NPWP: ${escapeHtml(settings?.tax_id || '-')}</p>
-            </div>
-          </div>
-          <div class="divider"></div>
-
-          <div class="section">
-            <div class="two-col">
-              <div class="meta">
-                <p><strong>Tanggal :</strong> ${formatShortDate(delivery.delivery_date)}</p>
-                <p><strong>No Delivery :</strong> ${escapeHtml(delivery.delivery_number || '-')}</p>
-                <p><strong>Sales Order :</strong> ${escapeHtml(order?.po_number || order?.order_number || '-')}</p>
+          <div class="page">
+            <div class="top">
+              <div class="logo-block">
+                ${
+                  logoSrc
+                    ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
+                    : `<div class="logo-placeholder" aria-label="Company logo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                          <path d="M3 10.5L12 4l9 6.5"></path>
+                          <path d="M5.5 9.5V20h13V9.5"></path>
+                          <path d="M9 20v-5h6v5"></path>
+                        </svg>
+                      </div>`
+                }
+                <div class="brand-name">${escapeHtml(settings?.company_name || 'Company')}</div>
+              </div>
+              <div class="doc-title">
+                <h1>Delivery Order</h1>
+                <div class="doc-meta">
+                  <div><span>No</span><strong>${escapeHtml(delivery.delivery_number || '-')}</strong></div>
+                  <div><span>Tanggal</span><strong>${formatShortDate(delivery.delivery_date)}</strong></div>
+                  <div><span>Sales Order</span><strong>${escapeHtml(order?.po_number || order?.order_number || '-')}</strong></div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="section">
-            <div class="meta">
-              <p><strong>Kepada:</strong></p>
-              <p>${escapeHtml(delivery.company_name || order?.company_name || '-')}</p>
-              <p>${escapeHtml(delivery.ship_address || '-')}</p>
+            <div class="address-grid">
+              <div class="address-card">
+                <h3>Dari</h3>
+                <p class="name">${escapeHtml(settings?.company_name || 'Company')}</p>
+                <p>${escapeHtml(settings?.company_address || '-')}</p>
+                <p>Email ${escapeHtml(settings?.email || '-')}</p>
+                <p>Telepon ${escapeHtml(settings?.phone || '-')}</p>
+                <p>NPWP ${escapeHtml(settings?.tax_id || '-')}</p>
+              </div>
+              <div class="address-card">
+                <h3>Kepada</h3>
+                <p class="name">${escapeHtml(delivery.company_name || order?.company_name || '-')}</p>
+                <p>${escapeHtml(delivery.ship_address || '-')}</p>
+              </div>
             </div>
-          </div>
 
-          <div class="section">
-            <h2>Barang</h2>
             <table>
               <thead>
                 <tr>
                   <th style="width: 40px;">No</th>
                   <th>Barang</th>
                   <th>Deskripsi</th>
-                  <th style="width: 80px;">Unit</th>
-                  <th style="width: 80px; text-align:right;">Qty</th>
+                  <th style="width: 60px;">Unit</th>
+                  <th style="width: 60px; text-align:right;">Qty</th>
                 </tr>
               </thead>
               <tbody>
                 ${rowsHtml || `<tr><td colspan="5" style="text-align:center;">Tidak ada barang</td></tr>`}
               </tbody>
             </table>
-          </div>
 
-          <div class="section notes">
-            <h2>Catatan</h2>
-            <ol>
-              ${notesList.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}
-            </ol>
-          </div>
-
-          <div class="signature">
-            <div class="box">
-              <div>Pengirim,</div>
-              <div class="name">....................</div>
+            <div class="notes">
+              <h3>Catatan</h3>
+              <ol>
+                ${notesList.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}
+              </ol>
             </div>
-            <div class="box">
-              <div>Penerima,</div>
-              <div class="name">....................</div>
+
+            <div class="signature">
+              <div class="box">
+                <div>Pengirim,</div>
+                <div class="name">....................</div>
+              </div>
+              <div class="box">
+                <div>Penerima,</div>
+                <div class="name">....................</div>
+              </div>
             </div>
           </div>
         </body>
