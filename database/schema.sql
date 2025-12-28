@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `company_name` VARCHAR(255) NOT NULL DEFAULT 'PT Royal General Indonesia',
   `company_address` TEXT NOT NULL DEFAULT 'Jl. Desa Harapan No. 47 RT/RW 004/001 Kel. Air Jamban, Kec. Mandau, Kab. Bengkalis, Prov. Riau 28784',
+  `director_name` VARCHAR(255) NOT NULL DEFAULT 'Muhammad Teddy Syahputra',
   `tax_id` VARCHAR(150) DEFAULT '0751 1971 0421 9000',
   `tax_rate` DECIMAL(5,2) NOT NULL DEFAULT 11.00,
   `email` VARCHAR(255) NOT NULL DEFAULT 'royalgeneralindonesia@gmail.com',
@@ -198,6 +199,10 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `logo_url` VARCHAR(500) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+INSERT INTO `settings` (`id`)
+SELECT NULL
+WHERE NOT EXISTS (SELECT 1 FROM `settings`);
 
 -- User activity logs
 CREATE TABLE IF NOT EXISTS `activity_logs` (

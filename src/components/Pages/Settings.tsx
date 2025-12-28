@@ -6,6 +6,7 @@ interface CompanySetting {
   id?: string;
   company_name: string;
   company_address: string;
+  director_name: string;
   tax_id: string;
   tax_rate: number | '';
   email: string;
@@ -19,6 +20,7 @@ const EMPTY_SETTING: CompanySetting = {
   company_name: 'PT Royal General Indonesia',
   company_address:
     'Jl. Desa Harapan No. 47 RT/RW 004/001 Kel. Air Jamban, Kec. Mandau, Kab. Bengkalis, Prov. Riau 28784',
+  director_name: 'Muhammad Teddy Syahputra',
   tax_id: '',
   tax_rate: 11,
   email: 'royalgeneralindonesia@gmail.com',
@@ -59,6 +61,7 @@ export default function Settings() {
           setFormData({
             company_name: current.company_name || EMPTY_SETTING.company_name,
             company_address: current.company_address || EMPTY_SETTING.company_address,
+            director_name: current.director_name || EMPTY_SETTING.director_name,
             tax_id: current.tax_id || '',
             tax_rate: current.tax_rate ?? EMPTY_SETTING.tax_rate,
             email: current.email || EMPTY_SETTING.email,
@@ -103,6 +106,7 @@ export default function Settings() {
       const requiredFields = [
         formData.company_name.trim(),
         formData.company_address.trim(),
+        formData.director_name.trim(),
         formData.email.trim(),
         normalizedPhone.trim(),
         formData.bank_name.trim(),
@@ -127,6 +131,7 @@ export default function Settings() {
       const payload: Record<string, unknown> = {
         company_name: formData.company_name,
         company_address: formData.company_address,
+        director_name: formData.director_name,
         tax_id: formData.tax_id,
         tax_rate: formData.tax_rate === '' ? 0 : Number(formData.tax_rate),
         email: formData.email,
@@ -221,6 +226,19 @@ export default function Settings() {
             value={formData.company_address}
             onChange={(event) => setFormData((prev) => ({ ...prev, company_address: event.target.value }))}
             rows={3}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Director Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.director_name}
+            onChange={(event) => setFormData((prev) => ({ ...prev, director_name: event.target.value }))}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             required
           />
