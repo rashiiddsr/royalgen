@@ -1520,6 +1520,7 @@ app.post('/api/:table', async (req, res) => {
         company_name: companyName,
         client_id: clientId,
         ship_address: shipAddress,
+        notes,
       } = payload;
 
       if (!deliveryDate || !salesOrderId || !deliveryNumber) {
@@ -1551,6 +1552,7 @@ app.post('/api/:table', async (req, res) => {
           client_id: clientId || null,
           company_name: companyName || null,
           ship_address: shipAddress || null,
+          notes: notes || null,
           goods: JSON.stringify(cleanedGoods),
           created_by: createdBy || null,
         },
@@ -1747,6 +1749,7 @@ app.put('/api/:table/:id', async (req, res) => {
         ship_address: shipAddress,
         company_name: companyName,
         client_id: clientId,
+        notes,
         performed_by: performedBy,
       } = req.body || {};
 
@@ -1784,6 +1787,7 @@ app.put('/api/:table/:id', async (req, res) => {
         ship_address: shipAddress ?? existing.ship_address,
         company_name: companyName ?? existing.company_name,
         client_id: clientId ?? existing.client_id,
+        notes: notes ?? existing.notes,
       };
 
       await query('UPDATE `delivery_orders` SET ? WHERE id = ?', [nextUpdates, id]);
