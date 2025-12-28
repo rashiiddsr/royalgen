@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Edit2, Search, Eye, Users } from 'lucide-react';
+import { Plus, Edit2, Search, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Supplier {
@@ -282,11 +282,8 @@ export default function Suppliers() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredSuppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
-                    <div className="flex flex-col items-center">
-                      <Users className="h-10 w-10 text-gray-300 mb-3" />
-                      <p>No suppliers found. Add your first supplier to get started.</p>
-                    </div>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No suppliers found. Add your first supplier to get started.
                   </td>
                 </tr>
               ) : (
