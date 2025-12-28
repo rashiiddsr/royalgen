@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
-import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search } from 'lucide-react';
+import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface QuotationGood {
@@ -19,11 +19,13 @@ interface QuotationType {
   quotation_number: string;
   rfq_id: string;
   client_id?: string | null;
+  client_address?: string | null;
   company_name: string;
   pic_name: string;
   pic_email: string;
   pic_phone: string;
   payment_time: string;
+  offer_validity_days?: number | string | null;
   goods: QuotationGood[] | string | null;
   total_amount: number;
   tax_amount: number;
@@ -63,9 +65,23 @@ interface GoodOption {
   status: string;
 }
 
+interface ClientOption {
+  id: string;
+  address: string;
+}
+
 interface CompanySetting {
   id: string;
+  company_name?: string | null;
+  company_address?: string | null;
+  director_name?: string | null;
+  tax_id?: string | null;
   tax_rate?: number | null;
+  email?: string | null;
+  phone?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  logo_url?: string | null;
 }
 
 const EMPTY_GOOD_ROW: QuotationGood = {
@@ -92,6 +108,8 @@ export default function Quotations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [taxRate, setTaxRate] = useState(0);
   const [includeTax, setIncludeTax] = useState(false);
+  const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const [formData, setFormData] = useState({
     quotation_number: '',
     rfq_id: '',
@@ -101,6 +119,7 @@ export default function Quotations() {
     pic_email: '',
     pic_phone: '',
     payment_time: '',
+    offer_validity_days: '',
     status: 'waiting',
   });
   const [goodsRows, setGoodsRows] = useState<QuotationGood[]>([{ ...EMPTY_GOOD_ROW }]);
@@ -111,15 +130,17 @@ export default function Quotations() {
 
   const fetchQuotations = async () => {
     try {
-      const [quotationData, rfqData, goodsData, userData, settingsData] = await Promise.all([
+      const [quotationData, rfqData, goodsData, userData, settingsData, clientData] = await Promise.all([
         getRecords<QuotationType>('quotations'),
         getRecords<RFQTypeLite>('rfqs'),
         getRecords<GoodOption>('goods'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
         getRecords<CompanySetting>('settings'),
+        getRecords<ClientOption>('clients'),
       ]);
 
       const rfqsById = new Map(rfqData.map((rfq) => [rfq.id, rfq]));
+      const clientsById = new Map(clientData.map((client) => [String(client.id), client]));
       const userMap = userData.reduce<Record<string, string>>((acc, user) => {
         const name = user.full_name || user.email || 'User';
         acc[String(user.id)] = name;
@@ -142,6 +163,9 @@ export default function Quotations() {
             ...quotation,
             goods: parsedGoods,
             rfqs: rfqsById.get(quotation.rfq_id),
+            client_address:
+              (quotation.client_id ? clientsById.get(String(quotation.client_id))?.address : null) ||
+              null,
             creator_name:
               quotation.creator_name ||
               (quotation.performed_by ? userMap[String(quotation.performed_by)] : null) ||
@@ -155,11 +179,193 @@ export default function Quotations() {
       setGoods(goodsData);
       const currentSettings = settingsData[0];
       setTaxRate(Number(currentSettings?.tax_rate) || 0);
+      setCompanySettings(currentSettings || null);
     } catch (error) {
       console.error('Error fetching quotations:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const formatShortDate = (value?: string) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
+  const buildQuotationTemplate = (quotation: QuotationType) => {
+    const settings = companySettings;
+    const goodsList = Array.isArray(quotation.goods) ? quotation.goods : [];
+    const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
+    const offerValidityDays = Number(quotation.offer_validity_days) || 30;
+    const baseDate = quotation.created_at ? new Date(quotation.created_at) : new Date();
+    const validUntil = new Date(baseDate);
+    validUntil.setDate(validUntil.getDate() + offerValidityDays);
+    const rowsHtml = goodsList
+      .map((row, index) => {
+        const qty = Number(row.qty) || 0;
+        const price = Number(row.price) || 0;
+        const subtotal = qty * price;
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(row.name || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
+            <td style="text-align:right;">${qty}</td>
+            <td style="text-align:right;">Rp ${formatRupiah(price)}</td>
+            <td style="text-align:center;">${row.delivery_time ?? '-'}</td>
+            <td style="text-align:right;">Rp ${formatRupiah(subtotal)}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <!doctype html>
+      <html lang="id">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(quotation.quotation_number || 'Quotation')}.pdf</title>
+          <style>
+            body { font-family: "Segoe UI", Arial, sans-serif; margin: 24px; color: #111827; }
+            .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 16px; margin-bottom: 12px; }
+            .company { text-align: center; }
+            .company h1 { margin: 8px 0 4px; font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+            .company p { margin: 4px 0; font-size: 12px; color: #374151; }
+            .meta { text-align: right; font-size: 12px; }
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #e5e7eb; font-size: 11px; }
+            .section { margin-top: 20px; }
+            .section h2 { font-size: 14px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1.5px solid #111827; padding: 8px; }
+            th { background: #f3f4f6; text-align: left; }
+            .two-col { display: flex; justify-content: space-between; gap: 24px; }
+            .client-info p { margin: 4px 0; font-size: 12px; color: #111827; }
+            .client-info .label { font-weight: 600; margin-bottom: 6px; }
+            .totals { margin-top: 12px; display: flex; justify-content: flex-end; }
+            .totals table { width: 280px; border: none; }
+            .totals td { border: none; padding: 4px 0; }
+            .totals tr:last-child td { font-weight: 700; }
+            .signature { margin-top: 32px; text-align: right; }
+            .signature .name { margin-top: 56px; font-weight: 600; }
+            .terms { margin-top: 18px; font-size: 12px; color: #111827; }
+            .terms ul { margin: 8px 0 0 16px; }
+            .terms li { margin-bottom: 4px; }
+            .logo { max-height: 70px; object-fit: contain; }
+            .logo-placeholder { width: 60px; height: 60px; border-radius: 12px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
+            .logo-placeholder svg { width: 32px; height: 32px; color: #9ca3af; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              ${
+                logoSrc
+                  ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
+                  : `<div class="logo-placeholder" aria-label="Company logo">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M3 10.5L12 4l9 6.5"></path>
+                        <path d="M5.5 9.5V20h13V9.5"></path>
+                        <path d="M9 20v-5h6v5"></path>
+                      </svg>
+                    </div>`
+              }
+            </div>
+            <div class="company">
+              <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
+              <p>${escapeHtml(settings?.company_address || '-')}</p>
+              <p>Email: ${escapeHtml(settings?.email || '-')} | Phone: ${escapeHtml(settings?.phone || '-')}</p>
+              <p>NPWP: ${escapeHtml(settings?.tax_id || '-')}</p>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="two-col">
+              <div class="client-info">
+                <div class="label">To:</div>
+                <p>${escapeHtml(quotation.company_name || '-')}</p>
+                <p>${escapeHtml(quotation.client_address || '-')}</p>
+                <p>${escapeHtml(quotation.pic_email && quotation.pic_email !== '-' ? quotation.pic_email : '')}</p>
+                <p>${escapeHtml(quotation.pic_phone && quotation.pic_phone !== '-' ? quotation.pic_phone : '')}</p>
+              </div>
+              <div class="meta" style="text-align:left;">
+                <p><strong>No:</strong> ${escapeHtml(quotation.quotation_number || '-')}</p>
+                <p><strong>Date:</strong> ${formatShortDate(quotation.created_at)}</p>
+                <p><strong>RFQ#:</strong> ${escapeHtml(quotation.rfqs?.rfq_number || '-')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h2>Goods & Services</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px;">No</th>
+                  <th>Goods</th>
+                  <th>Description</th>
+                  <th style="width: 60px;">Unit</th>
+                  <th style="width: 70px; text-align:right;">Qty</th>
+                  <th style="width: 110px; text-align:right;">Price</th>
+                  <th style="width: 100px; text-align:center;">Delivery (days)</th>
+                  <th style="width: 120px; text-align:right;">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml || `<tr><td colspan="8" style="text-align:center;">No goods listed</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="totals">
+            <table>
+              <tbody>
+                <tr>
+                  <td><strong>Total</strong></td>
+                  <td style="text-align:right;"><strong>Rp ${formatRupiah(Number(quotation.total_amount) || 0)}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section terms">
+            <h2>Terms & Conditions</h2>
+            <ul>
+              <li>Prices listed above are exclusive of tax and may be subject to applicable taxes.</li>
+              <li>Payment term: ${
+                quotation.payment_time ? `${escapeHtml(`${quotation.payment_time}`)} days` : '-'
+              } after invoice date.</li>
+              <li>This offer is valid until ${formatShortDate(validUntil.toISOString())}.</li>
+              <li>Please confirm acceptance by replying with a signed confirmation or purchase order.</li>
+            </ul>
+          </div>
+          <div class="signature">
+            <div>Best regards,</div>
+            <div class="name">${escapeHtml(settings?.director_name || '-')}</div>
+            <div>${escapeHtml(settings?.company_name || '')}</div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handlePreviewQuotation = (quotation: QuotationType) => {
+    const html = buildQuotationTemplate(quotation);
+    const previewWindow = window.open('', '_blank');
+    if (!previewWindow) return;
+    previewWindow.document.open();
+    previewWindow.document.write(html);
+    previewWindow.document.close();
   };
 
   const getNextQuotationNumber = () => {
@@ -218,6 +424,7 @@ export default function Quotations() {
       pic_email: '',
       pic_phone: '',
       payment_time: '',
+      offer_validity_days: '30',
       status: 'waiting',
     });
     setIncludeTax(false);
@@ -238,6 +445,7 @@ export default function Quotations() {
       pic_email: quotation.pic_email,
       pic_phone: quotation.pic_phone,
       payment_time: quotation.payment_time,
+      offer_validity_days: quotation.offer_validity_days ?? '',
       status: quotation.status,
     });
     setIncludeTax(quotation.include_tax === undefined ? false : Boolean(quotation.include_tax));
@@ -362,6 +570,11 @@ export default function Quotations() {
     const totalAmount = includeTax ? rawTotal - taxAmount : rawTotal;
     const grandTotal = includeTax ? rawTotal : rawTotal + taxAmount;
 
+    const offerValidityDays =
+      formData.offer_validity_days === '' || formData.offer_validity_days === null
+        ? 30
+        : Number(formData.offer_validity_days) || 30;
+
     const commonPayload = {
       goods: goodsRows.map((row) => ({
         ...row,
@@ -374,6 +587,7 @@ export default function Quotations() {
       grand_total: grandTotal,
       include_tax: includeTax,
       payment_time: formData.payment_time,
+      offer_validity_days: offerValidityDays,
       performed_by: profile?.id,
       performer_role: profile?.role,
     };
@@ -747,7 +961,7 @@ export default function Quotations() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Phone</label>
                   <input
@@ -770,6 +984,21 @@ export default function Quotations() {
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Offer Validity (days)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="30"
+                    value={formData.offer_validity_days}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, offer_validity_days: event.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
                 </div>
               </div>
@@ -1024,13 +1253,23 @@ export default function Quotations() {
                 <p className="text-sm text-gray-500 font-semibold uppercase">Quotation Details</p>
                 <h2 className="text-xl font-bold text-gray-900">{detailQuotation.quotation_number}</h2>
               </div>
-              <button
-                onClick={() => setDetailQuotation(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
-                aria-label="Close quotation details"
-              >
-                <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePreviewQuotation(detailQuotation)}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  <Download className="h-4 w-4" />
+                  View PDF
+                </button>
+                <button
+                  onClick={() => setDetailQuotation(null)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
+                  aria-label="Close quotation details"
+                >
+                  <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
