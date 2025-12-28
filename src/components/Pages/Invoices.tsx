@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getRecords, updateRecord } from '../../lib/api';
-import { CheckCircle, Edit2, Eye, Receipt, X } from 'lucide-react';
+import { CheckCircle, Download, Edit2, Eye, Receipt, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -44,6 +44,19 @@ interface ClientType {
   ship_addresses?: string[] | string | null;
 }
 
+interface CompanySetting {
+  id: string;
+  company_name?: string | null;
+  company_address?: string | null;
+  director_name?: string | null;
+  tax_id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  logo_url?: string | null;
+}
+
 const parseShipAddresses = (value?: string[] | string | null) => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -70,6 +83,8 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [detailInvoice, setDetailInvoice] = useState<InvoiceType | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceType | null>(null);
+  const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const [editForm, setEditForm] = useState({
     payment_time: '',
     billing_address: '',
@@ -81,10 +96,11 @@ export default function Invoices() {
 
   const fetchInvoices = async () => {
     try {
-      const [invoiceData, orderData, clientData] = await Promise.all([
+      const [invoiceData, orderData, clientData, settingsData] = await Promise.all([
         getRecords<InvoiceType>('invoices'),
         getRecords<OrderType>('sales_orders'),
         getRecords<ClientType>('clients'),
+        getRecords<CompanySetting>('settings'),
       ]);
 
       const orderMap = orderData.reduce<Record<string, OrderType>>((acc, order) => {
@@ -97,10 +113,16 @@ export default function Invoices() {
         return acc;
       }, {});
 
+      const parsedInvoices = invoiceData.map((invoice) => ({
+        ...invoice,
+        goods: parseInvoiceGoods(invoice.goods),
+      }));
+
       setOrdersById(orderMap);
       setClientsById(clientMap);
+      setCompanySettings(settingsData[0] || null);
       setInvoices(
-        invoiceData.sort(
+        parsedInvoices.sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         ),
       );
@@ -109,6 +131,204 @@ export default function Invoices() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
+  const parseInvoiceGoods = (value?: InvoiceGood[] | string | null) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? (parsed as InvoiceGood[]) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const buildInvoiceTemplate = (invoice: InvoiceType) => {
+    const settings = companySettings;
+    const goodsList = parseInvoiceGoods(invoice.goods);
+    const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
+    const rowsHtml = goodsList
+      .map((row, index) => {
+        const qty = Number(row.qty) || 0;
+        const price = Number(row.price) || 0;
+        const subtotal = Number(row.subtotal) || qty * price;
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(row.goods || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
+            <td style="text-align:right;">${qty}</td>
+            <td style="text-align:right;">Rp ${formatRupiah(price)}</td>
+            <td style="text-align:right;">Rp ${formatRupiah(subtotal)}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <!doctype html>
+      <html lang="id">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(invoice.invoice_number || 'Invoice')}.pdf</title>
+          <style>
+            :root {
+              --ink: #0f172a;
+              --muted: #6b7280;
+              --border: #e5e7eb;
+              --accent: #2563eb;
+              --accent-soft: #eff6ff;
+            }
+            * { box-sizing: border-box; }
+            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; }
+            .page { padding: 36px 40px 48px; }
+            .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+            .logo-block { display: flex; flex-direction: column; gap: 12px; }
+            .logo { max-height: 64px; object-fit: contain; }
+            .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+            .logo-placeholder svg { width: 32px; height: 32px; }
+            .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+            .doc-title { text-align: right; min-width: 220px; }
+            .doc-title h1 { margin: 0; font-size: 30px; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
+            .doc-meta { margin-top: 10px; display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+            .doc-meta div { display: flex; justify-content: space-between; gap: 16px; }
+            .address-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+            .address-grid h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .address-card { padding: 12px 0; }
+            .address-card p { margin: 4px 0; }
+            .address-card .name { font-weight: 600; color: #111827; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
+            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+            tr:nth-child(even) td { background: #f9fafb; }
+            .summary-grid { margin-top: 24px; display: grid; grid-template-columns: 1fr 0.8fr; gap: 32px; }
+            .payment { font-size: 13px; }
+            .payment h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .payment p { margin: 4px 0; }
+            .totals { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+            .totals-row { display: flex; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+            .totals-row:last-child { border-bottom: none; background: var(--accent-soft); font-weight: 600; }
+            .signature { margin-top: 36px; display: flex; justify-content: flex-end; text-align: right; font-size: 13px; }
+            .signature .name { margin-top: 58px; font-weight: 600; }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="top">
+              <div class="logo-block">
+                ${
+                  logoSrc
+                    ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
+                    : `<div class="logo-placeholder" aria-label="Company logo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                          <path d="M3 10.5L12 4l9 6.5"></path>
+                          <path d="M5.5 9.5V20h13V9.5"></path>
+                          <path d="M9 20v-5h6v5"></path>
+                        </svg>
+                      </div>`
+                }
+                <div class="brand-name">${escapeHtml(settings?.company_name || 'Company')}</div>
+              </div>
+              <div class="doc-title">
+                <h1>Invoice</h1>
+                <div class="doc-meta">
+                  <div><span>No</span><strong>${escapeHtml(invoice.invoice_number || '-')}</strong></div>
+                  <div><span>Tanggal</span><strong>${formatShortDate(invoice.invoice_date || invoice.created_at)}</strong></div>
+                  <div><span>Sales Order</span><strong>${escapeHtml(ordersById[String(invoice.sales_order_id || '')]?.order_number || '-')}</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="address-grid">
+              <div class="address-card">
+                <h3>Dari</h3>
+                <p class="name">${escapeHtml(settings?.company_name || 'Company')}</p>
+                <p>${escapeHtml(settings?.company_address || '-')}</p>
+                <p>Email ${escapeHtml(settings?.email || '-')}</p>
+                <p>Telepon ${escapeHtml(settings?.phone || '-')}</p>
+                <p>NPWP ${escapeHtml(settings?.tax_id || '-')}</p>
+              </div>
+              <div class="address-card">
+                <h3>Kepada</h3>
+                <p class="name">${escapeHtml(invoice.company_name || '-')}</p>
+                <p>${escapeHtml(invoice.billing_address || '-')}</p>
+                <p>Tempo pembayaran: ${escapeHtml(invoice.payment_time || '-')}</p>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px;">No</th>
+                  <th>Barang</th>
+                  <th>Deskripsi</th>
+                  <th style="width: 60px;">Unit</th>
+                  <th style="width: 56px; text-align:right;">Qty</th>
+                  <th style="width: 110px; text-align:right;">Harga</th>
+                  <th style="width: 120px; text-align:right;">Jumlah</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml || `<tr><td colspan="7" style="text-align:center;">Tidak ada barang</td></tr>`}
+              </tbody>
+            </table>
+
+            <div class="summary-grid">
+              <div class="payment">
+                <h3>Detail Pembayaran</h3>
+                <p>Bank: ${escapeHtml(settings?.bank_name || '-')}</p>
+                <p>No. Rekening: ${escapeHtml(settings?.bank_account || '-')}</p>
+              </div>
+              <div class="totals">
+                <div class="totals-row"><span>Subtotal</span><strong>Rp ${formatRupiah(Number(invoice.total_amount) || 0)}</strong></div>
+                <div class="totals-row"><span>Pajak</span><strong>Rp ${formatRupiah(Number(invoice.tax_amount) || 0)}</strong></div>
+                <div class="totals-row"><span>Grand Total</span><strong>Rp ${formatRupiah(Number(invoice.grand_total) || 0)}</strong></div>
+              </div>
+            </div>
+
+            <div class="signature">
+              <div>
+                <div>Hormat kami,</div>
+                <div class="name">${escapeHtml(settings?.director_name || '-')}</div>
+                <div>${escapeHtml(settings?.company_name || '')}</div>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handleDownloadInvoice = (invoice: InvoiceType) => {
+    const html = buildInvoiceTemplate(invoice);
+    const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const getStatusColor = (status: string) => {
@@ -317,12 +537,22 @@ export default function Invoices() {
                 <h2 className="text-2xl font-bold text-gray-900">Invoice Details</h2>
                 <p className="text-sm text-gray-600">{detailInvoice.invoice_number}</p>
               </div>
-              <button
-                onClick={() => setDetailInvoice(null)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadInvoice(detailInvoice)}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  <Download className="h-4 w-4" />
+                  Unduh PDF
+                </button>
+                <button
+                  onClick={() => setDetailInvoice(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-4 text-sm">
