@@ -305,6 +305,10 @@ export default function DeliveryOrders() {
       if (editingDelivery) {
         await updateRecord<DeliveryOrder>('delivery_orders', editingDelivery.id, {
           delivery_date: formData.delivery_date,
+          delivery_number: formData.delivery_number,
+          sales_order_id: formData.sales_order_id,
+          client_id: formData.client_id,
+          company_name: formData.company_name,
           goods: payloadGoods,
           ship_address: formData.ship_address,
           performed_by: profile?.id,
@@ -417,6 +421,16 @@ export default function DeliveryOrders() {
   const shipAddresses = selectedClient ? parseShipAddresses(selectedClient.ship_addresses) : [];
   const resolvedShipAddresses =
     shipAddresses.length > 0 ? shipAddresses : selectedClient?.address ? [selectedClient.address] : [];
+  const shipAddressOptions = useMemo(() => {
+    const options = new Set<string>();
+    if (formData.ship_address) {
+      options.add(formData.ship_address);
+    }
+    resolvedShipAddresses.forEach((address) => {
+      if (address) options.add(address);
+    });
+    return Array.from(options);
+  }, [formData.ship_address, resolvedShipAddresses]);
   const isEditing = Boolean(editingDelivery);
 
   if (loading) {
@@ -620,20 +634,7 @@ export default function DeliveryOrders() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Ship Address <span className="text-red-500">*</span>
                   </label>
-                  {isEditing || resolvedShipAddresses.length <= 1 ? (
-                    <input
-                      type="text"
-                      value={formData.ship_address}
-                      readOnly={isEditing || resolvedShipAddresses.length <= 1}
-                      onChange={(event) =>
-                        setFormData((prev) => ({ ...prev, ship_address: event.target.value }))
-                      }
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                        isEditing || resolvedShipAddresses.length <= 1 ? 'bg-gray-50' : ''
-                      }`}
-                      required
-                    />
-                  ) : (
+                  {shipAddressOptions.length > 1 ? (
                     <select
                       value={formData.ship_address}
                       onChange={(event) =>
@@ -643,12 +644,23 @@ export default function DeliveryOrders() {
                       required
                     >
                       <option value="">Select ship address</option>
-                      {resolvedShipAddresses.map((address, index) => (
+                      {shipAddressOptions.map((address, index) => (
                         <option key={`${address}-${index}`} value={address}>
                           {address}
                         </option>
                       ))}
                     </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.ship_address}
+                      onChange={(event) =>
+                        setFormData((prev) => ({ ...prev, ship_address: event.target.value }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter ship address"
+                      required
+                    />
                   )}
                   {!selectedOrder && (
                     <p className="text-xs text-gray-500 mt-1">Select a sales order to load ship address.</p>

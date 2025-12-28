@@ -1518,6 +1518,8 @@ app.post('/api/:table', async (req, res) => {
         created_by: createdBy,
         delivery_number: deliveryNumber,
         company_name: companyName,
+        client_id: clientId,
+        ship_address: shipAddress,
       } = payload;
 
       if (!deliveryDate || !salesOrderId || !deliveryNumber) {
@@ -1546,7 +1548,9 @@ app.post('/api/:table', async (req, res) => {
           delivery_number: deliveryNumber,
           delivery_date: formatDateOnly(deliveryDate),
           sales_order_id: salesOrderId,
+          client_id: clientId || null,
           company_name: companyName || null,
+          ship_address: shipAddress || null,
           goods: JSON.stringify(cleanedGoods),
           created_by: createdBy || null,
         },
@@ -1737,7 +1741,94 @@ app.put('/api/:table/:id', async (req, res) => {
 
   try {
     if (table === 'delivery_orders') {
-      return res.status(403).json({ error: 'Delivery orders cannot be edited' });
+      const {
+        goods = [],
+        delivery_date: deliveryDate,
+        ship_address: shipAddress,
+        company_name: companyName,
+        client_id: clientId,
+        performed_by: performedBy,
+      } = req.body || {};
+
+      const [existing] = await query('SELECT * FROM `delivery_orders` WHERE id = ? LIMIT 1', [id]);
+      if (!existing) {
+        return res.status(404).json({ error: 'Delivery order not found' });
+      }
+
+      const [order] = await query('SELECT * FROM `sales_orders` WHERE id = ? LIMIT 1', [
+        existing.sales_order_id,
+      ]);
+      if (order && ['waiting payment', 'done'].includes(order.status)) {
+        return res.status(403).json({ error: 'Delivery order cannot be edited after approval' });
+      }
+
+      const cleanedGoods = Array.isArray(goods)
+        ? goods
+            .filter((item) => Number(item?.qty) > 0)
+            .map((item) => ({
+              good_id: item.good_id || null,
+              name: item.name || null,
+              description: item.description || null,
+              unit: item.unit || null,
+              qty: Number(item.qty) || 0,
+            }))
+        : [];
+
+      if (cleanedGoods.length === 0) {
+        return res.status(400).json({ error: 'Delivery goods are required' });
+      }
+
+      const nextUpdates = {
+        delivery_date: deliveryDate ? formatDateOnly(deliveryDate) : existing.delivery_date,
+        goods: JSON.stringify(cleanedGoods),
+        ship_address: shipAddress ?? existing.ship_address,
+        company_name: companyName ?? existing.company_name,
+        client_id: clientId ?? existing.client_id,
+      };
+
+      await query('UPDATE `delivery_orders` SET ? WHERE id = ?', [nextUpdates, id]);
+      const [updated] = await query('SELECT * FROM `delivery_orders` WHERE id = ?', [id]);
+
+      if (order) {
+        const orderGoods = parseJsonArray(order.goods);
+        const deliveries = await query('SELECT * FROM `delivery_orders` WHERE sales_order_id = ?', [
+          existing.sales_order_id,
+        ]);
+        const shippedMap = {};
+        deliveries.forEach((delivery) => {
+          const items = parseJsonArray(delivery.goods);
+          items.forEach((item) => {
+            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
+            shippedMap[key] = (shippedMap[key] || 0) + (Number(item.qty) || 0);
+          });
+        });
+
+        const allShipped =
+          orderGoods.length > 0 &&
+          orderGoods.every((item) => {
+            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
+            const orderedQty = Number(item.qty) || 0;
+            const shippedQty = shippedMap[key] || 0;
+            return orderedQty > 0 ? shippedQty >= orderedQty : true;
+          });
+
+        const nextStatus = allShipped ? 'waiting approval' : 'on-delivery';
+        await query('UPDATE `sales_orders` SET status = ? WHERE id = ?', [nextStatus, existing.sales_order_id]);
+      }
+
+      await logActivity({
+        performedBy,
+        entityType: 'delivery_orders',
+        entityId: Number(id),
+        action: 'update',
+        description: `Updated delivery order ${updated?.delivery_number || id}`,
+      });
+
+      return res.json({
+        ...updated,
+        delivery_date: formatDateOnly(updated?.delivery_date),
+        goods: cleanedGoods,
+      });
     }
 
     if (table === 'clients') {
