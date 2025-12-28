@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
-import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search } from 'lucide-react';
+import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface QuotationGood {
@@ -65,7 +65,16 @@ interface GoodOption {
 
 interface CompanySetting {
   id: string;
+  company_name?: string | null;
+  company_address?: string | null;
+  director_name?: string | null;
+  tax_id?: string | null;
   tax_rate?: number | null;
+  email?: string | null;
+  phone?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  logo_url?: string | null;
 }
 
 const EMPTY_GOOD_ROW: QuotationGood = {
@@ -92,6 +101,8 @@ export default function Quotations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [taxRate, setTaxRate] = useState(0);
   const [includeTax, setIncludeTax] = useState(false);
+  const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const [formData, setFormData] = useState({
     quotation_number: '',
     rfq_id: '',
@@ -155,11 +166,193 @@ export default function Quotations() {
       setGoods(goodsData);
       const currentSettings = settingsData[0];
       setTaxRate(Number(currentSettings?.tax_rate) || 0);
+      setCompanySettings(currentSettings || null);
     } catch (error) {
       console.error('Error fetching quotations:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const formatShortDate = (value?: string) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
+  const buildQuotationTemplate = (quotation: QuotationType) => {
+    const settings = companySettings;
+    const goodsList = Array.isArray(quotation.goods) ? quotation.goods : [];
+    const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
+    const rowsHtml = goodsList
+      .map((row, index) => {
+        const qty = Number(row.qty) || 0;
+        const price = Number(row.price) || 0;
+        const subtotal = qty * price;
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(row.name || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
+            <td style="text-align:right;">${qty}</td>
+            <td style="text-align:right;">Rp ${formatRupiah(price)}</td>
+            <td style="text-align:center;">${row.delivery_time ?? '-'}</td>
+            <td style="text-align:right;">Rp ${formatRupiah(subtotal)}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <!doctype html>
+      <html lang="id">
+        <head>
+          <meta charset="utf-8" />
+          <title>Quotation ${escapeHtml(quotation.quotation_number || '')}</title>
+          <style>
+            body { font-family: "Segoe UI", Arial, sans-serif; margin: 24px; color: #111827; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+            .company { max-width: 60%; }
+            .company h1 { margin: 0; font-size: 20px; }
+            .company p { margin: 4px 0; font-size: 12px; color: #374151; }
+            .meta { text-align: right; font-size: 12px; }
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #e5e7eb; font-size: 11px; }
+            .section { margin-top: 20px; }
+            .section h2 { font-size: 14px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; }
+            th { background: #f9fafb; text-align: left; }
+            .totals { margin-top: 12px; display: flex; justify-content: flex-end; }
+            .totals table { width: 280px; border: none; }
+            .totals td { border: none; padding: 4px 0; }
+            .totals tr:last-child td { font-weight: 700; }
+            .signature { margin-top: 32px; text-align: right; }
+            .signature .name { margin-top: 56px; font-weight: 600; }
+            .footer { margin-top: 24px; font-size: 11px; color: #6b7280; }
+            .logo { max-height: 60px; object-fit: contain; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company">
+              ${logoSrc ? `<img class="logo" src="${logoSrc}" alt="Company logo" />` : ''}
+              <h1>${escapeHtml(settings?.company_name || 'Company')}</h1>
+              <p>${escapeHtml(settings?.company_address || '-')}</p>
+              <p>Email: ${escapeHtml(settings?.email || '-')} | Phone: ${escapeHtml(settings?.phone || '-')}</p>
+              <p>NPWP: ${escapeHtml(settings?.tax_id || '-')}</p>
+            </div>
+            <div class="meta">
+              <div class="badge">QUOTATION</div>
+              <p>Quotation No: <strong>${escapeHtml(quotation.quotation_number || '-')}</strong></p>
+              <p>Date: ${formatShortDate(quotation.created_at)}</p>
+              <p>Status: ${escapeHtml(quotation.status || '-')}</p>
+            </div>
+          </div>
+
+          <div class="section">
+            <h2>Client Information</h2>
+            <table>
+              <tbody>
+                <tr>
+                  <td>Company</td>
+                  <td>${escapeHtml(quotation.company_name || '-')}</td>
+                  <td>PIC</td>
+                  <td>${escapeHtml(quotation.pic_name || '-')}</td>
+                </tr>
+                <tr>
+                  <td>Email</td>
+                  <td>${escapeHtml(quotation.pic_email || '-')}</td>
+                  <td>Phone</td>
+                  <td>${escapeHtml(quotation.pic_phone || '-')}</td>
+                </tr>
+                <tr>
+                  <td>Payment Time</td>
+                  <td>${escapeHtml(quotation.payment_time ? `${quotation.payment_time} days` : '-')}</td>
+                  <td>RFQ</td>
+                  <td>${escapeHtml(quotation.rfqs?.rfq_number || '-')}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <h2>Goods & Services</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px;">No</th>
+                  <th>Goods</th>
+                  <th>Description</th>
+                  <th style="width: 60px;">Unit</th>
+                  <th style="width: 70px; text-align:right;">Qty</th>
+                  <th style="width: 110px; text-align:right;">Price</th>
+                  <th style="width: 100px; text-align:center;">Delivery (days)</th>
+                  <th style="width: 120px; text-align:right;">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml || `<tr><td colspan="8" style="text-align:center;">No goods listed</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="totals">
+            <table>
+              <tbody>
+                <tr>
+                  <td>Total</td>
+                  <td style="text-align:right;">Rp ${formatRupiah(Number(quotation.total_amount) || 0)}</td>
+                </tr>
+                <tr>
+                  <td>Tax</td>
+                  <td style="text-align:right;">Rp ${formatRupiah(Number(quotation.tax_amount) || 0)}</td>
+                </tr>
+                <tr>
+                  <td>Grand Total</td>
+                  <td style="text-align:right;">Rp ${formatRupiah(Number(quotation.grand_total) || 0)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="signature">
+            <div>Hormat kami,</div>
+            <div class="name">${escapeHtml(settings?.director_name || '-')}</div>
+            <div>${escapeHtml(settings?.company_name || '')}</div>
+          </div>
+
+          <div class="footer">
+            Bank: ${escapeHtml(settings?.bank_name || '-')} | Rekening: ${escapeHtml(
+              settings?.bank_account || '-'
+            )}
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handleDownloadQuotation = (quotation: QuotationType) => {
+    const html = buildQuotationTemplate(quotation);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
+    link.href = url;
+    link.download = `${safeNumber}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const getNextQuotationNumber = () => {
@@ -1024,13 +1217,23 @@ export default function Quotations() {
                 <p className="text-sm text-gray-500 font-semibold uppercase">Quotation Details</p>
                 <h2 className="text-xl font-bold text-gray-900">{detailQuotation.quotation_number}</h2>
               </div>
-              <button
-                onClick={() => setDetailQuotation(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
-                aria-label="Close quotation details"
-              >
-                <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadQuotation(detailQuotation)}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </button>
+                <button
+                  onClick={() => setDetailQuotation(null)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition dark:hover:bg-slate-800/60"
+                  aria-label="Close quotation details"
+                >
+                  <X className="h-5 w-5 text-gray-600 dark:text-slate-200" />
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
