@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { addRecord, getRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Search, Package, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface Good {
   id: string;
@@ -95,8 +96,12 @@ export default function Goods() {
     status: 'active',
   });
 
-  const fetchGoods = async () => {
+  const fetchGoods = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
+      if (!silent) {
+        setLoading(true);
+      }
       const data = await getRecords<Good>('goods');
       const sorted = [...data].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -105,7 +110,9 @@ export default function Goods() {
     } catch (error) {
       console.error('Error fetching goods:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -117,6 +124,14 @@ export default function Goods() {
       console.error('Error fetching suppliers:', error);
     }
   };
+
+  useAutoRefresh({
+    onRefresh: () => {
+      fetchGoods({ silent: true });
+      fetchSuppliers();
+    },
+    pause: showModal || Boolean(detailGood),
+  });
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
