@@ -86,6 +86,11 @@ const normalizeChatAttachment = (attachment) => {
   };
 };
 
+const resolveChatUserId = async (userId) => {
+  if (!userId) return null;
+  const [row] = await query('SELECT id FROM users WHERE id = ? LIMIT 1', [userId]);
+  return row?.id ? userId : null;
+};
 
 const TABLES = [
   'suppliers',
@@ -2953,8 +2958,7 @@ io.on('connection', (socket) => {
     const handleMessage = async () => {
       try {
         await pruneOldChatMessages();
-        const parsedUserId = Number(user.id);
-        const resolvedUserId = Number.isFinite(parsedUserId) ? parsedUserId : null;
+        const resolvedUserId = await resolveChatUserId(user.id);
         const result = await query(
           'INSERT INTO chat_messages (user_id, user_role, user_name, user_photo_url, message, attachment_url, attachment_name, attachment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [

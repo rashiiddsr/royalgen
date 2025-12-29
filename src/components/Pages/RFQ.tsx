@@ -2,7 +2,6 @@ import { useState, useEffect, ChangeEvent, FormEvent, useMemo } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, FileText, UploadCloud, Trash2, Search, Eye, Edit2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface RFQGoodItem {
   type: 'existing' | 'other';
@@ -119,14 +118,24 @@ export default function RFQ() {
 
   useEffect(() => {
     fetchData();
+    const interval = window.setInterval(() => {
+      fetchData();
+    }, 15000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
-  const fetchData = async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
+  const fetchData = async () => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
+      setLoading(true);
       const [rfqData, goodsData, userData, clientData] = await Promise.all([
         getRecords<RFQType>('rfqs'),
         getRecords<GoodOption>('goods'),
@@ -191,16 +200,9 @@ export default function RFQ() {
     } catch (error) {
       console.error('Error fetching RFQs or goods:', error);
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
-
-  useAutoRefresh({
-    onRefresh: () => fetchData({ silent: true }),
-    pause: showModal || Boolean(detailRfq),
-  });
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

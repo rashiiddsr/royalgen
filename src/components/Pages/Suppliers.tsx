@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Search, Eye, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface Supplier {
   id: string;
@@ -70,12 +69,8 @@ export default function Suppliers() {
     fetchGoods();
   }, []);
 
-  const fetchSuppliers = async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
+  const fetchSuppliers = async () => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
       const data = await getRecords<Supplier>('suppliers');
       const sorted = [...data].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -84,9 +79,7 @@ export default function Suppliers() {
     } catch (error) {
       console.error('Error fetching suppliers:', error);
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
@@ -98,14 +91,6 @@ export default function Suppliers() {
       console.error('Error fetching goods:', error);
     }
   };
-
-  useAutoRefresh({
-    onRefresh: () => {
-      fetchSuppliers({ silent: true });
-      fetchGoods();
-    },
-    pause: showModal || showGoodsModal || Boolean(detailSupplier),
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

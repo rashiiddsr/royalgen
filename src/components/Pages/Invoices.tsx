@@ -3,7 +3,6 @@ import { getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface InvoiceGood {
   no: number;
@@ -96,12 +95,8 @@ export default function Invoices() {
     fetchInvoices();
   }, []);
 
-  const fetchInvoices = async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
+  const fetchInvoices = async () => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
       const [invoiceData, orderData, clientData, settingsData] = await Promise.all([
         getRecords<InvoiceType>('invoices'),
         getRecords<OrderType>('sales_orders'),
@@ -135,16 +130,9 @@ export default function Invoices() {
     } catch (error) {
       console.error('Error fetching invoices:', error);
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
-
-  useAutoRefresh({
-    onRefresh: () => fetchInvoices({ silent: true }),
-    pause: Boolean(detailInvoice) || Boolean(editingInvoice),
-  });
 
   const escapeHtml = (value: string) =>
     value
