@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getRecords, updateRecord } from '../../lib/api';
-import { CheckCircle, Download, Edit2, Eye, Receipt, X } from 'lucide-react';
+import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -81,6 +81,7 @@ export default function Invoices() {
   const [ordersById, setOrdersById] = useState<Record<string, OrderType>>({});
   const [clientsById, setClientsById] = useState<Record<string, ClientType>>({});
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [detailInvoice, setDetailInvoice] = useState<InvoiceType | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceType | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
@@ -472,13 +473,37 @@ export default function Invoices() {
     );
   }
 
+  const filteredInvoices = invoices.filter((invoice) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    const orderNumber = ordersById[String(invoice.sales_order_id || '')]?.order_number || '';
+    return (
+      invoice.invoice_number?.toLowerCase().includes(query) ||
+      orderNumber.toLowerCase().includes(query) ||
+      invoice.company_name?.toLowerCase().includes(query) ||
+      invoice.status?.toLowerCase().includes(query) ||
+      invoice.payment_time?.toLowerCase().includes(query)
+    );
+  });
+
   return (
-    <div>
-      <div className="mb-6 flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
           <p className="text-gray-600 mt-1">Monitor invoices generated from approved sales orders</p>
         </div>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search invoices by number, sales order, company, status, or payment time..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
@@ -507,7 +532,7 @@ export default function Invoices() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-900 dark:divide-slate-800">
-              {invoices.length === 0 ? (
+              {filteredInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -515,7 +540,7 @@ export default function Invoices() {
                   </td>
                 </tr>
               ) : (
-                invoices.map((invoice) => (
+                filteredInvoices.map((invoice) => (
                   <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">

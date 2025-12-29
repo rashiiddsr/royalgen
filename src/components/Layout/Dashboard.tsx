@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, ReactNode } from 'react';
+import { useEffect, useRef, useState, ReactNode, type RefObject } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Building2,
@@ -38,7 +38,9 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement | null>(null);
+  const notificationMobileRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuMobileRef = useRef<HTMLDivElement | null>(null);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const { notifications, unreadCount, markAllRead, dismissNotification } = useNotifications();
 
@@ -64,7 +66,10 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   useEffect(() => {
     setNotificationsOpen(false);
     setProfileMenuOpen(false);
-  }, [currentPage]);
+    if (!isDesktop) {
+      setSidebarOpen(false);
+    }
+  }, [currentPage, isDesktop]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 1024px)');
@@ -80,10 +85,17 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (notificationRef.current && !notificationRef.current.contains(target)) {
+      const isNotificationTarget = [notificationRef, notificationMobileRef].some(
+        (ref) => ref.current && ref.current.contains(target),
+      );
+      const isProfileTarget = [profileMenuRef, profileMenuMobileRef].some(
+        (ref) => ref.current && ref.current.contains(target),
+      );
+
+      if (!isNotificationTarget) {
         setNotificationsOpen(false);
       }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+      if (!isProfileTarget) {
         setProfileMenuOpen(false);
       }
     };
@@ -111,6 +123,152 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
       .join('') || 'U'
   );
 
+  const renderHeaderActions = (
+    notificationContainerRef: RefObject<HTMLDivElement>,
+    profileContainerRef: RefObject<HTMLDivElement>,
+    { compact = false }: { compact?: boolean } = {},
+  ) => (
+    <div className={`flex items-center ${compact ? 'gap-2' : 'gap-3'}`}>
+      <div className="relative" ref={notificationContainerRef}>
+        <button
+          type="button"
+          onClick={() => setNotificationsOpen((prev) => !prev)}
+          className={`relative inline-flex items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 ${
+            compact ? 'p-1.5' : 'p-2'
+          }`}
+          aria-label="Toggle notifications"
+        >
+          <Bell className={`${compact ? 'h-4 w-4' : 'h-5 w-5'}`} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+        {notificationsOpen && (
+          <div className="absolute right-0 z-30 mt-3 w-80 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-slate-800">
+              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</p>
+              <button
+                type="button"
+                onClick={() => markAllRead()}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+              >
+                Mark all read
+              </button>
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">
+                  No notifications yet.
+                </div>
+              ) : (
+                notifications.map((item) => (
+                  <div
+                    key={item.id}
+                    className="border-b border-gray-100 px-4 py-3 last:border-b-0 dark:border-slate-800"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1 dark:text-slate-300">
+                          {item.message}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-2 dark:text-slate-400">
+                          {new Date(item.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => dismissNotification(item.id)}
+                        className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                        aria-label="Dismiss notification"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="relative" ref={profileContainerRef}>
+        <button
+          type="button"
+          onClick={() => setProfileMenuOpen((prev) => !prev)}
+          className={`flex items-center gap-3 rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 ${
+            compact ? 'px-2 py-1.5' : 'px-3 py-2'
+          }`}
+        >
+          <span className={`rounded-full overflow-hidden bg-blue-600 text-white flex items-center justify-center text-xs font-semibold ${
+            compact ? 'h-7 w-7' : 'h-8 w-8'
+          }`}
+          >
+            {avatarContent}
+          </span>
+          <span className="hidden md:flex flex-col items-start leading-tight">
+            <span className="text-sm font-semibold">{profile?.full_name}</span>
+            <span className="text-xs text-gray-500 capitalize dark:text-slate-400">
+              {profile?.role}
+            </span>
+          </span>
+          <ChevronDown className="h-4 w-4 text-gray-500 dark:text-slate-400" />
+        </button>
+        {profileMenuOpen && (
+          <div className="absolute right-0 z-30 mt-3 w-72 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                {profile?.full_name}
+              </p>
+              <p className="text-xs text-gray-500 capitalize dark:text-slate-400">
+                {profile?.role}
+              </p>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">
+                  Theme
+                </label>
+                <select
+                  value={themePreference}
+                  onChange={(event) => onThemeChange(event.target.value as ThemePreference)}
+                  className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="system">System Default</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
+            </div>
+            <div className="border-t border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('profile');
+                  setProfileMenuOpen(false);
+                }}
+                className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Profile Settings
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="w-full px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900/80 dark:to-slate-900/60">
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-gray-200 z-40 px-4 py-3 flex items-center justify-between shadow-sm dark:bg-slate-900/80 dark:border-slate-800">
@@ -135,6 +293,7 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
             <p className="text-xs text-gray-600 font-medium dark:text-slate-400">Procurement</p>
           </div>
         </div>
+        {profile && renderHeaderActions(notificationMobileRef, profileMenuMobileRef, { compact: true })}
       </div>
 
       <div
@@ -183,10 +342,13 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
                 <button
                   key={item.page}
                   onClick={() => {
-                    onNavigate(item.page);
-                    setNotificationsOpen(false);
-                    setProfileMenuOpen(false);
-                  }}
+                  onNavigate(item.page);
+                  setNotificationsOpen(false);
+                  setProfileMenuOpen(false);
+                  if (!isDesktop) {
+                    setSidebarOpen(false);
+                  }
+                }}
                   className={`w-full flex items-center rounded-xl transition-all duration-200 ${
                     isActive
                       ? 'bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold shadow-lg shadow-blue-500/30 transform scale-[1.02]'
@@ -225,137 +387,8 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
-            <div className="flex items-center gap-3">
-              <div className="relative" ref={notificationRef}>
-                <button
-                  type="button"
-                  onClick={() => setNotificationsOpen((prev) => !prev)}
-                  className="relative inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  aria-label="Toggle notifications"
-                >
-                  <Bell className="h-5 w-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-                {notificationsOpen && (
-                  <div className="absolute right-0 z-30 mt-3 w-80 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                    <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-slate-800">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</p>
-                      <button
-                        type="button"
-                        onClick={() => markAllRead()}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-                      >
-                        Mark all read
-                      </button>
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">
-                          No notifications yet.
-                        </div>
-                      ) : (
-                        notifications.map((item) => (
-                          <div
-                            key={item.id}
-                            className="border-b border-gray-100 px-4 py-3 last:border-b-0 dark:border-slate-800"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                                  {item.title}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1 dark:text-slate-300">
-                                  {item.message}
-                                </p>
-                                <p className="text-xs text-gray-400 mt-2 dark:text-slate-400">
-                                  {new Date(item.createdAt).toLocaleString()}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => dismissNotification(item.id)}
-                                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
-                                aria-label="Dismiss notification"
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="relative" ref={profileMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setProfileMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-3 rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                >
-                  <span className="h-8 w-8 rounded-full overflow-hidden bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">
-                    {avatarContent}
-                  </span>
-                  <span className="hidden md:flex flex-col items-start leading-tight">
-                    <span className="text-sm font-semibold">{profile?.full_name}</span>
-                    <span className="text-xs text-gray-500 capitalize dark:text-slate-400">
-                      {profile?.role}
-                    </span>
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-gray-500 dark:text-slate-400" />
-                </button>
-                {profileMenuOpen && (
-                  <div className="absolute right-0 z-30 mt-3 w-72 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                    <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                        {profile?.full_name}
-                      </p>
-                      <p className="text-xs text-gray-500 capitalize dark:text-slate-400">
-                        {profile?.role}
-                      </p>
-                    </div>
-                    <div className="px-4 py-3 space-y-3">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">
-                          Theme
-                        </label>
-                        <select
-                          value={themePreference}
-                          onChange={(event) => onThemeChange(event.target.value as ThemePreference)}
-                          className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                          <option value="system">System Default</option>
-                          <option value="light">Light</option>
-                          <option value="dark">Dark</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="border-t border-gray-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onNavigate('profile');
-                          setProfileMenuOpen(false);
-                        }}
-                        className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800"
-                      >
-                        Profile Settings
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSignOut}
-                        className="w-full px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
-                      >
-                        Sign Out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+            <div className="hidden lg:flex items-center gap-3">
+              {profile && renderHeaderActions(notificationRef, profileMenuRef)}
             </div>
           </div>
           {children}

@@ -52,7 +52,7 @@ export default function Goods() {
   const [supplierSearch, setSupplierSearch] = useState('');
   const { profile } = useAuth();
 
-  const canToggleStatus = ['admin', 'manager', 'superadmin'].includes(profile?.role ?? '');
+  const canToggleStatus = ['manager', 'superadmin'].includes(profile?.role ?? '');
 
   const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
   const getCategoryBadge = (category: Good['category']) => {
@@ -374,32 +374,31 @@ export default function Goods() {
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleToggleStatus(good)}
-                        disabled={!canToggleStatus}
-                        className={`inline-flex items-center p-2 rounded-full transition ${
-                          !canToggleStatus
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : good.status === 'active'
+                      {canToggleStatus && (
+                        <button
+                          onClick={() => handleToggleStatus(good)}
+                          className={`inline-flex items-center p-2 rounded-full transition ${
+                            good.status === 'active'
                               ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
                               : 'text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800/60'
-                        }`}
-                        aria-label={`Set good ${good.status === 'active' ? 'inactive' : 'active'}`}
-                      >
-                        <span
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full ${
-                            good.status === 'active'
-                              ? 'bg-emerald-500'
-                              : 'bg-gray-300 dark:bg-slate-700'
                           }`}
+                          aria-label={`Set good ${good.status === 'active' ? 'inactive' : 'active'}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                              good.status === 'active' ? 'translate-x-4' : 'translate-x-1'
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full ${
+                              good.status === 'active'
+                                ? 'bg-emerald-500'
+                                : 'bg-gray-300 dark:bg-slate-700'
                             }`}
-                          />
-                        </span>
-                      </button>
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                                good.status === 'active' ? 'translate-x-4' : 'translate-x-1'
+                              }`}
+                            />
+                          </span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
