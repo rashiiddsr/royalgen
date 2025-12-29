@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  textarea,
+  select {
+    border-color: #3b82f6 !important;
+    box-shadow: none !important;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+  textarea:focus,
+  select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: none !important;
+  }
+}
+
 @layer utilities {
   .animation-delay-2000 {
     animation-delay: 2s;
