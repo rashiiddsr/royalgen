@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Download, Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface DeliveryGood {
   good_id?: string;
@@ -318,8 +319,12 @@ export default function DeliveryOrders() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
+      if (!silent) {
+        setLoading(true);
+      }
       const [deliveryData, orderData, userData, clientData, settingsData] = await Promise.all([
         getRecords<DeliveryOrder>('delivery_orders'),
         getRecords<SalesOrder>('sales_orders'),
@@ -354,9 +359,16 @@ export default function DeliveryOrders() {
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  useAutoRefresh({
+    onRefresh: () => fetchData({ silent: true }),
+    pause: showModal || Boolean(detailDelivery),
+  });
 
   const getNextDeliveryNumber = () => {
     const year = new Date().getFullYear();
@@ -670,7 +682,7 @@ export default function DeliveryOrders() {
           placeholder="Search delivery orders by number, sales order, company, or creator..."
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
         />
       </div>
 

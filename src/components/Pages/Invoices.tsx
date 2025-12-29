@@ -3,6 +3,7 @@ import { getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface InvoiceGood {
   no: number;
@@ -95,8 +96,12 @@ export default function Invoices() {
     fetchInvoices();
   }, []);
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
+      if (!silent) {
+        setLoading(true);
+      }
       const [invoiceData, orderData, clientData, settingsData] = await Promise.all([
         getRecords<InvoiceType>('invoices'),
         getRecords<OrderType>('sales_orders'),
@@ -130,9 +135,16 @@ export default function Invoices() {
     } catch (error) {
       console.error('Error fetching invoices:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  useAutoRefresh({
+    onRefresh: () => fetchInvoices({ silent: true }),
+    pause: Boolean(detailInvoice) || Boolean(editingInvoice),
+  });
 
   const escapeHtml = (value: string) =>
     value
@@ -502,7 +514,7 @@ export default function Invoices() {
           placeholder="Search invoices by number, sales order, company, status, or payment time..."
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
         />
       </div>
 
