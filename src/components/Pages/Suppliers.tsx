@@ -331,30 +331,29 @@ export default function Suppliers() {
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleToggleStatus(supplier)}
-                        disabled={!canDeactivateSupplier}
-                        className={`inline-flex items-center p-2 rounded-full transition ${
-                          !canDeactivateSupplier
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : supplier.status === 'active'
+                      {canDeactivateSupplier && (
+                        <button
+                          onClick={() => handleToggleStatus(supplier)}
+                          className={`inline-flex items-center p-2 rounded-full transition ${
+                            supplier.status === 'active'
                               ? 'text-emerald-600 hover:bg-emerald-50'
                               : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                        aria-label={`Set supplier ${supplier.status === 'active' ? 'inactive' : 'active'}`}
-                      >
-                        <span
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full ${
-                            supplier.status === 'active' ? 'bg-emerald-500' : 'bg-gray-300'
                           }`}
+                          aria-label={`Set supplier ${supplier.status === 'active' ? 'inactive' : 'active'}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                              supplier.status === 'active' ? 'translate-x-4' : 'translate-x-1'
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full ${
+                              supplier.status === 'active' ? 'bg-emerald-500' : 'bg-gray-300'
                             }`}
-                          />
-                        </span>
-                      </button>
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                                supplier.status === 'active' ? 'translate-x-4' : 'translate-x-1'
+                              }`}
+                            />
+                          </span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

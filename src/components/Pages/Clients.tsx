@@ -60,6 +60,7 @@ const parseShipAddresses = (value?: string[] | string | null) => {
 
 export default function Clients() {
   const { profile } = useAuth();
+  const canToggleStatus = ['superadmin', 'manager'].includes(profile?.role ?? '');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -314,44 +315,42 @@ export default function Clients() {
                         <div className="text-xs text-gray-500">{client.phone}</div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{client.tax_id || '-'}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            client.status === 'blacklist'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {client.status || 'active'}
-                        </span>
-                      </td>
+                    <td className="px-6 py-4 text-sm">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          client.status === 'blacklist'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'
+                            : 'bg-green-100 text-green-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                        }`}
+                      >
+                        {client.status || 'active'}
+                      </span>
+                    </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {shipAddresses.length > 0 ? `${shipAddresses.length} address(es)` : '-'}
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        <button
-                          onClick={() => setDetailClient(client)}
-                          className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          aria-label="View client"
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <button
+                        onClick={() => setDetailClient(client)}
+                        className="inline-flex items-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        aria-label="View client"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => openModal(client)}
-                          className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
-                          aria-label="Edit client"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
+                      <button
+                        onClick={() => openModal(client)}
+                        className="inline-flex items-center p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                        aria-label="Edit client"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      {canToggleStatus && (
                         <button
                           onClick={() => handleToggleStatus(client)}
-                          disabled={!profile || !['superadmin', 'manager'].includes(profile.role ?? '')}
                           className={`inline-flex items-center p-2 rounded-full transition ${
-                            !profile || !['superadmin', 'manager'].includes(profile.role ?? '')
-                              ? 'text-gray-300 cursor-not-allowed'
-                              : client.status === 'blacklist'
-                                ? 'text-gray-600 hover:bg-gray-100'
-                                : 'text-emerald-600 hover:bg-emerald-50'
+                            client.status === 'blacklist'
+                              ? 'text-gray-600 hover:bg-gray-100'
+                              : 'text-emerald-600 hover:bg-emerald-50'
                           }`}
                           aria-label={`Set client ${client.status === 'blacklist' ? 'active' : 'blacklist'}`}
                         >
@@ -367,7 +366,8 @@ export default function Clients() {
                             />
                           </span>
                         </button>
-                      </td>
+                      )}
+                    </td>
                     </tr>
                   );
                 })

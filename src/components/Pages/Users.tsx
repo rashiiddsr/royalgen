@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
+import { Plus, Edit2, Trash2, UserPlus, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ManagedUser {
@@ -38,6 +38,7 @@ export default function Users() {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [formData, setFormData] = useState<Partial<ManagedUser>>(DEFAULT_FORM);
+  const [searchTerm, setSearchTerm] = useState('');
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const { profile } = useAuth();
 
@@ -118,9 +119,22 @@ export default function Users() {
     );
   }
 
+  const filteredUsers = users.filter((user) => {
+    if (user.role === 'superadmin') return false;
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      user.full_name?.toLowerCase().includes(query) ||
+      user.username?.toLowerCase().includes(query) ||
+      user.email?.toLowerCase().includes(query) ||
+      user.role?.toLowerCase().includes(query) ||
+      user.phone?.toLowerCase().includes(query)
+    );
+  });
+
   return (
-    <div>
-      <div className="mb-6 flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">
@@ -136,44 +150,53 @@ export default function Users() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search users by name, username, email, role, or phone..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100"
+        />
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 border-b border-gray-200 dark:bg-slate-800 dark:border-slate-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">
                   Email
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">
                   Phone
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.filter((user) => user.role !== 'superadmin').length === 0 ? (
+            <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-900 dark:divide-slate-800">
+              {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-slate-400">
                     <UserPlus className="h-10 w-10 text-gray-400 mx-auto mb-4" />
                     No users found. Add a team member to begin.
                   </td>
                 </tr>
               ) : (
-                users
-                  .filter((user) => user.role !== 'superadmin')
-                  .map((user) => (
+                filteredUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-600 font-semibold">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-600 font-semibold dark:bg-slate-700 dark:text-slate-200">
                           {user.photo_url ? (
                             <img src={`${apiRoot}${user.photo_url}`} alt={user.full_name} className="w-full h-full object-cover" />
                           ) : (
@@ -185,30 +208,30 @@ export default function Users() {
                               .join('') || 'U'
                           )}
                         </div>
-                        <div className="font-semibold text-gray-900">{user.full_name}</div>
+                        <div className="font-semibold text-gray-900 dark:text-slate-100">{user.full_name}</div>
                         {user.username && (
-                          <div className="text-xs text-gray-500">@{user.username}</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400">@{user.username}</div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">{user.email}</td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-200">{user.email}</td>
                     <td className="px-6 py-4">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 capitalize">
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 capitalize dark:bg-blue-500/20 dark:text-blue-200">
                         {user.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">{user.phone || '-'}</td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-200">{user.phone || '-'}</td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => openModal(user)}
-                        className="inline-flex items-center px-3 py-1.5 text-sm bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100"
+                        className="inline-flex items-center px-3 py-1.5 text-sm bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20"
                       >
                         <Edit2 className="h-4 w-4 mr-1" /> Edit
                       </button>
                       <button
                         onClick={() => handleDelete(user.id)}
                         disabled={user.role === 'superadmin'}
-                        className="inline-flex items-center px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/20"
                       >
                         <Trash2 className="h-4 w-4 mr-1" /> Delete
                       </button>
@@ -272,24 +295,22 @@ export default function Users() {
                     />
                   </div>
                 )}
-                {editingUser && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Role</label>
-                    {editingUser?.role === 'superadmin' ? (
-                      <div className="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 capitalize">Superadmin</div>
-                    ) : (
-                      <select
-                        value={formData.role || 'staff'}
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value as ManagedUser['role'] })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent capitalize"
-                      >
-                        <option value="manager">Manager</option>
-                        <option value="admin">Admin</option>
-                        <option value="staff">Staff</option>
-                      </select>
-                    )}
-                  </div>
-                )}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Role</label>
+                  {editingUser?.role === 'superadmin' ? (
+                    <div className="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 capitalize">Superadmin</div>
+                  ) : (
+                    <select
+                      value={formData.role || 'staff'}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as ManagedUser['role'] })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent capitalize"
+                    >
+                      <option value="manager">Manager</option>
+                      <option value="admin">Admin</option>
+                      <option value="staff">Staff</option>
+                    </select>
+                  )}
+                </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
                   <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
