@@ -3,7 +3,6 @@ import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface QuotationGood {
   good_id: string;
@@ -129,8 +128,7 @@ export default function Quotations() {
     fetchQuotations();
   }, []);
 
-  const fetchQuotations = async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
+  const fetchQuotations = async () => {
     try {
       const [quotationData, rfqData, goodsData, userData, settingsData, clientData] = await Promise.all([
         getRecords<QuotationType>('quotations'),
@@ -185,16 +183,9 @@ export default function Quotations() {
     } catch (error) {
       console.error('Error fetching quotations:', error);
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
-
-  useAutoRefresh({
-    onRefresh: () => fetchQuotations({ silent: true }),
-    pause: showModal || Boolean(detailQuotation) || Boolean(statusQuotation) || Boolean(linkedRfq),
-  });
 
   const escapeHtml = (value: string) =>
     value
@@ -703,10 +694,6 @@ export default function Quotations() {
 
   const handleStatusUpdate = async (quotation: QuotationType, nextStatus: string) => {
     if (!canUpdateStatus || !profile) return;
-    if (quotation.status === 'process' && (nextStatus === 'reject' || nextStatus === 'rejected')) {
-      alert('Processed quotations cannot be rejected.');
-      return;
-    }
     if (nextStatus === 'reject' || nextStatus === 'rejected') {
       const confirmed = window.confirm('Are you sure you want to reject this quotation? This will lock edits.');
       if (!confirmed) return;
@@ -743,7 +730,7 @@ export default function Quotations() {
       ];
     }
     if (quotation.status === 'process') {
-      return [];
+      return [{ label: 'Reject', status: 'reject', style: 'bg-red-600 hover:bg-red-700' }];
     }
     return [];
   };

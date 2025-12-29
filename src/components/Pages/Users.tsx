@@ -2,7 +2,6 @@ import { useEffect, useState, FormEvent } from 'react';
 import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Trash2, UserPlus, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface ManagedUser {
   id: number | string;
@@ -47,27 +46,16 @@ export default function Users() {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
+  const fetchUsers = async () => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
       const data = await getRecords<ManagedUser>('users');
       setUsers(data);
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
-
-  useAutoRefresh({
-    onRefresh: () => fetchUsers({ silent: true }),
-    pause: showModal,
-  });
 
   const openModal = (user?: ManagedUser) => {
     if (user) {
