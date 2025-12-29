@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Download, Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface DeliveryGood {
   good_id?: string;
@@ -318,8 +319,12 @@ export default function DeliveryOrders() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
+      if (!silent) {
+        setLoading(true);
+      }
       const [deliveryData, orderData, userData, clientData, settingsData] = await Promise.all([
         getRecords<DeliveryOrder>('delivery_orders'),
         getRecords<SalesOrder>('sales_orders'),
@@ -354,9 +359,16 @@ export default function DeliveryOrders() {
     } catch (error) {
       console.error('Error fetching delivery orders:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  useAutoRefresh({
+    onRefresh: () => fetchData({ silent: true }),
+    pause: showModal || Boolean(detailDelivery),
+  });
 
   const getNextDeliveryNumber = () => {
     const year = new Date().getFullYear();

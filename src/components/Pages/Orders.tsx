@@ -3,6 +3,7 @@ import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface OrderDocument {
   name: string;
@@ -188,8 +189,12 @@ export default function Orders() {
     return doc.data;
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
+      if (!silent) {
+        setLoading(true);
+      }
       const [orderData, quotationData, userData, deliveryData] = await Promise.all([
         getRecords<OrderType>('sales_orders'),
         getRecords<QuotationType>('quotations'),
@@ -225,9 +230,16 @@ export default function Orders() {
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  useAutoRefresh({
+    onRefresh: () => fetchOrders({ silent: true }),
+    pause: showModal || Boolean(detailOrder),
+  });
 
   const openCreateModal = () => {
     setEditingOrder(null);
@@ -549,7 +561,7 @@ export default function Orders() {
           placeholder="Search sales orders by PO, project, quotation, company, or status..."
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
       </div>
 

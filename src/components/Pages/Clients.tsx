@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { Eye, Plus, Search, Trash2, UserRound, Edit2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface Client {
   id: string;
@@ -76,8 +77,12 @@ export default function Clients() {
     fetchClients();
   }, []);
 
-  const fetchClients = async () => {
+  const fetchClients = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
+      if (!silent) {
+        setLoading(true);
+      }
       const data = await getRecords<Client>('clients');
       const sorted = [...data]
         .map((client) => ({
@@ -90,9 +95,16 @@ export default function Clients() {
     } catch (error) {
       console.error('Error fetching clients:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  useAutoRefresh({
+    onRefresh: () => fetchClients({ silent: true }),
+    pause: showModal || Boolean(detailClient),
+  });
 
   const openModal = (client?: Client) => {
     if (client) {
