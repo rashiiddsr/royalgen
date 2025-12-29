@@ -3,6 +3,7 @@ import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface QuotationGood {
   good_id: string;
@@ -128,7 +129,8 @@ export default function Quotations() {
     fetchQuotations();
   }, []);
 
-  const fetchQuotations = async () => {
+  const fetchQuotations = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
       const [quotationData, rfqData, goodsData, userData, settingsData, clientData] = await Promise.all([
         getRecords<QuotationType>('quotations'),
@@ -183,9 +185,16 @@ export default function Quotations() {
     } catch (error) {
       console.error('Error fetching quotations:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  useAutoRefresh({
+    onRefresh: () => fetchQuotations({ silent: true }),
+    pause: showModal || Boolean(detailQuotation) || Boolean(statusQuotation) || Boolean(linkedRfq),
+  });
 
   const escapeHtml = (value: string) =>
     value
@@ -694,6 +703,10 @@ export default function Quotations() {
 
   const handleStatusUpdate = async (quotation: QuotationType, nextStatus: string) => {
     if (!canUpdateStatus || !profile) return;
+    if (quotation.status === 'process' && (nextStatus === 'reject' || nextStatus === 'rejected')) {
+      alert('Processed quotations cannot be rejected.');
+      return;
+    }
     if (nextStatus === 'reject' || nextStatus === 'rejected') {
       const confirmed = window.confirm('Are you sure you want to reject this quotation? This will lock edits.');
       if (!confirmed) return;
@@ -730,7 +743,7 @@ export default function Quotations() {
       ];
     }
     if (quotation.status === 'process') {
-      return [{ label: 'Reject', status: 'reject', style: 'bg-red-600 hover:bg-red-700' }];
+      return [];
     }
     return [];
   };
@@ -791,7 +804,7 @@ export default function Quotations() {
             placeholder="Search quotations by number, RFQ, company, goods, or creator..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
           />
         </div>
       </div>
