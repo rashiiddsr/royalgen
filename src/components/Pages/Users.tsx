@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { addRecord, deleteRecord, getRecords, updateRecord } from '../../lib/api';
-import { Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
+import { Plus, Edit2, Trash2, UserPlus, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ManagedUser {
@@ -38,6 +38,7 @@ export default function Users() {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [formData, setFormData] = useState<Partial<ManagedUser>>(DEFAULT_FORM);
+  const [searchTerm, setSearchTerm] = useState('');
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const { profile } = useAuth();
 
@@ -118,9 +119,22 @@ export default function Users() {
     );
   }
 
+  const filteredUsers = users.filter((user) => {
+    if (user.role === 'superadmin') return false;
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      user.full_name?.toLowerCase().includes(query) ||
+      user.username?.toLowerCase().includes(query) ||
+      user.email?.toLowerCase().includes(query) ||
+      user.role?.toLowerCase().includes(query) ||
+      user.phone?.toLowerCase().includes(query)
+    );
+  });
+
   return (
-    <div>
-      <div className="mb-6 flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">
@@ -134,6 +148,17 @@ export default function Users() {
           <Plus className="h-5 w-5 mr-2" />
           Add User
         </button>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search users by name, username, email, role, or phone..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -159,7 +184,7 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.filter((user) => user.role !== 'superadmin').length === 0 ? (
+              {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                     <UserPlus className="h-10 w-10 text-gray-400 mx-auto mb-4" />
@@ -167,9 +192,7 @@ export default function Users() {
                   </td>
                 </tr>
               ) : (
-                users
-                  .filter((user) => user.role !== 'superadmin')
-                  .map((user) => (
+                filteredUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
