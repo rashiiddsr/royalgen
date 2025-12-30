@@ -2,6 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  textarea,
+  select {
+    box-shadow: none !important;
+  }
+
+  .dark input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  .dark textarea,
+  .dark select {
+    --tw-shadow: 0 0 #0000 !important;
+    --tw-shadow-colored: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    box-shadow: none !important;
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+    outline: none;
+  }
+
+  .dark input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+  .dark textarea:focus,
+  .dark select:focus {
+    --tw-shadow: 0 0 #0000 !important;
+    --tw-shadow-colored: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    box-shadow: none !important;
+    outline: none;
+  }
+
+  .dark .focus\:ring-2:focus,
+  .dark .focus-within\:ring-2:focus-within {
+    --tw-shadow: 0 0 #0000 !important;
+    --tw-shadow-colored: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    box-shadow: none !important;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+  textarea:focus,
+  select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: none !important;
+  }
+
+  .focus\:border-transparent:focus,
+  .focus-within\:border-transparent:focus-within,
+  .dark .focus-within\:border-transparent:focus-within {
+    border-color: #3b82f6 !important;
+  }
+
+  input[readonly],
+  input:disabled,
+  textarea[readonly],
+  textarea:disabled,
+  select:disabled {
+    background-color: #f1f5f9;
+    border-color: #94a3b8;
+    color: #475569;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.75) !important;
+  }
+
+  .dark input[readonly],
+  .dark input:disabled,
+  .dark textarea[readonly],
+  .dark textarea:disabled,
+  .dark select:disabled {
+    background-color: rgba(148, 163, 184, 0.16);
+    border-color: rgba(148, 163, 184, 0.7);
+    color: rgba(226, 232, 240, 0.9);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.55) !important;
+  }
+
+  table thead {
+    background-color: #f8fafc !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.5) !important;
+  }
+
+  .dark table thead {
+    background-color: #1e293b !important;
+    border-bottom: 1px solid #334155 !important;
+    box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.35) !important;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='file']):not([readonly]):not(:disabled),
+  textarea:not([readonly]):not(:disabled),
+  select:not(:disabled) {
+    border-color: #d1d5db;
+  }
+}
+
 @layer utilities {
   .animation-delay-2000 {
     animation-delay: 2s;
