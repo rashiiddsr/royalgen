@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
@@ -307,16 +307,19 @@ export default function DeliveryOrders() {
     `;
   };
 
-  const handleDownloadDeliveryOrder = (delivery: DeliveryOrder) => {
+  const handleDownloadDeliveryOrder = async (delivery: DeliveryOrder) => {
     const html = buildDeliveryOrderTemplate(delivery);
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (previewWindow) {
-      previewWindow.document.title = `${safeNumber}.pdf`;
+    try {
+      const { url } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
+      if (previewWindow) {
+        previewWindow.document.title = `${safeNumber}.pdf`;
+      }
+    } catch (error) {
+      console.error('Failed to download delivery order PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const fetchData = async (options?: { silent?: boolean }) => {
@@ -1055,7 +1058,7 @@ export default function DeliveryOrders() {
                   className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50"
                 >
                   <Download className="h-4 w-4" />
-                  Download
+                  View Document
                 </button>
                 <button
                   onClick={() => setDetailDelivery(null)}
