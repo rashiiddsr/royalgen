@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { addRecord, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -397,11 +397,8 @@ export default function Quotations() {
     const html = buildQuotationTemplate(quotation, latestSettings);
     const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
     try {
-      const { url } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
-      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
-      if (previewWindow) {
-        previewWindow.document.title = `${safeNumber}.pdf`;
-      }
+      const { blob } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
+      downloadPdfBlob(blob, safeNumber);
     } catch (error) {
       console.error('Failed to download quotation PDF', error);
       alert('Failed to generate PDF. Please try again.');
