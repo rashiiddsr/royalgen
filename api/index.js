@@ -129,7 +129,7 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
 
-const generatePdfFromHtml = async (html, filenamePrefix = 'document') => {
+const generatePdfFromHtml = async (html) => {
   const browser = await puppeteer.launch({
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -138,11 +138,7 @@ const generatePdfFromHtml = async (html, filenamePrefix = 'document') => {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
     await page.emulateMediaType('screen');
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
-    const filename = `${filenamePrefix}-${Date.now()}.pdf`;
-    const filePath = path.join(uploadDir, filename);
-    fs.writeFileSync(filePath, pdfBuffer);
-    return `/downloads/${filename}`;
+    return await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
   } finally {
     await browser.close();
   }
@@ -1538,19 +1534,19 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-const documentPdfColumns = {
-  quotations: 'quotation_pdf_url',
-  delivery_orders: 'delivery_pdf_url',
-  invoices: 'invoice_pdf_url',
-  sales_orders: 'global_delivery_pdf_url',
+const documentTables = {
+  quotations: 'quotations',
+  delivery_orders: 'delivery_orders',
+  invoices: 'invoices',
+  sales_orders: 'sales_orders',
 };
 
 app.post('/api/documents/:type/:id/pdf', async (req, res) => {
   const { type, id } = req.params;
   const { html, filename } = req.body || {};
-  const column = documentPdfColumns[type];
+  const table = documentTables[type];
 
-  if (!column) {
+  if (!table) {
     return res.status(400).json({ error: 'Invalid document type' });
   }
 
@@ -1559,23 +1555,17 @@ app.post('/api/documents/:type/:id/pdf', async (req, res) => {
   }
 
   try {
-    const [existing] = await query(`SELECT ${column} FROM \`${type}\` WHERE id = ? LIMIT 1`, [id]);
-    if (!existing) {
+    const rows = await query(`SELECT id FROM \`${table}\` WHERE id = ? LIMIT 1`, [id]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    if (existing[column]) {
-      const existingPath = resolveUploadFilePath(existing[column]);
-      if (existingPath && fs.existsSync(existingPath)) {
-        return res.json({ url: existing[column] });
-      }
-    }
-
     const safePrefix = (typeof filename === 'string' ? filename.trim() : '') || `${type}-${id}`;
-    const normalizedPrefix = safePrefix.replace(/[^\w.-]+/g, '_');
-    const pdfUrl = await generatePdfFromHtml(html, normalizedPrefix);
-    await query(`UPDATE \`${type}\` SET ${column} = ? WHERE id = ?`, [pdfUrl, id]);
-    return res.json({ url: pdfUrl });
+    const normalizedPrefix = safePrefix.replace(/[^\w.-]+/g, '_') || `${type}-${id}`;
+    const pdfBuffer = await generatePdfFromHtml(html);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${normalizedPrefix}.pdf"`);
+    return res.send(pdfBuffer);
   } catch (error) {
     console.error('Failed to generate pdf', error);
     return res.status(500).json({ error: 'Failed to generate PDF' });
