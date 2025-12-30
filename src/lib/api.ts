@@ -143,11 +143,30 @@ export async function generateDocumentPdf(
   id: string | number,
   html: string,
   filename?: string,
-): Promise<{ url: string }> {
+): Promise<{ blob: Blob }> {
   const response = await fetch(`${API_BASE_URL}/documents/${type}/${id}/pdf`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ html, filename }),
   });
-  return handleResponse(response);
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const message = data?.error || 'Request failed';
+    throw new Error(message);
+  }
+  const blob = await response.blob();
+  return { blob };
+}
+
+export function downloadPdfBlob(blob: Blob, filename: string) {
+  const safeName = filename.replace(/[^\w.-]+/g, '_') || 'document';
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${safeName}.pdf`;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

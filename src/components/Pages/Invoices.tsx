@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -407,11 +407,8 @@ export default function Invoices() {
     const html = buildInvoiceTemplate(invoice, latestSettings);
     const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
     try {
-      const { url } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
-      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
-      if (previewWindow) {
-        previewWindow.document.title = `${safeNumber}.pdf`;
-      }
+      const { blob } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
+      downloadPdfBlob(blob, safeNumber);
     } catch (error) {
       console.error('Failed to download invoice PDF', error);
       alert('Failed to generate PDF. Please try again.');
