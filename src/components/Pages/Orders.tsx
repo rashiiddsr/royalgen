@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -728,7 +728,7 @@ export default function Orders() {
     return match[1];
   };
 
-  const handleDownloadDeliveryOrder = (delivery: DeliveryOrder) => {
+  const handleDownloadDeliveryOrder = async (delivery: DeliveryOrder) => {
     const orderNumber = detailOrder?.po_number || detailOrder?.order_number || '-';
     const html = buildDeliveryOrderTemplate({
       deliveryNumber: delivery.delivery_number,
@@ -740,16 +740,19 @@ export default function Orders() {
       salesOrderNumber: orderNumber,
     });
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (previewWindow) {
-      previewWindow.document.title = `${safeNumber}.pdf`;
+    try {
+      const { url } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
+      if (previewWindow) {
+        previewWindow.document.title = `${safeNumber}.pdf`;
+      }
+    } catch (error) {
+      console.error('Failed to download delivery order PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const handleDownloadGlobalDeliveryOrder = () => {
+  const handleDownloadGlobalDeliveryOrder = async () => {
     if (!detailOrder || linkedDeliveries.length === 0) return;
     const latestDelivery = linkedDeliveries[0];
     const baseNumber = resolveBaseDeliveryNumber(latestDelivery.delivery_number);
@@ -764,13 +767,16 @@ export default function Orders() {
       salesOrderNumber: orderNumber,
     });
     const safeNumber = baseNumber.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (previewWindow) {
-      previewWindow.document.title = `${safeNumber}.pdf`;
+    try {
+      const { url } = await generateDocumentPdf('delivery_orders', latestDelivery.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
+      if (previewWindow) {
+        previewWindow.document.title = `${safeNumber}.pdf`;
+      }
+    } catch (error) {
+      console.error('Failed to download delivery order PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const usedQuotationIds = useMemo(
