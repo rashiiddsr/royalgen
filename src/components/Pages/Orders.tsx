@@ -247,6 +247,7 @@ export default function Orders() {
     notes,
     goods,
     salesOrderNumber,
+    settingsOverride,
   }: {
     deliveryNumber: string;
     deliveryDate?: string | null;
@@ -255,8 +256,9 @@ export default function Orders() {
     notes?: string | null;
     goods: OrderGood[];
     salesOrderNumber?: string | null;
+    settingsOverride?: CompanySetting | null;
   }) => {
-    const settings = companySettings;
+    const settings = settingsOverride ?? companySettings;
     const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
     const defaultNotes = [
       'Harap periksa barang yang diterima sesuai dengan detail yang tercantum di atas.',
@@ -731,6 +733,9 @@ export default function Orders() {
   };
 
   const handleDownloadDeliveryOrder = async (delivery: DeliveryOrder) => {
+    const settingsData = await getRecords<CompanySetting>('settings');
+    const latestSettings = settingsData[0] || null;
+    setCompanySettings(latestSettings);
     const orderNumber = detailOrder?.po_number || detailOrder?.order_number || '-';
     const html = buildDeliveryOrderTemplate({
       deliveryNumber: delivery.delivery_number,
@@ -740,6 +745,7 @@ export default function Orders() {
       notes: delivery.notes,
       goods: parseDeliveryGoods(delivery.goods),
       salesOrderNumber: orderNumber,
+      settingsOverride: latestSettings,
     });
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
     try {
@@ -757,6 +763,9 @@ export default function Orders() {
   const handleDownloadGlobalDeliveryOrder = async () => {
     if (!detailOrder || linkedDeliveries.length === 0) return;
     const latestDelivery = linkedDeliveries[0];
+    const settingsData = await getRecords<CompanySetting>('settings');
+    const latestSettings = settingsData[0] || null;
+    setCompanySettings(latestSettings);
     const baseNumber = resolveBaseDeliveryNumber(latestDelivery.delivery_number);
     const orderNumber = detailOrder.po_number || detailOrder.order_number || '-';
     const safeNumber = baseNumber.replace(/[^\w.-]+/g, '_') || 'delivery-order';
@@ -770,6 +779,7 @@ export default function Orders() {
           notes: latestDelivery.notes,
           goods: parseDeliveryGoods(latestDelivery.goods),
           salesOrderNumber: orderNumber,
+          settingsOverride: latestSettings,
         });
         const { url } = await generateDocumentPdf('delivery_orders', latestDelivery.id, html, safeNumber);
         await updateRecord('sales_orders', detailOrder.id, { global_delivery_pdf_url: url });
@@ -788,6 +798,7 @@ export default function Orders() {
         notes: latestDelivery.notes,
         goods: detailGoods,
         salesOrderNumber: orderNumber,
+        settingsOverride: latestSettings,
       });
       const { url } = await generateDocumentPdf('sales_orders', detailOrder.id, html, safeNumber);
       const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');

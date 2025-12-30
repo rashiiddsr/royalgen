@@ -211,8 +211,8 @@ export default function Quotations() {
     return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
-  const buildQuotationTemplate = (quotation: QuotationType) => {
-    const settings = companySettings;
+  const buildQuotationTemplate = (quotation: QuotationType, settingsOverride?: CompanySetting | null) => {
+    const settings = settingsOverride ?? companySettings;
     const goodsList = Array.isArray(quotation.goods) ? quotation.goods : [];
     const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
     const offerValidityDays = Number(quotation.offer_validity_days) || 30;
@@ -391,7 +391,10 @@ export default function Quotations() {
   };
 
   const handleDownloadQuotation = async (quotation: QuotationType) => {
-    const html = buildQuotationTemplate(quotation);
+    const settingsData = await getRecords<CompanySetting>('settings');
+    const latestSettings = settingsData[0] || null;
+    setCompanySettings(latestSettings);
+    const html = buildQuotationTemplate(quotation, latestSettings);
     const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
     try {
       const { url } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);

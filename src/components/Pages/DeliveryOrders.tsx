@@ -153,8 +153,8 @@ export default function DeliveryOrders() {
     return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
-  const buildDeliveryOrderTemplate = (delivery: DeliveryOrder) => {
-    const settings = companySettings;
+  const buildDeliveryOrderTemplate = (delivery: DeliveryOrder, settingsOverride?: CompanySetting | null) => {
+    const settings = settingsOverride ?? companySettings;
     const order = orderMap.get(String(delivery.sales_order_id));
     const goodsList = Array.isArray(delivery.goods) ? delivery.goods : [];
     const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
@@ -309,7 +309,10 @@ export default function DeliveryOrders() {
   };
 
   const handleDownloadDeliveryOrder = async (delivery: DeliveryOrder) => {
-    const html = buildDeliveryOrderTemplate(delivery);
+    const settingsData = await getRecords<CompanySetting>('settings');
+    const latestSettings = settingsData[0] || null;
+    setCompanySettings(latestSettings);
+    const html = buildDeliveryOrderTemplate(delivery, latestSettings);
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
     try {
       const { url } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
@@ -463,6 +466,27 @@ export default function DeliveryOrders() {
     return `${baseNumber}-${nextSuffix}`;
   };
 
+  const computeDeliveryNumberForEdit = (delivery: DeliveryOrder, rows: DeliveryGood[]) => {
+    const salesOrderId = String(delivery.sales_order_id || '');
+    const baseNumber =
+      parseDeliveryNumber(delivery.delivery_number).base || resolveBaseDeliveryNumber(salesOrderId);
+    const otherDeliveries = deliveries.filter(
+      (item) =>
+        String(item.sales_order_id) === salesOrderId && String(item.id) !== String(delivery.id)
+    );
+    const hasShipmentQty = rows.some((row) => Number(row.qty) > 0);
+    const completeNow = isDeliveryComplete(rows);
+
+    if (otherDeliveries.length === 0) {
+      if (!hasShipmentQty || completeNow) {
+        return baseNumber;
+      }
+      return `${baseNumber}-1`;
+    }
+
+    return delivery.delivery_number || baseNumber;
+  };
+
   const openCreateModal = () => {
     setEditingDelivery(null);
     setFormData({
@@ -595,7 +619,7 @@ export default function DeliveryOrders() {
 
     try {
       const computedNumber = editingDelivery
-        ? formData.delivery_number
+        ? computeDeliveryNumberForEdit(editingDelivery, goodsRows)
         : computeDeliveryNumber(formData.sales_order_id, goodsRows);
       if (editingDelivery) {
         await updateRecord<DeliveryOrder>('delivery_orders', editingDelivery.id, {

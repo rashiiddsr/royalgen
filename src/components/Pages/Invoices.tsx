@@ -232,8 +232,8 @@ export default function Invoices() {
     return [];
   };
 
-  const buildInvoiceTemplate = (invoice: InvoiceType) => {
-    const settings = companySettings;
+  const buildInvoiceTemplate = (invoice: InvoiceType, settingsOverride?: CompanySetting | null) => {
+    const settings = settingsOverride ?? companySettings;
     const goodsList = parseInvoiceGoods(invoice.goods);
     const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
     const taxRate = Number(settings?.tax_rate) || 0;
@@ -401,7 +401,10 @@ export default function Invoices() {
   };
 
   const handleDownloadInvoice = async (invoice: InvoiceType) => {
-    const html = buildInvoiceTemplate(invoice);
+    const settingsData = await getRecords<CompanySetting>('settings');
+    const latestSettings = settingsData[0] || null;
+    setCompanySettings(latestSettings);
+    const html = buildInvoiceTemplate(invoice, latestSettings);
     const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
     try {
       const { url } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);

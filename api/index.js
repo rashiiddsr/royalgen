@@ -1799,6 +1799,10 @@ app.post('/api/:table', async (req, res) => {
       const settingsPayload = normalizeSettingsPayload(payload);
       const result = await query('INSERT INTO ?? SET ?', [table, settingsPayload]);
       const [created] = await query('SELECT * FROM ?? WHERE id = ?', [table, result.insertId]);
+      await query('UPDATE `quotations` SET quotation_pdf_url = NULL');
+      await query('UPDATE `delivery_orders` SET delivery_pdf_url = NULL');
+      await query('UPDATE `invoices` SET invoice_pdf_url = NULL');
+      await query('UPDATE `sales_orders` SET global_delivery_pdf_url = NULL');
 
       await logActivity({
         performedBy,
@@ -2249,6 +2253,7 @@ app.put('/api/:table/:id', async (req, res) => {
       const {
         goods = [],
         delivery_date: deliveryDate,
+        delivery_number: deliveryNumber,
         ship_address: shipAddress,
         company_name: companyName,
         client_id: clientId,
@@ -2286,6 +2291,7 @@ app.put('/api/:table/:id', async (req, res) => {
 
       const nextUpdates = {
         delivery_date: deliveryDate ? formatDateOnly(deliveryDate) : existing.delivery_date,
+        delivery_number: deliveryNumber || existing.delivery_number,
         goods: JSON.stringify(cleanedGoods),
         ship_address: shipAddress ?? existing.ship_address,
         company_name: companyName ?? existing.company_name,
