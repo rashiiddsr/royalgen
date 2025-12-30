@@ -407,13 +407,11 @@ export default function Invoices() {
     const html = buildInvoiceTemplate(invoice, latestSettings);
     const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
     try {
-      const { blob } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
-      const url = URL.createObjectURL(blob);
-      const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+      const { url } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
       if (previewWindow) {
         previewWindow.document.title = `${safeNumber}.pdf`;
       }
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (error) {
       console.error('Failed to download invoice PDF', error);
       alert('Failed to generate PDF. Please try again.');

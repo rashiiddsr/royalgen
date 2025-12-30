@@ -397,13 +397,11 @@ export default function Quotations() {
     const html = buildQuotationTemplate(quotation, latestSettings);
     const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
     try {
-      const { blob } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
-      const url = URL.createObjectURL(blob);
-      const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+      const { url } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
       if (previewWindow) {
         previewWindow.document.title = `${safeNumber}.pdf`;
       }
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (error) {
       console.error('Failed to download quotation PDF', error);
       alert('Failed to generate PDF. Please try again.');
