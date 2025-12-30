@@ -143,17 +143,11 @@ export async function generateDocumentPdf(
   id: string | number,
   html: string,
   filename?: string,
-): Promise<{ blob: Blob }> {
+): Promise<{ url: string }> {
   const response = await fetch(`${API_BASE_URL}/documents/${type}/${id}/pdf`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ html, filename }),
   });
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    const message = data?.error || 'Request failed';
-    throw new Error(message);
-  }
-  const blob = await response.blob();
-  return { blob };
+  return handleResponse(response);
 }
