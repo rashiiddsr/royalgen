@@ -2493,6 +2493,12 @@ app.put('/api/:table/:id', async (req, res) => {
         description: `Updated sales order ${updated?.order_number || id}`,
       });
 
+      const shouldResetLinkedDocs = shouldResetGlobalDo;
+      if (shouldResetLinkedDocs) {
+        await query('UPDATE `delivery_orders` SET delivery_pdf_url = NULL WHERE sales_order_id = ?', [id]);
+        await query('UPDATE `invoices` SET invoice_pdf_url = NULL WHERE sales_order_id = ?', [id]);
+      }
+
       if (isStatusChange) {
         await logActivity({
           performedBy,
