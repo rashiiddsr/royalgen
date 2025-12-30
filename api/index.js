@@ -9,7 +9,6 @@ import net from 'net';
 import tls from 'tls';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import puppeteer from 'puppeteer';
 import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,7 +28,6 @@ if (!fs.existsSync(uploadDir)) {
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/uploads', express.static(uploadDir));
-app.use('/downloads', express.static(uploadDir));
 
 const io = new SocketIOServer(server, {
   cors: {
@@ -128,25 +126,6 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 };
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
-
-const generatePdfFromHtml = async (html, filenamePrefix = 'document') => {
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    await page.emulateMediaType('screen');
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
-    const filename = `${filenamePrefix}-${Date.now()}.pdf`;
-    const filePath = path.join(uploadDir, filename);
-    fs.writeFileSync(filePath, pdfBuffer);
-    return `/downloads/${filename}`;
-  } finally {
-    await browser.close();
-  }
-};
 
 const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') => {
   if (!Array.isArray(documents)) return [];
@@ -743,23 +722,14 @@ const resolveUploadFilePath = (url) => {
   if (url.startsWith('/uploads/')) {
     return path.join(uploadDir, url.replace('/uploads/', ''));
   }
-  if (url.startsWith('/downloads/')) {
-    return path.join(uploadDir, url.replace('/downloads/', ''));
-  }
   if (url.startsWith('uploads/')) {
     return path.join(uploadDir, url.replace('uploads/', ''));
-  }
-  if (url.startsWith('downloads/')) {
-    return path.join(uploadDir, url.replace('downloads/', ''));
   }
   if (url.startsWith('http')) {
     try {
       const parsed = new URL(url);
       if (parsed.pathname.startsWith('/uploads/')) {
         return path.join(uploadDir, parsed.pathname.replace('/uploads/', ''));
-      }
-      if (parsed.pathname.startsWith('/downloads/')) {
-        return path.join(uploadDir, parsed.pathname.replace('/downloads/', ''));
       }
     } catch {
       return null;
@@ -1535,49 +1505,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
   } catch (error) {
     console.error('Reset password error', error);
     return res.status(500).json({ error: 'Failed to reset password' });
-  }
-});
-
-const documentPdfColumns = {
-  quotations: 'quotation_pdf_url',
-  delivery_orders: 'delivery_pdf_url',
-  invoices: 'invoice_pdf_url',
-};
-
-app.post('/api/documents/:type/:id/pdf', async (req, res) => {
-  const { type, id } = req.params;
-  const { html, filename } = req.body || {};
-  const column = documentPdfColumns[type];
-
-  if (!column) {
-    return res.status(400).json({ error: 'Invalid document type' });
-  }
-
-  if (!html || typeof html !== 'string') {
-    return res.status(400).json({ error: 'HTML content is required' });
-  }
-
-  try {
-    const [existing] = await query(`SELECT ${column} FROM \`${type}\` WHERE id = ? LIMIT 1`, [id]);
-    if (!existing) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-
-    if (existing[column]) {
-      const existingPath = resolveUploadFilePath(existing[column]);
-      if (existingPath && fs.existsSync(existingPath)) {
-        return res.json({ url: existing[column] });
-      }
-    }
-
-    const safePrefix = (typeof filename === 'string' ? filename.trim() : '') || `${type}-${id}`;
-    const normalizedPrefix = safePrefix.replace(/[^\w.-]+/g, '_');
-    const pdfUrl = await generatePdfFromHtml(html, normalizedPrefix);
-    await query(`UPDATE \`${type}\` SET ${column} = ? WHERE id = ?`, [pdfUrl, id]);
-    return res.json({ url: pdfUrl });
-  } catch (error) {
-    console.error('Failed to generate pdf', error);
-    return res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 
