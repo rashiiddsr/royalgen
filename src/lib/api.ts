@@ -35,6 +35,8 @@ type TableName =
   | 'users'
   | 'activity_logs';
 
+type DocumentType = 'quotations' | 'delivery_orders' | 'invoices' | 'sales_orders';
+
 type BaseRecord = { id: string | number; created_at?: string } & Record<string, unknown>;
 
 async function handleResponse(response: Response) {
@@ -134,4 +136,18 @@ export async function getActivityLogs(userId?: number | string) {
     headers: {},
   });
   return handleResponse(response) as Promise<ActivityLog[]>;
+}
+
+export async function generateDocumentPdf(
+  type: DocumentType,
+  id: string | number,
+  html: string,
+  filename?: string,
+): Promise<{ url: string }> {
+  const response = await fetch(`${API_BASE_URL}/documents/${type}/${id}/pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ html, filename }),
+  });
+  return handleResponse(response);
 }

@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
   `include_tax` TINYINT(1) NOT NULL DEFAULT 0,
+  `quotation_pdf_url` VARCHAR(500) DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT 'waiting',
   `negotiation_round` INT DEFAULT 0,
   `performed_by` INT DEFAULT NULL,
@@ -143,6 +144,7 @@ CREATE TABLE IF NOT EXISTS `sales_orders` (
   `payment_time` VARCHAR(120) DEFAULT NULL,
   `goods` JSON DEFAULT NULL,
   `documents` JSON DEFAULT NULL,
+  `global_delivery_pdf_url` VARCHAR(500) DEFAULT NULL,
   `total_amount` DECIMAL(12,2) DEFAULT 0,
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
@@ -163,6 +165,7 @@ CREATE TABLE IF NOT EXISTS `delivery_orders` (
   `ship_address` TEXT DEFAULT NULL,
   `notes` TEXT DEFAULT NULL,
   `goods` JSON DEFAULT NULL,
+  `delivery_pdf_url` VARCHAR(500) DEFAULT NULL,
   `created_by` INT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -178,6 +181,7 @@ CREATE TABLE IF NOT EXISTS `invoices` (
   `payment_time` VARCHAR(120) DEFAULT NULL,
   `invoice_date` DATE DEFAULT NULL,
   `goods` JSON DEFAULT NULL,
+  `invoice_pdf_url` VARCHAR(500) DEFAULT NULL,
   `total_amount` DECIMAL(12,2) DEFAULT 0,
   `tax_amount` DECIMAL(12,2) DEFAULT 0,
   `grand_total` DECIMAL(12,2) DEFAULT 0,
