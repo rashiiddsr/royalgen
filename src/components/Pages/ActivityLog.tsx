@@ -51,7 +51,7 @@ export default function ActivityLog({ showHeader = true }: ActivityLogProps) {
             <h1 className="text-3xl font-bold text-gray-900">Activity Log</h1>
             <p className="text-gray-600 mt-1">View your recent actions across the platform.</p>
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm text-sm text-gray-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200">
+            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm text-sm text-gray-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200">
             <Filter className="h-4 w-4 text-gray-500" />
             Showing personal activity on {selectedDate}
           </div>
@@ -64,7 +64,7 @@ export default function ActivityLog({ showHeader = true }: ActivityLogProps) {
           type="date"
           value={selectedDate}
           onChange={(event) => setSelectedDate(event.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+           className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
       </div>
 
