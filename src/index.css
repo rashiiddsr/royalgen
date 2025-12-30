@@ -93,7 +93,7 @@
   input:not([type='checkbox']):not([type='radio']):not([type='file']):not([readonly]):not(:disabled),
   textarea:not([readonly]):not(:disabled),
   select:not(:disabled) {
-    border-color: #d1d5db;
+    border-color: #3b82f6 !important;
   }
 }
 
