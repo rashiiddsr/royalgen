@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -399,19 +399,16 @@ export default function Invoices() {
     `;
   };
 
-  const handleDownloadInvoice = async (invoice: InvoiceType) => {
+  const handleDownloadInvoice = (invoice: InvoiceType) => {
     const html = buildInvoiceTemplate(invoice);
     const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
-    try {
-      const { url } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
-      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
-      if (previewWindow) {
-        previewWindow.document.title = `${safeNumber}.pdf`;
-      }
-    } catch (error) {
-      console.error('Failed to download invoice PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
     }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const getStatusColor = (status: string) => {
@@ -651,7 +648,7 @@ export default function Invoices() {
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
                   <Download className="h-4 w-4" />
-                  View Document
+                  Unduh PDF
                 </button>
                 <button
                   onClick={() => setDetailInvoice(null)}

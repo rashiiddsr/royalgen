@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { addRecord, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -389,19 +389,16 @@ export default function Quotations() {
     `;
   };
 
-  const handleDownloadQuotation = async (quotation: QuotationType) => {
+  const handleDownloadQuotation = (quotation: QuotationType) => {
     const html = buildQuotationTemplate(quotation);
     const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
-    try {
-      const { url } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
-      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
-      if (previewWindow) {
-        previewWindow.document.title = `${safeNumber}.pdf`;
-      }
-    } catch (error) {
-      console.error('Failed to download quotation PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
     }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const getNextQuotationNumber = () => {
@@ -1316,7 +1313,7 @@ export default function Quotations() {
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
                   <Download className="h-4 w-4" />
-                  View Document
+                  Unduh PDF
                 </button>
                 <button
                   onClick={() => setDetailQuotation(null)}

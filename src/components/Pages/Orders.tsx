@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -728,7 +728,7 @@ export default function Orders() {
     return match[1];
   };
 
-  const handleDownloadDeliveryOrder = async (delivery: DeliveryOrder) => {
+  const handleDownloadDeliveryOrder = (delivery: DeliveryOrder) => {
     const orderNumber = detailOrder?.po_number || detailOrder?.order_number || '-';
     const html = buildDeliveryOrderTemplate({
       deliveryNumber: delivery.delivery_number,
@@ -740,19 +740,16 @@ export default function Orders() {
       salesOrderNumber: orderNumber,
     });
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    try {
-      const { url } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
-      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
-      if (previewWindow) {
-        previewWindow.document.title = `${safeNumber}.pdf`;
-      }
-    } catch (error) {
-      console.error('Failed to download delivery order PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
     }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const handleDownloadGlobalDeliveryOrder = async () => {
+  const handleDownloadGlobalDeliveryOrder = () => {
     if (!detailOrder || linkedDeliveries.length === 0) return;
     const latestDelivery = linkedDeliveries[0];
     const baseNumber = resolveBaseDeliveryNumber(latestDelivery.delivery_number);
@@ -767,16 +764,13 @@ export default function Orders() {
       salesOrderNumber: orderNumber,
     });
     const safeNumber = baseNumber.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    try {
-      const { url } = await generateDocumentPdf('delivery_orders', latestDelivery.id, html, safeNumber);
-      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
-      if (previewWindow) {
-        previewWindow.document.title = `${safeNumber}.pdf`;
-      }
-    } catch (error) {
-      console.error('Failed to download delivery order PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
     }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const usedQuotationIds = useMemo(
@@ -1242,7 +1236,7 @@ export default function Orders() {
                   onClick={() => setShowDoModal((prev) => !prev)}
                   className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                 >
-                  View Document
+                  View DO Linked
                 </button>
                 <button
                   onClick={() => {
@@ -1325,7 +1319,7 @@ export default function Orders() {
                       className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                     >
                       <Download className="h-4 w-4" />
-                      View Document
+                      Unduh DO Global
                     </button>
                   )}
                 </div>
@@ -1350,7 +1344,7 @@ export default function Orders() {
                             className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                           >
                             <Download className="h-4 w-4" />
-                            View Document
+                            Unduh DO
                           </button>
                         </li>
                       ))}
