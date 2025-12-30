@@ -388,13 +388,75 @@ export default function DeliveryOrders() {
     ];
     const romanMonth = romanMonths[new Date().getMonth()];
     const maxSequence = deliveries.reduce((max, delivery) => {
-      const match = delivery.delivery_number?.match(/^(\d{4})\/RGI\/DO\/[IVXLCDM]+\/(\d{4})$/);
+      const match = delivery.delivery_number?.match(
+        /^(\d{4})\/RGI\/DO\/[IVXLCDM]+\/(\d{4})(?:-(\d+))?$/
+      );
       if (!match || Number(match[2]) !== year) return max;
       const sequence = Number(match[1]);
       return Number.isNaN(sequence) ? max : Math.max(max, sequence);
     }, 0);
     const nextSequence = String(maxSequence + 1).padStart(4, '0');
     return `${nextSequence}/RGI/DO/${romanMonth}/${year}`;
+  };
+
+  const parseDeliveryNumber = (value?: string | null) => {
+    if (!value) {
+      return { base: '', suffix: null as number | null };
+    }
+    const match = value.match(/^(\d{4}\/RGI\/DO\/[IVXLCDM]+\/\d{4})(?:-(\d+))?$/);
+    if (!match) {
+      return { base: value, suffix: null as number | null };
+    }
+    return { base: match[1], suffix: match[2] ? Number(match[2]) : null };
+  };
+
+  const resolveBaseDeliveryNumber = (salesOrderId: string) => {
+    const orderDeliveries = deliveries
+      .filter((delivery) => String(delivery.sales_order_id) === String(salesOrderId))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    if (orderDeliveries.length === 0) {
+      return getNextDeliveryNumber();
+    }
+    const { base } = parseDeliveryNumber(orderDeliveries[0].delivery_number);
+    return base || getNextDeliveryNumber();
+  };
+
+  const resolveNextDeliverySuffix = (salesOrderId: string, baseNumber: string) => {
+    const orderDeliveries = deliveries.filter(
+      (delivery) => String(delivery.sales_order_id) === String(salesOrderId)
+    );
+    const maxSuffix = orderDeliveries.reduce((max, delivery) => {
+      const parsed = parseDeliveryNumber(delivery.delivery_number);
+      if (parsed.base !== baseNumber || !parsed.suffix) return max;
+      return Math.max(max, parsed.suffix);
+    }, 0);
+    return maxSuffix + 1;
+  };
+
+  const isDeliveryComplete = (rows: DeliveryGood[]) => {
+    if (rows.length === 0) return false;
+    return rows.every((row) => {
+      const remaining = Number(row.remaining_qty) || 0;
+      const shipped = Number(row.qty) || 0;
+      return shipped >= remaining;
+    });
+  };
+
+  const computeDeliveryNumber = (salesOrderId: string, rows: DeliveryGood[]) => {
+    if (!salesOrderId) return getNextDeliveryNumber();
+    const orderDeliveries = deliveries.filter(
+      (delivery) => String(delivery.sales_order_id) === String(salesOrderId)
+    );
+    const baseNumber = resolveBaseDeliveryNumber(salesOrderId);
+    const hasShipmentQty = rows.some((row) => Number(row.qty) > 0);
+    const completeNow = isDeliveryComplete(rows);
+    if (orderDeliveries.length === 0) {
+      if (!hasShipmentQty || completeNow) {
+        return baseNumber;
+      }
+    }
+    const nextSuffix = resolveNextDeliverySuffix(salesOrderId, baseNumber);
+    return `${baseNumber}-${nextSuffix}`;
   };
 
   const openCreateModal = () => {
@@ -452,6 +514,8 @@ export default function DeliveryOrders() {
     });
     const filteredRemaining = remainingGoods.filter((item) => (item.remaining_qty ?? 0) > 0);
 
+    const nextDeliveryNumber = computeDeliveryNumber(salesOrderId, filteredRemaining);
+
     setFormData((prev) => ({
       ...prev,
       sales_order_id: salesOrderId,
@@ -459,18 +523,27 @@ export default function DeliveryOrders() {
       company_name: order?.company_name || client?.company_name || '',
       ship_address: resolvedShipAddresses[0] || '',
       notes: '',
+      delivery_number: nextDeliveryNumber,
     }));
     setGoodsRows(filteredRemaining);
   };
 
   const handleGoodsQtyChange = (index: number, value: string) => {
-    setGoodsRows((prev) =>
-      prev.map((row, rowIndex) => {
+    setGoodsRows((prev) => {
+      const nextRows = prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const qty = value === '' ? '' : Number(value);
         return { ...row, qty };
-      })
-    );
+      });
+      if (!editingDelivery && formData.sales_order_id) {
+        const nextNumber = computeDeliveryNumber(formData.sales_order_id, nextRows);
+        setFormData((current) => ({
+          ...current,
+          delivery_number: nextNumber,
+        }));
+      }
+      return nextRows;
+    });
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -517,10 +590,13 @@ export default function DeliveryOrders() {
     }
 
     try {
+      const computedNumber = editingDelivery
+        ? formData.delivery_number
+        : computeDeliveryNumber(formData.sales_order_id, goodsRows);
       if (editingDelivery) {
         await updateRecord<DeliveryOrder>('delivery_orders', editingDelivery.id, {
           delivery_date: formData.delivery_date,
-          delivery_number: formData.delivery_number,
+          delivery_number: computedNumber,
           sales_order_id: formData.sales_order_id,
           client_id: formData.client_id,
           company_name: formData.company_name,
@@ -531,7 +607,7 @@ export default function DeliveryOrders() {
         } as DeliveryOrder);
       } else {
         await addRecord<DeliveryOrder>('delivery_orders', {
-          delivery_number: formData.delivery_number,
+          delivery_number: computedNumber,
           delivery_date: formData.delivery_date,
           sales_order_id: formData.sales_order_id,
           client_id: formData.client_id,

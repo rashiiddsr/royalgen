@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
-import { CheckCircle, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
+import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
@@ -68,7 +68,23 @@ interface DeliveryOrder {
   delivery_number: string;
   delivery_date?: string;
   sales_order_id: string;
+  company_name?: string;
+  ship_address?: string | null;
+  notes?: string | null;
+  goods?: OrderGood[] | string | null;
+  created_by?: number | null;
   created_at: string;
+}
+
+interface CompanySetting {
+  id: string;
+  company_name?: string | null;
+  company_address?: string | null;
+  director_name?: string | null;
+  tax_id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  logo_url?: string | null;
 }
 
 const EMPTY_FORM = {
@@ -101,6 +117,7 @@ export default function Orders() {
   const [documentsError, setDocumentsError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const isEditing = Boolean(editingOrder);
+  const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const canApprovePayment = profile?.role === 'superadmin' || profile?.role === 'manager';
 
@@ -127,6 +144,19 @@ export default function Orders() {
     if (typeof docs === 'string') {
       try {
         return JSON.parse(docs) as OrderDocument[];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const parseDeliveryGoods = (goods?: OrderGood[] | string | null) => {
+    if (!goods) return [];
+    if (Array.isArray(goods)) return goods;
+    if (typeof goods === 'string') {
+      try {
+        return JSON.parse(goods) as OrderGood[];
       } catch {
         return [];
       }
@@ -162,6 +192,25 @@ export default function Orders() {
   const formatCurrency = (value: number) => `Rp ${formatRupiah(value)}`;
   const canEditOrder = (order: OrderType) => !['waiting payment', 'done'].includes(order.status);
 
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => {
+      const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      };
+      return map[char] || char;
+    });
+
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
   const resolveOrderTotals = (orderGoods: OrderGood[], order?: OrderType) => {
     const subtotal =
       order?.total_amount !== undefined && order?.total_amount !== null
@@ -189,17 +238,186 @@ export default function Orders() {
     return doc.data;
   };
 
+  const buildDeliveryOrderTemplate = ({
+    deliveryNumber,
+    deliveryDate,
+    shipAddress,
+    companyName,
+    notes,
+    goods,
+    salesOrderNumber,
+  }: {
+    deliveryNumber: string;
+    deliveryDate?: string | null;
+    shipAddress?: string | null;
+    companyName?: string | null;
+    notes?: string | null;
+    goods: OrderGood[];
+    salesOrderNumber?: string | null;
+  }) => {
+    const settings = companySettings;
+    const logoSrc = settings?.logo_url ? `${apiRoot}${settings.logo_url}` : '';
+    const defaultNotes = [
+      'Harap periksa barang yang diterima sesuai dengan detail yang tercantum di atas.',
+      'Segera laporkan kepada kami jika terdapat ketidaksesuaian atau kerusakan barang dalam waktu 1x24 jam setelah barang diterima.',
+    ];
+    const notesList = [...defaultNotes];
+    if (notes) {
+      notesList.push(`Catatan tambahan: ${notes}`);
+    }
+    const rowsHtml = goods
+      .map((row, index) => {
+        const qty = Number(row.qty) || 0;
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(row.name || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
+            <td style="text-align:right;">${qty}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <!doctype html>
+      <html lang="id">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(deliveryNumber || 'Delivery Order')}.pdf</title>
+          <style>
+            :root {
+              --ink: #0f172a;
+              --muted: #6b7280;
+              --border: #e5e7eb;
+              --accent: #2563eb;
+              --accent-soft: #eff6ff;
+            }
+            * { box-sizing: border-box; }
+            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; }
+            .page { padding: 36px 40px 48px; }
+            .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+            .logo-block { display: flex; flex-direction: column; gap: 12px; }
+            .logo { max-height: 64px; object-fit: contain; }
+            .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+            .logo-placeholder svg { width: 32px; height: 32px; }
+            .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+            .doc-title { text-align: right; min-width: 220px; }
+            .doc-title h1 { margin: 0; font-size: 30px; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
+            .doc-meta { margin-top: 10px; display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+            .doc-meta div { display: flex; justify-content: space-between; gap: 16px; }
+            .address-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+            .address-grid h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .address-card { padding: 12px 0; }
+            .address-card p { margin: 4px 0; }
+            .address-card .name { font-weight: 600; color: #111827; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
+            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+            tr:nth-child(even) td { background: #f9fafb; }
+            .notes { margin-top: 24px; font-size: 13px; }
+            .notes h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
+            .notes ol { margin: 0; padding-left: 18px; }
+            .notes li { margin-bottom: 6px; text-align: justify; text-justify: inter-word; }
+            .signature { margin-top: 36px; display: flex; justify-content: space-between; gap: 40px; font-size: 13px; }
+            .signature .box { width: 45%; text-align: center; border-top: 1px solid var(--border); padding-top: 12px; }
+            .signature .name { margin-top: 66px; font-weight: 600; }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="top">
+              <div class="logo-block">
+                ${
+                  logoSrc
+                    ? `<img class="logo" src="${logoSrc}" alt="Company logo" />`
+                    : `<div class="logo-placeholder" aria-label="Company logo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                          <path d="M3 10.5L12 4l9 6.5"></path>
+                          <path d="M5.5 9.5V20h13V9.5"></path>
+                          <path d="M9 20v-5h6v5"></path>
+                        </svg>
+                      </div>`
+                }
+                <div class="brand-name">${escapeHtml(settings?.company_name || 'Company')}</div>
+              </div>
+              <div class="doc-title">
+                <h1>Delivery Order</h1>
+                <div class="doc-meta">
+                  <div><span>No</span><strong>${escapeHtml(deliveryNumber || '-')}</strong></div>
+                  <div><span>Tanggal</span><strong>${formatShortDate(deliveryDate)}</strong></div>
+                  <div><span>Sales Order</span><strong>${escapeHtml(salesOrderNumber || '-')}</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="address-grid">
+              <div class="address-card">
+                <h3>Dari</h3>
+                <p class="name">${escapeHtml(settings?.company_name || 'Company')}</p>
+                <p>${escapeHtml(settings?.company_address || '-')}</p>
+                <p>Email ${escapeHtml(settings?.email || '-')}</p>
+                <p>Telepon ${escapeHtml(settings?.phone || '-')}</p>
+                <p>NPWP ${escapeHtml(settings?.tax_id || '-')}</p>
+              </div>
+              <div class="address-card">
+                <h3>Kepada</h3>
+                <p class="name">${escapeHtml(companyName || '-')}</p>
+                <p>${escapeHtml(shipAddress || '-')}</p>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px;">No</th>
+                  <th>Barang</th>
+                  <th>Deskripsi</th>
+                  <th style="width: 60px;">Unit</th>
+                  <th style="width: 60px; text-align:right;">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml || `<tr><td colspan="5" style="text-align:center;">Tidak ada barang</td></tr>`}
+              </tbody>
+            </table>
+
+            <div class="notes">
+              <h3>Catatan</h3>
+              <ol>
+                ${notesList.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}
+              </ol>
+            </div>
+
+            <div class="signature">
+              <div class="box">
+                <div>Pengirim,</div>
+                <div class="name">....................</div>
+              </div>
+              <div class="box">
+                <div>Penerima,</div>
+                <div class="name">....................</div>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
   const fetchOrders = async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
     try {
       if (!silent) {
         setLoading(true);
       }
-      const [orderData, quotationData, userData, deliveryData] = await Promise.all([
+      const [orderData, quotationData, userData, deliveryData, settingsData] = await Promise.all([
         getRecords<OrderType>('sales_orders'),
         getRecords<QuotationType>('quotations'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
         getRecords<DeliveryOrder>('delivery_orders'),
+        getRecords<CompanySetting>('settings'),
       ]);
 
       const quotationMap = new Map(quotationData.map((quotation) => [quotation.id, quotation]));
@@ -219,7 +437,13 @@ export default function Orders() {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setOrders(mappedOrders);
-      setDeliveries(deliveryData);
+      setDeliveries(
+        deliveryData.map((delivery) => ({
+          ...delivery,
+          goods: parseDeliveryGoods(delivery.goods),
+        }))
+      );
+      setCompanySettings(settingsData[0] || null);
       setUsersById(userMap);
       setQuotations(
         quotationData.map((quotation) => ({
@@ -492,6 +716,62 @@ export default function Orders() {
     : [];
   const detailGoods = detailOrder ? parseGoods(detailOrder.goods) : [];
   const detailTotals = detailOrder ? resolveOrderTotals(detailGoods, detailOrder) : null;
+  const canDownloadGlobalDo =
+    detailOrder &&
+    linkedDeliveries.length > 1 &&
+    ['waiting approval', 'waiting payment', 'done'].includes(detailOrder.status);
+
+  const resolveBaseDeliveryNumber = (deliveryNumber?: string | null) => {
+    if (!deliveryNumber) return '';
+    const match = deliveryNumber.match(/^(\d{4}\/RGI\/DO\/[IVXLCDM]+\/\d{4})(?:-(\d+))?$/);
+    if (!match) return deliveryNumber;
+    return match[1];
+  };
+
+  const handleDownloadDeliveryOrder = (delivery: DeliveryOrder) => {
+    const orderNumber = detailOrder?.po_number || detailOrder?.order_number || '-';
+    const html = buildDeliveryOrderTemplate({
+      deliveryNumber: delivery.delivery_number,
+      deliveryDate: delivery.delivery_date,
+      shipAddress: delivery.ship_address || '-',
+      companyName: delivery.company_name || detailOrder?.company_name || '-',
+      notes: delivery.notes,
+      goods: parseDeliveryGoods(delivery.goods),
+      salesOrderNumber: orderNumber,
+    });
+    const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleDownloadGlobalDeliveryOrder = () => {
+    if (!detailOrder || linkedDeliveries.length === 0) return;
+    const latestDelivery = linkedDeliveries[0];
+    const baseNumber = resolveBaseDeliveryNumber(latestDelivery.delivery_number);
+    const orderNumber = detailOrder.po_number || detailOrder.order_number || '-';
+    const html = buildDeliveryOrderTemplate({
+      deliveryNumber: baseNumber,
+      deliveryDate: latestDelivery.delivery_date,
+      shipAddress: latestDelivery.ship_address || '-',
+      companyName: latestDelivery.company_name || detailOrder.company_name || '-',
+      notes: latestDelivery.notes,
+      goods: detailGoods,
+      salesOrderNumber: orderNumber,
+    });
+    const safeNumber = baseNumber.replace(/[^\w.-]+/g, '_') || 'delivery-order';
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (previewWindow) {
+      previewWindow.document.title = `${safeNumber}.pdf`;
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const usedQuotationIds = useMemo(
     () => new Set(orders.map((order) => String(order.quotation_id))),
@@ -1032,6 +1312,16 @@ export default function Orders() {
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-900">Linked Delivery Orders</h3>
+                  {canDownloadGlobalDo && (
+                    <button
+                      type="button"
+                      onClick={handleDownloadGlobalDeliveryOrder}
+                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                    >
+                      <Download className="h-4 w-4" />
+                      Unduh DO Global
+                    </button>
+                  )}
                 </div>
                   {linkedDeliveries.length === 0 ? (
                     <p className="text-sm text-gray-500">No delivery orders linked yet.</p>
@@ -1048,6 +1338,14 @@ export default function Orders() {
                               {delivery.delivery_date || '-'}
                             </p>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDeliveryOrder(delivery)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                          >
+                            <Download className="h-4 w-4" />
+                            Unduh DO
+                          </button>
                         </li>
                       ))}
                     </ul>
