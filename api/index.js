@@ -9,6 +9,7 @@ import net from 'net';
 import tls from 'tls';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import puppeteer from 'puppeteer';
 import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,6 +29,7 @@ if (!fs.existsSync(uploadDir)) {
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/uploads', express.static(uploadDir));
+app.use('/downloads', express.static(uploadDir));
 
 const io = new SocketIOServer(server, {
   cors: {
@@ -126,6 +128,25 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 };
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
+
+const generatePdfFromHtml = async (html, filenamePrefix = 'document') => {
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.emulateMediaType('screen');
+    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
+    const filename = `${filenamePrefix}-${Date.now()}.pdf`;
+    const filePath = path.join(uploadDir, filename);
+    fs.writeFileSync(filePath, pdfBuffer);
+    return `/downloads/${filename}`;
+  } finally {
+    await browser.close();
+  }
+};
 
 const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') => {
   if (!Array.isArray(documents)) return [];
@@ -722,14 +743,23 @@ const resolveUploadFilePath = (url) => {
   if (url.startsWith('/uploads/')) {
     return path.join(uploadDir, url.replace('/uploads/', ''));
   }
+  if (url.startsWith('/downloads/')) {
+    return path.join(uploadDir, url.replace('/downloads/', ''));
+  }
   if (url.startsWith('uploads/')) {
     return path.join(uploadDir, url.replace('uploads/', ''));
+  }
+  if (url.startsWith('downloads/')) {
+    return path.join(uploadDir, url.replace('downloads/', ''));
   }
   if (url.startsWith('http')) {
     try {
       const parsed = new URL(url);
       if (parsed.pathname.startsWith('/uploads/')) {
         return path.join(uploadDir, parsed.pathname.replace('/uploads/', ''));
+      }
+      if (parsed.pathname.startsWith('/downloads/')) {
+        return path.join(uploadDir, parsed.pathname.replace('/downloads/', ''));
       }
     } catch {
       return null;
@@ -1508,6 +1538,50 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+const documentPdfColumns = {
+  quotations: 'quotation_pdf_url',
+  delivery_orders: 'delivery_pdf_url',
+  invoices: 'invoice_pdf_url',
+  sales_orders: 'global_delivery_pdf_url',
+};
+
+app.post('/api/documents/:type/:id/pdf', async (req, res) => {
+  const { type, id } = req.params;
+  const { html, filename } = req.body || {};
+  const column = documentPdfColumns[type];
+
+  if (!column) {
+    return res.status(400).json({ error: 'Invalid document type' });
+  }
+
+  if (!html || typeof html !== 'string') {
+    return res.status(400).json({ error: 'HTML content is required' });
+  }
+
+  try {
+    const [existing] = await query(`SELECT ${column} FROM \`${type}\` WHERE id = ? LIMIT 1`, [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    if (existing[column]) {
+      const existingPath = resolveUploadFilePath(existing[column]);
+      if (existingPath && fs.existsSync(existingPath)) {
+        return res.json({ url: existing[column] });
+      }
+    }
+
+    const safePrefix = (typeof filename === 'string' ? filename.trim() : '') || `${type}-${id}`;
+    const normalizedPrefix = safePrefix.replace(/[^\w.-]+/g, '_');
+    const pdfUrl = await generatePdfFromHtml(html, normalizedPrefix);
+    await query(`UPDATE \`${type}\` SET ${column} = ? WHERE id = ?`, [pdfUrl, id]);
+    return res.json({ url: pdfUrl });
+  } catch (error) {
+    console.error('Failed to generate pdf', error);
+    return res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+
 app.get('/api/:table', async (req, res) => {
   const { table } = req.params;
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
@@ -1962,11 +2036,11 @@ app.post('/api/:table', async (req, res) => {
         ]);
         const deliveryRecipients = await getRoleEmails(['superadmin', 'manager']);
         const deliveryRequester = await getUserById(createdBy || order.created_by);
-        const deliveryDocuments = resolveDocumentUrls(created, [
-          'delivery_document_url',
-          'delivery_pdf_url',
-          'delivery_document',
-        ]);
+      const deliveryDocuments = resolveDocumentUrls(created, [
+        'delivery_document_url',
+        'delivery_pdf_url',
+        'delivery_document',
+      ]);
         const attachments = buildEmailAttachments(
           deliveryDocuments,
           `delivery-order-${created.delivery_number || created.id}`
@@ -1998,7 +2072,10 @@ app.post('/api/:table', async (req, res) => {
           });
 
         const nextStatus = allShipped ? 'waiting approval' : 'on-delivery';
-        await query('UPDATE `sales_orders` SET status = ? WHERE id = ?', [nextStatus, salesOrderId]);
+        await query('UPDATE `sales_orders` SET status = ?, global_delivery_pdf_url = NULL WHERE id = ?', [
+          nextStatus,
+          salesOrderId,
+        ]);
 
         if (allShipped) {
           const roleEmails = await getRoleEmails(['superadmin', 'manager']);
@@ -2214,6 +2291,7 @@ app.put('/api/:table/:id', async (req, res) => {
         company_name: companyName ?? existing.company_name,
         client_id: clientId ?? existing.client_id,
         notes: notes ?? existing.notes,
+        delivery_pdf_url: null,
       };
 
       await query('UPDATE `delivery_orders` SET ? WHERE id = ?', [nextUpdates, id]);
@@ -2243,7 +2321,10 @@ app.put('/api/:table/:id', async (req, res) => {
           });
 
         const nextStatus = allShipped ? 'waiting approval' : 'on-delivery';
-        await query('UPDATE `sales_orders` SET status = ? WHERE id = ?', [nextStatus, existing.sales_order_id]);
+        await query('UPDATE `sales_orders` SET status = ?, global_delivery_pdf_url = NULL WHERE id = ?', [
+          nextStatus,
+          existing.sales_order_id,
+        ]);
         if (allShipped && order.status !== 'waiting approval') {
           const roleEmails = await getRoleEmails(['superadmin', 'manager']);
           const requester = await getUserById(order.created_by);
@@ -2308,6 +2389,10 @@ app.put('/api/:table/:id', async (req, res) => {
       const { performed_by: performedBy } = req.body || {};
       const settingsUpdates = normalizeSettingsPayload(req.body || {}, id);
       await query('UPDATE ?? SET ? WHERE id = ?', [table, settingsUpdates, id]);
+      await query('UPDATE `quotations` SET quotation_pdf_url = NULL');
+      await query('UPDATE `delivery_orders` SET delivery_pdf_url = NULL');
+      await query('UPDATE `invoices` SET invoice_pdf_url = NULL');
+      await query('UPDATE `sales_orders` SET global_delivery_pdf_url = NULL');
       const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
 
       await logActivity({
@@ -2338,6 +2423,8 @@ app.put('/api/:table/:id', async (req, res) => {
       const requestedStatus = orderUpdates.status;
       const isStatusChange = requestedStatus && requestedStatus !== existing.status;
       const isPrivileged = performerRole && ['superadmin', 'manager'].includes(performerRole);
+      const hasGoodsUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
+      const hasDocumentsUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'documents');
 
       if (isStatusChange && requestedStatus === 'waiting payment' && !isPrivileged) {
         return res.status(403).json({ error: 'Only managers can update status to waiting payment' });
@@ -2353,14 +2440,22 @@ app.put('/api/:table/:id', async (req, res) => {
       let cleanedGoods;
       let cleanedDocuments;
 
-      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'goods')) {
+      if (hasGoodsUpdate) {
         cleanedGoods = Array.isArray(goods) ? goods : [];
         nextUpdates.goods = JSON.stringify(cleanedGoods);
       }
 
-      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'documents')) {
+      if (hasDocumentsUpdate) {
         cleanedDocuments = normalizeDocumentsPayload(documents, 'sales-order');
         nextUpdates.documents = cleanedDocuments.length ? JSON.stringify(cleanedDocuments) : null;
+      }
+
+      const hasOrderFieldUpdate = Object.keys(orderUpdates).some((key) => key !== 'global_delivery_pdf_url');
+      const shouldResetGlobalDo =
+        !Object.prototype.hasOwnProperty.call(orderUpdates, 'global_delivery_pdf_url') &&
+        (hasOrderFieldUpdate || hasGoodsUpdate || hasDocumentsUpdate);
+      if (shouldResetGlobalDo) {
+        nextUpdates.global_delivery_pdf_url = null;
       }
 
       await query('UPDATE ?? SET ? WHERE id = ?', [table, nextUpdates, id]);
@@ -2501,6 +2596,7 @@ app.put('/api/:table/:id', async (req, res) => {
       if (isStatusChange) {
         nextUpdates.status = requestedStatus;
       }
+      nextUpdates.quotation_pdf_url = null;
 
       await query('UPDATE ?? SET ? WHERE id = ?', [table, nextUpdates, id]);
       const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
@@ -2733,6 +2829,7 @@ app.put('/api/:table/:id', async (req, res) => {
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: 'No valid fields to update' });
       }
+      updates.invoice_pdf_url = null;
 
       await query('UPDATE ?? SET ? WHERE id = ?', [table, updates, id]);
       const [updated] = await query('SELECT * FROM `invoices` WHERE id = ? LIMIT 1', [id]);
