@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -295,8 +295,9 @@ export default function Orders() {
               --accent-soft: #eff6ff;
             }
             * { box-sizing: border-box; }
-            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; }
-            .page { padding: 36px 40px 48px; }
+            @page { size: A4; margin: 20mm; }
+            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; font-weight: 500; }
+            .page { padding: 0; }
             .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
             .logo-block { display: flex; flex-direction: column; gap: 12px; }
             .logo { max-height: 64px; object-fit: contain; }
@@ -304,7 +305,7 @@ export default function Orders() {
             .logo-placeholder svg { width: 32px; height: 32px; }
             .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
             .doc-title { text-align: right; min-width: 220px; }
-            .doc-title h1 { margin: 0; font-size: 30px; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
+            .doc-title h1 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
             .doc-meta { margin-top: 10px; display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
             .doc-meta div { display: flex; justify-content: space-between; gap: 16px; }
             .address-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
@@ -313,7 +314,7 @@ export default function Orders() {
             .address-card p { margin: 4px 0; }
             .address-card .name { font-weight: 600; color: #111827; }
             table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
-            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
             td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
             tr:nth-child(even) td { background: #f9fafb; }
             .notes { margin-top: 24px; font-size: 13px; }
@@ -728,7 +729,7 @@ export default function Orders() {
     return match[1];
   };
 
-  const handleDownloadDeliveryOrder = (delivery: DeliveryOrder) => {
+  const handleDownloadDeliveryOrder = async (delivery: DeliveryOrder) => {
     const orderNumber = detailOrder?.po_number || detailOrder?.order_number || '-';
     const html = buildDeliveryOrderTemplate({
       deliveryNumber: delivery.delivery_number,
@@ -740,16 +741,19 @@ export default function Orders() {
       salesOrderNumber: orderNumber,
     });
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (previewWindow) {
-      previewWindow.document.title = `${safeNumber}.pdf`;
+    try {
+      const { url } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
+      if (previewWindow) {
+        previewWindow.document.title = `${safeNumber}.pdf`;
+      }
+    } catch (error) {
+      console.error('Failed to download delivery order PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const handleDownloadGlobalDeliveryOrder = () => {
+  const handleDownloadGlobalDeliveryOrder = async () => {
     if (!detailOrder || linkedDeliveries.length === 0) return;
     const latestDelivery = linkedDeliveries[0];
     const baseNumber = resolveBaseDeliveryNumber(latestDelivery.delivery_number);
@@ -764,13 +768,16 @@ export default function Orders() {
       salesOrderNumber: orderNumber,
     });
     const safeNumber = baseNumber.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (previewWindow) {
-      previewWindow.document.title = `${safeNumber}.pdf`;
+    try {
+      const { url } = await generateDocumentPdf('delivery_orders', latestDelivery.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
+      if (previewWindow) {
+        previewWindow.document.title = `${safeNumber}.pdf`;
+      }
+    } catch (error) {
+      console.error('Failed to download delivery order PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const usedQuotationIds = useMemo(
@@ -1236,7 +1243,7 @@ export default function Orders() {
                   onClick={() => setShowDoModal((prev) => !prev)}
                   className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                 >
-                  View DO Linked
+                  View Document
                 </button>
                 <button
                   onClick={() => {
@@ -1319,7 +1326,7 @@ export default function Orders() {
                       className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                     >
                       <Download className="h-4 w-4" />
-                      Unduh DO Global
+                      View Document
                     </button>
                   )}
                 </div>
@@ -1344,7 +1351,7 @@ export default function Orders() {
                             className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                           >
                             <Download className="h-4 w-4" />
-                            Unduh DO
+                            View Document
                           </button>
                         </li>
                       ))}

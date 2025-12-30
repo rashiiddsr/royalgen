@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -255,8 +255,9 @@ export default function Quotations() {
               --accent-soft: #eff6ff;
             }
             * { box-sizing: border-box; }
-            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; }
-            .page { padding: 36px 40px 48px; }
+            @page { size: A4; margin: 20mm; }
+            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; font-weight: 500; }
+            .page { padding: 0; }
             .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
             .logo-block { display: flex; flex-direction: column; gap: 12px; }
             .logo { max-height: 64px; object-fit: contain; }
@@ -264,7 +265,7 @@ export default function Quotations() {
             .logo-placeholder svg { width: 32px; height: 32px; }
             .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
             .quote-title { text-align: right; min-width: 220px; }
-            .quote-title h1 { margin: 0; font-size: 30px; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
+            .quote-title h1 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #111827; }
             .quote-meta { margin-top: 10px; display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
             .quote-meta div { display: flex; justify-content: space-between; gap: 16px; }
             .address-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
@@ -273,7 +274,7 @@ export default function Quotations() {
             .address-card p { margin: 4px 0; }
             .address-card .name { font-weight: 600; color: #111827; }
             table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
-            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+            th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
             td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
             tr:nth-child(even) td { background: #f9fafb; }
             .summary-grid { margin-top: 24px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 32px; }
@@ -389,16 +390,19 @@ export default function Quotations() {
     `;
   };
 
-  const handleDownloadQuotation = (quotation: QuotationType) => {
+  const handleDownloadQuotation = async (quotation: QuotationType) => {
     const html = buildQuotationTemplate(quotation);
     const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (previewWindow) {
-      previewWindow.document.title = `${safeNumber}.pdf`;
+    try {
+      const { url } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
+      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
+      if (previewWindow) {
+        previewWindow.document.title = `${safeNumber}.pdf`;
+      }
+    } catch (error) {
+      console.error('Failed to download quotation PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const getNextQuotationNumber = () => {
@@ -1313,7 +1317,7 @@ export default function Quotations() {
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
                   <Download className="h-4 w-4" />
-                  Unduh PDF
+                  View Document
                 </button>
                 <button
                   onClick={() => setDetailQuotation(null)}
