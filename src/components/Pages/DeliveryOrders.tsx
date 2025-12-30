@@ -315,11 +315,13 @@ export default function DeliveryOrders() {
     const html = buildDeliveryOrderTemplate(delivery, latestSettings);
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
     try {
-      const { url } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
-      const previewWindow = window.open(`${apiRoot}${url}`, '_blank', 'noopener,noreferrer');
+      const { blob } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
+      const url = URL.createObjectURL(blob);
+      const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
       if (previewWindow) {
         previewWindow.document.title = `${safeNumber}.pdf`;
       }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (error) {
       console.error('Failed to download delivery order PDF', error);
       alert('Failed to generate PDF. Please try again.');
