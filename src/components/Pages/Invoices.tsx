@@ -651,7 +651,7 @@ export default function Invoices() {
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
                   <Download className="h-4 w-4" />
-                  Unduh PDF
+                  View Document
                 </button>
                 <button
                   onClick={() => setDetailInvoice(null)}

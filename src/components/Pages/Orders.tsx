@@ -1242,7 +1242,7 @@ export default function Orders() {
                   onClick={() => setShowDoModal((prev) => !prev)}
                   className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                 >
-                  View DO Linked
+                  View Document
                 </button>
                 <button
                   onClick={() => {
@@ -1325,7 +1325,7 @@ export default function Orders() {
                       className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                     >
                       <Download className="h-4 w-4" />
-                      Unduh DO Global
+                      View Document
                     </button>
                   )}
                 </div>
@@ -1350,7 +1350,7 @@ export default function Orders() {
                             className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                           >
                             <Download className="h-4 w-4" />
-                            Unduh DO
+                            View Document
                           </button>
                         </li>
                       ))}
