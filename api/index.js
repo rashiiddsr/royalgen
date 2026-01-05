@@ -140,7 +140,7 @@ const generatePdfFromHtml = async (html) => {
   });
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
     await page.emulateMediaType('screen');
     return await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
   } finally {
@@ -1566,9 +1566,11 @@ app.post('/api/documents/:type/:id/pdf', async (req, res) => {
     const safePrefix = (typeof filename === 'string' ? filename.trim() : '') || `${type}-${id}`;
     const normalizedPrefix = safePrefix.replace(/[^\w.-]+/g, '_') || `${type}-${id}`;
     const pdfBuffer = await generatePdfFromHtml(html);
+    const resolvedBuffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${normalizedPrefix}.pdf"`);
-    return res.send(pdfBuffer);
+    res.setHeader('Content-Length', resolvedBuffer.length);
+    return res.end(resolvedBuffer);
   } catch (error) {
     console.error('Failed to generate pdf', error);
     return res.status(500).json({ error: 'Failed to generate PDF' });

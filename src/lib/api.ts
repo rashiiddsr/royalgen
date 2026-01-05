@@ -154,6 +154,11 @@ export async function generateDocumentPdf(
     const message = data?.error || 'Request failed';
     throw new Error(message);
   }
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/pdf')) {
+    const payload = await response.text().catch(() => '');
+    throw new Error(payload || 'Invalid PDF response');
+  }
   const blob = await response.blob();
   return { blob };
 }
