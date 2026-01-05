@@ -20,11 +20,13 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<{ data: string; name: string; type: string } | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [unreadCount, setUnreadCount] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const widgetRef = useRef<HTMLDivElement | null>(null);
+  const toggleButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const isOpenRef = useRef(false);
@@ -59,7 +61,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
       const gainNode = audioContext.createGain();
       oscillator.type = 'sine';
       oscillator.frequency.value = 880;
-      gainNode.gain.value = 0.05;
+      gainNode.gain.value = 0.12;
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
       oscillator.start();
@@ -109,9 +111,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
         if (!isOpenRef.current) {
           setUnreadCount((prev) => prev + 1);
         }
-        if (document.visibilityState === 'visible') {
-          playNotificationSound();
-        }
+        playNotificationSound();
       }
     });
 
@@ -133,6 +133,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
     if (!isOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (!widgetRef.current) return;
+      if (toggleButtonRef.current?.contains(event.target as Node)) return;
       if (!widgetRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -162,6 +163,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
     );
     setDraft('');
     setAttachment(null);
+    setAttachmentError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -170,10 +172,19 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
   const handleAttachmentChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      setAttachmentError('Maksimal ukuran file 25 MB.');
+      setAttachment(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== 'string') return;
       setAttachment({ data: reader.result, name: file.name, type: file.type });
+      setAttachmentError(null);
     };
     reader.readAsDataURL(file);
   };
@@ -183,6 +194,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
+        ref={toggleButtonRef}
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:from-blue-500 hover:to-emerald-500"
       >
         <MessageCircle className="h-5 w-5" />
@@ -305,6 +317,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
                   type="button"
                   onClick={() => {
                     setAttachment(null);
+                    setAttachmentError(null);
                     if (fileInputRef.current) {
                       fileInputRef.current.value = '';
                     }
@@ -322,7 +335,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
                   ref={fileInputRef}
                   type="file"
                   className="hidden"
-                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                  accept="*/*"
                   onChange={handleAttachmentChange}
                 />
               </label>
@@ -340,6 +353,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
                 <Send className="h-4 w-4" />
               </button>
             </div>
+            {attachmentError && <p className="mt-2 text-xs text-red-500">{attachmentError}</p>}
           </form>
         </div>
       )}
