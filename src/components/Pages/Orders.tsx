@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, downloadFileBlob, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -236,6 +236,23 @@ export default function Orders() {
       return `${apiRoot}${doc.url}`;
     }
     return doc.data;
+  };
+
+  const handleDownloadDocument = async (doc: OrderDocument) => {
+    const url = resolveDocumentUrl(doc);
+    if (!url) return;
+    const filename = doc.name || 'document';
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+      const blob = await response.blob();
+      downloadFileBlob(blob, filename);
+    } catch (error) {
+      console.error('Failed to download document', error);
+      window.open(url, '_blank', 'noopener');
+    }
   };
 
   const buildDeliveryOrderTemplate = ({
@@ -1463,15 +1480,13 @@ export default function Orders() {
                     {parseDocuments(detailOrder.documents).map((doc, index) => (
                       <li key={`${doc.name}-${index}`}>
                         {resolveDocumentUrl(doc) ? (
-                          <a
-                            href={resolveDocumentUrl(doc)}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDocument(doc)}
                             className="text-blue-600 hover:text-blue-700 underline"
-                            download={doc.name}
                           >
                             {doc.name}
-                          </a>
+                          </button>
                         ) : (
                           doc.name
                         )}

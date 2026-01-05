@@ -27,7 +27,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use('/uploads', express.static(uploadDir));
 app.use('/downloads', express.static(uploadDir));
 
@@ -106,19 +106,23 @@ const TABLES = [
 
 const isValidTable = (name) => TABLES.includes(name);
 
-const saveBase64File = (fileData, filenamePrefix = 'upload') => {
+const base64ToBuffer = (fileData) => {
   const matches = fileData.match(/^data:(.+);base64,(.+)$/);
   if (!matches || matches.length !== 3) {
     throw new Error('Invalid file data');
   }
-
   const mimeType = matches[1];
+  const buffer = Buffer.from(matches[2], 'base64');
+  return { mimeType, buffer };
+};
+
+const saveBase64File = (fileData, filenamePrefix = 'upload') => {
+  const { mimeType, buffer } = base64ToBuffer(fileData);
   const extensionMap = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
     'application/msword': 'doc',
   };
   const extension = extensionMap[mimeType] || mimeType.split('/')[1] || 'bin';
-  const buffer = Buffer.from(matches[2], 'base64');
   const filename = `${filenamePrefix}-${Date.now()}.${extension}`;
   const filePath = path.join(uploadDir, filename);
 
@@ -153,6 +157,9 @@ const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') 
         return { name: doc.name || 'document', url: doc.url };
       }
       if (doc.data && typeof doc.data === 'string') {
+        if (!doc.data.startsWith('data:')) {
+          return { name: doc.name || 'document', url: doc.data };
+        }
         try {
           const url = saveBase64File(doc.data, filenamePrefix);
           return { name: doc.name || 'document', url };
