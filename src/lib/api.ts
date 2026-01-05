@@ -159,7 +159,11 @@ export async function generateDocumentPdf(
     const payload = await response.text().catch(() => '');
     throw new Error(payload || 'Invalid PDF response');
   }
-  const blob = await response.blob();
+  const buffer = await response.arrayBuffer();
+  if (!buffer.byteLength) {
+    throw new Error('Empty PDF response');
+  }
+  const blob = new Blob([buffer], { type: 'application/pdf' });
   return { blob };
 }
 

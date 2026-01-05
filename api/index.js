@@ -1569,6 +1569,7 @@ app.post('/api/documents/:type/:id/pdf', async (req, res) => {
     const resolvedBuffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${normalizedPrefix}.pdf"`);
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Length', resolvedBuffer.length);
     return res.end(resolvedBuffer);
   } catch (error) {
