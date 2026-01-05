@@ -27,11 +27,12 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '40mb' }));
 app.use('/uploads', express.static(uploadDir));
 app.use('/downloads', express.static(uploadDir));
 
 const io = new SocketIOServer(server, {
+  maxHttpBufferSize: 40 * 1024 * 1024,
   cors: {
     origin: '*',
     methods: ['GET', 'POST'],
