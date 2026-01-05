@@ -16,6 +16,8 @@ interface ChatWidgetProps {
 }
 
 export default function ChatWidget({ profile }: ChatWidgetProps) {
+  const chatAttachmentLimitMb = 25;
+  const chatAttachmentLimitBytes = chatAttachmentLimitMb * 1000 * 1000;
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -172,8 +174,8 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
   const handleAttachmentChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 25 * 1024 * 1024) {
-      setAttachmentError('Maksimal ukuran file 25 MB.');
+    if (file.size > chatAttachmentLimitBytes) {
+      setAttachmentError(`File too large. Maximum size is ${chatAttachmentLimitMb} MB.`);
       setAttachment(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -353,6 +355,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
                 <Send className="h-4 w-4" />
               </button>
             </div>
+            <p className="mt-2 text-xs text-gray-500">Maximum {chatAttachmentLimitMb} MB per file.</p>
             {attachmentError && <p className="mt-2 text-xs text-red-500">{attachmentError}</p>}
           </form>
         </div>

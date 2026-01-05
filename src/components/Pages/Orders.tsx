@@ -544,13 +544,16 @@ export default function Orders() {
     setGoodsRows(nextGoods);
   };
 
+  const documentLimitMb = 5;
+  const documentLimitBytes = documentLimitMb * 1000 * 1000;
+
   const handleDocumentsChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files ? Array.from(event.target.files) : [];
     if (!files.length) return;
-    const oversizedFile = files.find((file) => file.size > 5 * 1024 * 1024);
+    const oversizedFile = files.find((file) => file.size > documentLimitBytes);
     if (oversizedFile) {
       event.target.value = '';
-      setDocumentsError('File too large. Maximum size is 5MB per file.');
+      setDocumentsError(`File too large. Maximum size is ${documentLimitMb} MB per file.`);
       return;
     }
 
@@ -1206,7 +1209,7 @@ export default function Orders() {
                   <UploadCloud className="h-5 w-5 text-gray-500" />
                   <div>
                     <p className="text-sm text-gray-800">Upload supporting documents</p>
-                    <p className="text-xs text-gray-500">PDF or image, max 5MB each</p>
+                    <p className="text-xs text-gray-500">PDF or image, maximum {documentLimitMb} MB per file</p>
                     <input
                       type="file"
                       multiple
