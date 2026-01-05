@@ -461,7 +461,7 @@ export default function Quotations() {
       pic_email: '',
       pic_phone: '',
       payment_time: '',
-      offer_validity_days: '30',
+      offer_validity_days: '',
       status: 'waiting',
     });
     setIncludeTax(false);

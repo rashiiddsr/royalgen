@@ -318,8 +318,8 @@ export default function Orders() {
             body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; font-weight: 500; }
             .page { padding: 0; }
             .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
-            .logo-block { display: flex; flex-direction: column; gap: 12px; }
-            .logo { max-height: 80px; max-width: 180px; width: auto; object-fit: contain; }
+            .logo-block { display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+            .logo { max-height: 80px; max-width: 180px; width: auto; object-fit: contain; display: block; }
             .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
             .logo-placeholder svg { width: 32px; height: 32px; }
             .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -804,7 +804,7 @@ export default function Orders() {
         deliveryDate: latestDelivery.delivery_date,
         shipAddress: latestDelivery.ship_address || '-',
         companyName: latestDelivery.company_name || detailOrder.company_name || '-',
-        notes: latestDelivery.notes,
+        notes: null,
         goods: detailGoods,
         salesOrderNumber: orderNumber,
         settingsOverride: latestSettings,
@@ -1270,7 +1270,7 @@ export default function Orders() {
                   <button
                     type="button"
                     onClick={() => handleAcceptApproval()}
-                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-200 dark:hover:bg-amber-500/30"
                   >
                     Accept Approval
                   </button>
@@ -1278,7 +1278,7 @@ export default function Orders() {
                 <button
                   type="button"
                   onClick={() => setShowDoModal((prev) => !prev)}
-                  className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                  className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-500/20 dark:text-blue-200 dark:hover:bg-blue-500/30"
                 >
                   View DO Linked
                 </button>
@@ -1353,14 +1353,14 @@ export default function Orders() {
               </div>
 
               {showDoModal && (
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 dark:border-slate-700 dark:bg-slate-800/60">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Linked Delivery Orders</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Linked Delivery Orders</h3>
                   {canDownloadGlobalDo && (
                     <button
                       type="button"
                       onClick={handleDownloadGlobalDeliveryOrder}
-                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
                     >
                       <Download className="h-4 w-4" />
                       View DO Global
@@ -1368,24 +1368,24 @@ export default function Orders() {
                   )}
                 </div>
                   {linkedDeliveries.length === 0 ? (
-                    <p className="text-sm text-gray-500">No delivery orders linked yet.</p>
+                    <p className="text-sm text-gray-500 dark:text-slate-300">No delivery orders linked yet.</p>
                   ) : (
-                    <ul className="space-y-2 text-sm text-gray-700">
+                    <ul className="space-y-2 text-sm text-gray-700 dark:text-slate-200">
                       {linkedDeliveries.map((delivery) => (
                         <li
                           key={delivery.id}
-                          className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2"
+                          className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40"
                         >
                           <div>
-                            <p className="font-medium text-gray-900">{delivery.delivery_number}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="font-medium text-gray-900 dark:text-slate-100">{delivery.delivery_number}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">
                               {delivery.delivery_date || '-'}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleDownloadDeliveryOrder(delivery)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-500/20 dark:text-blue-200 dark:hover:bg-blue-500/30"
                           >
                             <Download className="h-4 w-4" />
                             View Document
@@ -1409,7 +1409,7 @@ export default function Orders() {
                         'noopener,noreferrer'
                       )
                     }
-                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
                   >
                     View Progress
                   </button>
