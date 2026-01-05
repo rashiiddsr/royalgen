@@ -322,6 +322,29 @@ const parseJsonArray = (value, fallback = []) => {
   }
 };
 
+const resolveGoodsKeys = (item) => {
+  const keys = [];
+  if (item?.good_id) {
+    keys.push(`id:${item.good_id}`);
+  }
+  if (item?.name) {
+    keys.push(`name:${item.name}`);
+  }
+  return keys;
+};
+
+const getShippedQty = (item, shippedMap) => {
+  const idKey = item?.good_id ? `id:${item.good_id}` : null;
+  if (idKey && Object.prototype.hasOwnProperty.call(shippedMap, idKey)) {
+    return shippedMap[idKey] || 0;
+  }
+  const nameKey = item?.name ? `name:${item.name}` : null;
+  if (nameKey && Object.prototype.hasOwnProperty.call(shippedMap, nameKey)) {
+    return shippedMap[nameKey] || 0;
+  }
+  return 0;
+};
+
 const romanMonths = [
   'I',
   'II',
@@ -2072,17 +2095,18 @@ app.post('/api/:table', async (req, res) => {
         deliveries.forEach((delivery) => {
           const items = parseJsonArray(delivery.goods);
           items.forEach((item) => {
-            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
-            shippedMap[key] = (shippedMap[key] || 0) + (Number(item.qty) || 0);
+            const qty = Number(item.qty) || 0;
+            resolveGoodsKeys(item).forEach((key) => {
+              shippedMap[key] = (shippedMap[key] || 0) + qty;
+            });
           });
         });
 
         const allShipped =
           orderGoods.length > 0 &&
           orderGoods.every((item) => {
-            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
             const orderedQty = Number(item.qty) || 0;
-            const shippedQty = shippedMap[key] || 0;
+            const shippedQty = getShippedQty(item, shippedMap);
             return orderedQty > 0 ? shippedQty >= orderedQty : true;
           });
 
@@ -2319,17 +2343,18 @@ app.put('/api/:table/:id', async (req, res) => {
         deliveries.forEach((delivery) => {
           const items = parseJsonArray(delivery.goods);
           items.forEach((item) => {
-            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
-            shippedMap[key] = (shippedMap[key] || 0) + (Number(item.qty) || 0);
+            const qty = Number(item.qty) || 0;
+            resolveGoodsKeys(item).forEach((key) => {
+              shippedMap[key] = (shippedMap[key] || 0) + qty;
+            });
           });
         });
 
         const allShipped =
           orderGoods.length > 0 &&
           orderGoods.every((item) => {
-            const key = item.good_id ? `id:${item.good_id}` : `name:${item.name}`;
             const orderedQty = Number(item.qty) || 0;
-            const shippedQty = shippedMap[key] || 0;
+            const shippedQty = getShippedQty(item, shippedMap);
             return orderedQty > 0 ? shippedQty >= orderedQty : true;
           });
 
