@@ -21,16 +21,20 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<{ data: string; name: string; type: string } | null>(null);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  const [unreadCount, setUnreadCount] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const widgetRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const audioRef = useRef<AudioContext | null>(null);
+  const isOpenRef = useRef(false);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
   const groupedMessages = useMemo(() => {
     const groups: Array<{ label: string; messages: ChatMessage[] }> = [];
     messages.forEach((message) => {
       const date = new Date(message.created_at);
-      const label = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const label = date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
       const lastGroup = groups[groups.length - 1];
       if (!lastGroup || lastGroup.label !== label) {
         groups.push({ label, messages: [message] });
@@ -41,8 +45,32 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
     return groups;
   }, [messages]);
 
+  const playNotificationSound = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (!audioRef.current) {
+        audioRef.current = new AudioContext();
+      }
+      const audioContext = audioRef.current;
+      if (audioContext.state === 'suspended') {
+        void audioContext.resume();
+      }
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gainNode.gain.value = 0.05;
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.15);
+    } catch (error) {
+      console.error('Failed to play chat notification sound', error);
+    }
+  };
+
   useEffect(() => {
-    if (!isOpen || socketRef.current) return;
+    if (socketRef.current) return;
     setStatus('connecting');
     const socket = io(apiRoot, { transports: ['websocket'] });
     socketRef.current = socket;
@@ -76,6 +104,15 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
 
     socket.on('chat_message', (payload: ChatMessage) => {
       setMessages((prev) => [...prev, payload]);
+      const isOwn = String(payload.sender.id) === String(profile.id);
+      if (!isOwn) {
+        if (!isOpenRef.current) {
+          setUnreadCount((prev) => prev + 1);
+        }
+        if (document.visibilityState === 'visible') {
+          playNotificationSound();
+        }
+      }
     });
 
     socket.on('connect_error', () => {
@@ -86,7 +123,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [apiRoot, isOpen, profile.full_name, profile.id, profile.role]);
+  }, [apiRoot, profile.full_name, profile.id, profile.role]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,6 +141,13 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+    if (isOpen) {
+      setUnreadCount(0);
+    }
+  }, [isOpen]);
+
   const handleSend = (event: FormEvent) => {
     event.preventDefault();
     if ((!draft.trim() && !attachment) || !socketRef.current || status !== 'connected') return;
@@ -118,6 +162,9 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
     );
     setDraft('');
     setAttachment(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleAttachmentChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -139,7 +186,14 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:from-blue-500 hover:to-emerald-500"
       >
         <MessageCircle className="h-5 w-5" />
-        Forum Chat
+        <span className="relative inline-flex items-center">
+          Forum Chat
+          {unreadCount > 0 && (
+            <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white text-xs font-semibold text-blue-600">
+              {unreadCount}
+            </span>
+          )}
+        </span>
       </button>
 
       {isOpen && (
@@ -165,7 +219,7 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
           <div className="flex-1 overflow-y-auto px-4 py-3 text-sm">
             {messages.length === 0 ? (
               <div className="text-center text-sm text-gray-500 dark:text-slate-400">
-                Belum ada pesan. Mulai diskusi sekarang.
+                No messages yet. Start the conversation.
               </div>
             ) : (
               groupedMessages.map((group) => (
@@ -222,13 +276,13 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
                                   target="_blank"
                                   rel="noreferrer"
                                 >
-                                  {msg.attachment.name || 'Lampiran'}
+                                  {msg.attachment.name || 'Attachment'}
                                 </a>
                               )}
                             </div>
                           )}
                           <p className="mt-1 text-[10px] opacity-70">
-                            {new Date(msg.created_at).toLocaleTimeString('id-ID', {
+                            {new Date(msg.created_at).toLocaleTimeString('en-US', {
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
@@ -247,25 +301,35 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
             {attachment && (
               <div className="mb-2 flex items-center justify-between rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600 dark:bg-slate-800 dark:text-slate-200">
                 <span className="truncate">{attachment.name}</span>
-                <button type="button" onClick={() => setAttachment(null)} className="text-red-500">
-                  Hapus
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachment(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="text-red-500"
+                >
+                  Remove
                 </button>
               </div>
             )}
             <div className="flex items-center gap-2">
               <label className="flex cursor-pointer items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                Lampirkan
+                Attach
                 <input
+                  ref={fileInputRef}
                   type="file"
                   className="hidden"
-                  accept="audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
                   onChange={handleAttachmentChange}
                 />
               </label>
               <input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder="Ketik pesan..."
+                placeholder="Type a message..."
                 className="flex-1 rounded-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
               <button

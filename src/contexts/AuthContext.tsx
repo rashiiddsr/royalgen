@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const SESSION_KEY = 'rgi_session_profile';
-  const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+  const SESSION_TTL_MS = 1000 * 60 * 60 * 4;
 
   type StoredSession = {
     profile: UserProfile;

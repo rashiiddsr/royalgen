@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { applyTheme, ThemePreference } from './lib/theme';
 import { getThemePreference, setThemePreference as persistThemePreference } from './lib/userPreferences';
@@ -24,17 +24,19 @@ function App() {
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search).get('progress_order')
       : null;
+  const pageStorageKey = 'currentPage';
   const [currentPage, setCurrentPage] = useState(() => {
     if (typeof window === 'undefined') return 'dashboard';
-    return localStorage.getItem('currentPage') || 'dashboard';
+    return sessionStorage.getItem(pageStorageKey) || 'dashboard';
   });
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => getThemePreference());
+  const lastUserIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (progressOrderId) return;
-    localStorage.setItem('currentPage', currentPage);
-  }, [currentPage, progressOrderId]);
+    sessionStorage.setItem(pageStorageKey, currentPage);
+  }, [currentPage, pageStorageKey, progressOrderId]);
 
   useEffect(() => {
     persistThemePreference(themePreference);
@@ -63,6 +65,22 @@ function App() {
     window.addEventListener('app:navigate', handleDashboardNavigate as EventListener);
     return () => window.removeEventListener('app:navigate', handleDashboardNavigate as EventListener);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!user || !profile) {
+      sessionStorage.removeItem(pageStorageKey);
+      setCurrentPage('dashboard');
+      lastUserIdRef.current = null;
+      return;
+    }
+    const nextUserId = profile.id ?? profile.email;
+    if (lastUserIdRef.current !== nextUserId) {
+      setCurrentPage('dashboard');
+      sessionStorage.setItem(pageStorageKey, 'dashboard');
+      lastUserIdRef.current = nextUserId;
+    }
+  }, [pageStorageKey, profile, user]);
 
   if (loading) {
     return (

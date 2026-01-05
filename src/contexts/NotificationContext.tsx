@@ -86,12 +86,28 @@ const buildSnapshotMap = <T extends { id: string | number }>(records: T[]) =>
 const getStorageKey = (prefix: string, userId?: string | number) =>
   `${prefix}:${userId ?? 'guest'}`;
 
+const STORAGE_TTL_MS = 1000 * 60 * 60 * 6;
+
+type StoredValue<T> = {
+  value: T;
+  expiresAt: string;
+};
+
 const loadStorage = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+    const parsed = JSON.parse(raw) as StoredValue<T> | T;
+    if (parsed && typeof parsed === 'object' && 'value' in parsed && 'expiresAt' in parsed) {
+      const expiresAt = new Date(parsed.expiresAt).getTime();
+      if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+        window.localStorage.removeItem(key);
+        return fallback;
+      }
+      return parsed.value;
+    }
+    return parsed as T;
   } catch {
     return fallback;
   }
@@ -99,7 +115,13 @@ const loadStorage = <T,>(key: string, fallback: T): T => {
 
 const saveStorage = (key: string, value: unknown) => {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(key, JSON.stringify(value));
+  window.localStorage.setItem(
+    key,
+    JSON.stringify({
+      value,
+      expiresAt: new Date(Date.now() + STORAGE_TTL_MS).toISOString(),
+    })
+  );
 };
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
