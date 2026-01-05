@@ -154,19 +154,33 @@ export async function generateDocumentPdf(
     const message = data?.error || 'Request failed';
     throw new Error(message);
   }
-  const blob = await response.blob();
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/pdf')) {
+    const payload = await response.text().catch(() => '');
+    throw new Error(payload || 'Invalid PDF response');
+  }
+  const buffer = await response.arrayBuffer();
+  if (!buffer.byteLength) {
+    throw new Error('Empty PDF response');
+  }
+  const blob = new Blob([buffer], { type: 'application/pdf' });
   return { blob };
 }
 
-export function downloadPdfBlob(blob: Blob, filename: string) {
+export function downloadFileBlob(blob: Blob, filename: string) {
   const safeName = filename.replace(/[^\w.-]+/g, '_') || 'document';
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${safeName}.pdf`;
+  link.download = safeName;
   link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function downloadPdfBlob(blob: Blob, filename: string) {
+  const safeName = filename.replace(/[^\w.-]+/g, '_') || 'document';
+  downloadFileBlob(blob, `${safeName}.pdf`);
 }
