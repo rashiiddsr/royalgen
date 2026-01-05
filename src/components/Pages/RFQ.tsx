@@ -202,12 +202,16 @@ export default function RFQ() {
     pause: showModal || Boolean(detailRfq),
   });
 
+  const attachmentLimitMb = 5;
+  const attachmentLimitBytes = attachmentLimitMb * 1000 * 1000;
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > attachmentLimitBytes) {
       event.target.value = '';
       setAttachmentData(null);
+      setAttachmentError(`File too large. Maximum size is ${attachmentLimitMb} MB.`);
       return;
     }
 
@@ -808,7 +812,7 @@ export default function RFQ() {
                     <p className="text-sm text-gray-800">
                       Upload supporting file <span className="text-red-500">*</span>
                     </p>
-                    <p className="text-xs text-gray-500">PDF or image, max 5MB</p>
+                    <p className="text-xs text-gray-500">PDF or image, maximum {attachmentLimitMb} MB</p>
                     <input
                       type="file"
                       accept=".pdf,image/*"
