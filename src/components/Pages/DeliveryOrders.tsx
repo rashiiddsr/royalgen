@@ -201,7 +201,7 @@ export default function DeliveryOrders() {
             .page { padding: 0; }
             .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
             .logo-block { display: flex; flex-direction: column; gap: 12px; }
-            .logo { max-height: 64px; object-fit: contain; }
+            .logo { max-height: 80px; max-width: 180px; width: auto; object-fit: contain; }
             .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
             .logo-placeholder svg { width: 32px; height: 32px; }
             .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -1077,7 +1077,7 @@ export default function DeliveryOrders() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleDownloadDeliveryOrder(detailDelivery)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                 >
                   <Download className="h-4 w-4" />
                   View Document

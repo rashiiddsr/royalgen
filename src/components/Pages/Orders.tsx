@@ -319,7 +319,7 @@ export default function Orders() {
             .page { padding: 0; }
             .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
             .logo-block { display: flex; flex-direction: column; gap: 12px; }
-            .logo { max-height: 64px; object-fit: contain; }
+            .logo { max-height: 80px; max-width: 180px; width: auto; object-fit: contain; }
             .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
             .logo-placeholder svg { width: 32px; height: 32px; }
             .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }

@@ -133,18 +133,46 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
 
-const generatePdfFromHtml = async (html) => {
-  const browser = await puppeteer.launch({
+let pdfBrowser;
+const getPdfBrowser = async () => {
+  if (pdfBrowser?.isConnected?.()) return pdfBrowser;
+  pdfBrowser = await puppeteer.launch({
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
+  return pdfBrowser;
+};
+
+const closePdfBrowser = async () => {
+  if (!pdfBrowser) return;
   try {
-    const page = await browser.newPage();
+    await pdfBrowser.close();
+  } catch (error) {
+    console.error('Failed to close PDF browser', error);
+  } finally {
+    pdfBrowser = undefined;
+  }
+};
+
+process.on('exit', () => {
+  void closePdfBrowser();
+});
+process.on('SIGINT', () => {
+  void closePdfBrowser().finally(() => process.exit(0));
+});
+process.on('SIGTERM', () => {
+  void closePdfBrowser().finally(() => process.exit(0));
+});
+
+const generatePdfFromHtml = async (html) => {
+  const browser = await getPdfBrowser();
+  const page = await browser.newPage();
+  try {
     await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
     await page.emulateMediaType('screen');
     return await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
   } finally {
-    await browser.close();
+    await page.close();
   }
 };
 
