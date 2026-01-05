@@ -5,6 +5,7 @@ RGI NexaProc is a procurement management platform for handling suppliers, goods,
 ## Highlights
 
 - **Authentication**: Email/username + password login, optional Google sign-in, password reset flows.
+- **User Management Email**: Sementara email digunakan untuk akun baru dan reset password.
 - **Suppliers**: Manage supplier profiles, contacts, payment terms, and status.
 - **Goods Catalog**: Track SKU, category, unit, pricing, MOQ, and linked suppliers.
 - **RFQ Management**: Create RFQs, attach documents, and track requester details.
@@ -48,7 +49,7 @@ mysql -u <user> -p <database_name> < database/schema.sql
 
 ### 2) Configure Environment Variables
 
-Create `api/.env` with your database and optional integration settings.
+Create `api/.env` with your database and optional integration settings. Untuk sementara, email dipakai untuk akun baru dan reset password.
 
 ```
 DB_HOST=localhost
@@ -165,4 +166,5 @@ Authentication endpoints live under `/api/auth`:
 
 - If the frontend cannot reach the API, verify `VITE_API_BASE_URL` and that the API server is running.
 - If database queries fail, confirm your MySQL credentials and that the schema has been imported.
-- For email/Google login issues, ensure the related environment variables are set in `api/.env` and `.env`.
+- For Google login issues, ensure the related environment variables are set in `api/.env` and `.env`.
+- For new account or password reset emails, ensure the `MAIL_*` variables are configured in `api/.env`.
