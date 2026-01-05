@@ -1,6 +1,6 @@
 -- RGI NexaProc MySQL schema
-CREATE DATABASE IF NOT EXISTS `rgi_nexaproc`;
-USE `rgi_nexaproc`;
+CREATE DATABASE IF NOT EXISTS `roya2064_rgi_nexaproc`;
+USE `roya2064_rgi_nexaproc`;
 
 -- Users with fixed roles
 CREATE TABLE IF NOT EXISTS `users` (
