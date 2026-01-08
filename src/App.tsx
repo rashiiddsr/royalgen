@@ -4,7 +4,6 @@ import { applyTheme, ThemePreference } from './lib/theme';
 import { getThemePreference, setThemePreference as persistThemePreference } from './lib/userPreferences';
 import Login from './components/Auth/Login';
 import Dashboard from './components/Layout/Dashboard';
-import AppErrorBoundary from './components/Layout/AppErrorBoundary';
 import DashboardHome from './components/Pages/DashboardHome';
 import Suppliers from './components/Pages/Suppliers';
 import Clients from './components/Pages/Clients';
@@ -86,12 +85,20 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
+          </div>
         </div>
-      </div>
-    );
+      );
+  }
+
+  if (!user || !profile) {
+    return <Login />;
+  }
+
+  if (progressOrderId) {
+    return <OrderProgress orderId={progressOrderId} />;
   }
 
   const renderPage = () => {
@@ -126,22 +133,14 @@ function App() {
   };
 
   return (
-    <AppErrorBoundary onReset={() => window.location.reload()}>
-      {!user || !profile ? (
-        <Login />
-      ) : progressOrderId ? (
-        <OrderProgress orderId={progressOrderId} />
-      ) : (
-        <Dashboard
-          currentPage={currentPage}
-          onNavigate={setCurrentPage}
-          themePreference={themePreference}
-          onThemeChange={setThemePreference}
-        >
-          {renderPage()}
-        </Dashboard>
-      )}
-    </AppErrorBoundary>
+    <Dashboard
+      currentPage={currentPage}
+      onNavigate={setCurrentPage}
+      themePreference={themePreference}
+      onThemeChange={setThemePreference}
+    >
+      {renderPage()}
+    </Dashboard>
   );
 }
 
