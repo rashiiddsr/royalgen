@@ -18,7 +18,6 @@ import {
   Bell,
   CheckCircle,
   ChevronDown,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ThemePreference } from '../../lib/theme';
@@ -50,7 +49,6 @@ export default function Dashboard({ children, currentPage, onNavigate, themePref
     { name: 'Suppliers', icon: Users, page: 'suppliers', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Clients', icon: Building2, page: 'clients', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Goods', icon: Package, page: 'goods', roles: ['superadmin', 'admin', 'manager', 'staff'] },
-    { name: 'Goods Variants', icon: SlidersHorizontal, page: 'goods-variants', roles: ['superadmin', 'admin', 'manager'] },
     { name: 'RFQ', icon: FileText, page: 'rfq', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Quotations', icon: FileCheck, page: 'quotations', roles: ['superadmin', 'admin', 'manager', 'staff'] },
     { name: 'Sales Orders', icon: ShoppingCart, page: 'orders', roles: ['superadmin', 'admin', 'manager', 'staff'] },
