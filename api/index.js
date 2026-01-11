@@ -94,6 +94,8 @@ const TABLES = [
   'suppliers',
   'clients',
   'goods',
+  'goods_categories',
+  'goods_units',
   'goods_suppliers',
   'rfqs',
   'quotations',

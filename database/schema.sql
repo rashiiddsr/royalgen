@@ -68,13 +68,35 @@ CREATE TABLE IF NOT EXISTS `goods` (
   `sku` VARCHAR(120) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
   `description` TEXT NOT NULL,
-  `category` ENUM('consumable','instrument','electrical','piping','other') NOT NULL,
+  `category` VARCHAR(100) NOT NULL,
   `unit` VARCHAR(50) NOT NULL,
   `price` DECIMAL(12,2) DEFAULT 0,
   `minimum_order_quantity` INT NOT NULL,
   `status` VARCHAR(50) DEFAULT 'active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS `goods_categories` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(120) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_goods_category_name` (`name`)
+);
+
+CREATE TABLE IF NOT EXISTS `goods_units` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(120) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_goods_unit_name` (`name`)
+);
+
+INSERT INTO `goods_categories` (`name`)
+VALUES ('consumable'), ('instrument'), ('electrical'), ('piping'), ('other')
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+INSERT INTO `goods_units` (`name`)
+VALUES ('pcs'), ('box'), ('kg'), ('liter'), ('meter'), ('set')
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
 -- Goods & Suppliers relationship
 CREATE TABLE IF NOT EXISTS `goods_suppliers` (
