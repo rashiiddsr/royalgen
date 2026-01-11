@@ -16,8 +16,8 @@ interface OrderGood {
   name?: string;
   description?: string;
   unit?: string;
-  qty: number | '';
-  price: number | '';
+  qty: number;
+  price: number;
   deadline_days?: number | '';
 }
 
@@ -27,7 +27,7 @@ interface OrderType {
   po_number?: string;
   project_name?: string;
   order_date?: string;
-  quotation_id?: string | null;
+  quotation_id: string;
   client_id?: string | null;
   company_name?: string;
   pic_name?: string;
@@ -76,25 +76,6 @@ interface DeliveryOrder {
   created_at: string;
 }
 
-interface GoodOption {
-  id: string;
-  name: string;
-  sku?: string;
-  description: string;
-  unit: string;
-  minimum_order_quantity?: number;
-  status: string;
-}
-
-interface ClientOption {
-  id: string;
-  company_name: string;
-  address: string;
-  phone: string;
-  email: string;
-  status?: string | null;
-}
-
 interface CompanySetting {
   id: string;
   company_name?: string | null;
@@ -104,7 +85,6 @@ interface CompanySetting {
   email?: string | null;
   phone?: string | null;
   logo_url?: string | null;
-  tax_rate?: number | null;
 }
 
 const EMPTY_FORM = {
@@ -120,22 +100,10 @@ const EMPTY_FORM = {
   payment_time: '',
 };
 
-const EMPTY_GOOD_ROW: OrderGood = {
-  good_id: '',
-  name: '',
-  description: '',
-  unit: '',
-  qty: '',
-  price: '',
-  deadline_days: '',
-};
-
 export default function Orders() {
   const { profile } = useAuth();
   const [orders, setOrders] = useState<OrderType[]>([]);
   const [quotations, setQuotations] = useState<QuotationType[]>([]);
-  const [goods, setGoods] = useState<GoodOption[]>([]);
-  const [clients, setClients] = useState<ClientOption[]>([]);
   const [usersById, setUsersById] = useState<Record<string, string>>({});
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,14 +115,9 @@ export default function Orders() {
   const [goodsRows, setGoodsRows] = useState<OrderGood[]>([]);
   const [documents, setDocuments] = useState<OrderDocument[]>([]);
   const [documentsError, setDocumentsError] = useState('');
-  const [contactError, setContactError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [clientSearch, setClientSearch] = useState('');
-  const [includeTax, setIncludeTax] = useState(false);
-  const [useQuotation, setUseQuotation] = useState(true);
   const isEditing = Boolean(editingOrder);
   const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
-  const [taxRate, setTaxRate] = useState(0);
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const canApprovePayment = profile?.role === 'superadmin' || profile?.role === 'manager';
 
@@ -228,17 +191,6 @@ export default function Orders() {
 
   const formatCurrency = (value: number) => `Rp ${formatRupiah(value)}`;
   const canEditOrder = (order: OrderType) => !['waiting payment', 'done'].includes(order.status);
-  const normalizePhoneInput = (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed === '-') return '-';
-    const digits = trimmed.replace(/\D/g, '');
-    if (!digits || digits === '62') return '';
-    if (digits.startsWith('62')) return `+${digits}`;
-    if (digits.startsWith('0')) return `+62${digits.slice(1)}`;
-    return `+62${digits}`;
-  };
-  const isValidEmail = (value: string) => value === '-' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  const isValidPhone = (value: string) => value === '-' || /^\+62\d{6,}$/.test(value);
 
   const escapeHtml = (value: string) =>
     value.replace(/[&<>"']/g, (char) => {
@@ -480,15 +432,12 @@ export default function Orders() {
       if (!silent) {
         setLoading(true);
       }
-      const [orderData, quotationData, userData, deliveryData, settingsData, goodsData, clientData] =
-        await Promise.all([
+      const [orderData, quotationData, userData, deliveryData, settingsData] = await Promise.all([
         getRecords<OrderType>('sales_orders'),
         getRecords<QuotationType>('quotations'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
         getRecords<DeliveryOrder>('delivery_orders'),
         getRecords<CompanySetting>('settings'),
-        getRecords<GoodOption>('goods'),
-        getRecords<ClientOption>('clients'),
       ]);
 
       const quotationMap = new Map(quotationData.map((quotation) => [quotation.id, quotation]));
@@ -514,9 +463,7 @@ export default function Orders() {
           goods: parseDeliveryGoods(delivery.goods),
         }))
       );
-      const settings = settingsData[0] || null;
-      setCompanySettings(settings);
-      setTaxRate(Number(settings?.tax_rate) || 0);
+      setCompanySettings(settingsData[0] || null);
       setUsersById(userMap);
       setQuotations(
         quotationData.map((quotation) => ({
@@ -524,8 +471,6 @@ export default function Orders() {
           goods: parseGoods(quotation.goods),
         }))
       );
-      setGoods(goodsData);
-      setClients(clientData);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -546,16 +491,11 @@ export default function Orders() {
     setGoodsRows([]);
     setDocuments([]);
     setDocumentsError('');
-    setContactError('');
-    setClientSearch('');
-    setIncludeTax(false);
-    setUseQuotation(true);
     setShowModal(true);
   };
 
   const openEditModal = (order: OrderType) => {
     if (!canEditOrder(order)) return;
-    const isLinked = Boolean(order.quotation_id);
     setEditingOrder(order);
     setFormData({
       project_name: order.project_name || '',
@@ -569,49 +509,15 @@ export default function Orders() {
       pic_phone: order.pic_phone || '',
       payment_time: order.payment_time || '',
     });
-    setUseQuotation(isLinked);
-    setIncludeTax(false);
-    const parsedGoods = parseGoods(order.goods).map((row) => ({
-      ...row,
-      deadline_days: row.deadline_days ?? '',
-    }));
-    setGoodsRows(!isLinked && parsedGoods.length === 0 ? [{ ...EMPTY_GOOD_ROW }] : parsedGoods);
+    setGoodsRows(
+      parseGoods(order.goods).map((row) => ({
+        ...row,
+        deadline_days: row.deadline_days ?? '',
+      }))
+    );
     setDocuments(parseDocuments(order.documents));
     setDocumentsError('');
-    setContactError('');
-    setClientSearch('');
     setShowModal(true);
-  };
-
-  const handleOrderSourceChange = (nextUseQuotation: boolean) => {
-    if (isEditing) return;
-    setUseQuotation(nextUseQuotation);
-    setIncludeTax(false);
-    if (nextUseQuotation) {
-      setFormData((prev) => ({
-        ...prev,
-        quotation_id: '',
-        client_id: '',
-        company_name: '',
-        pic_name: '',
-        pic_email: '',
-        pic_phone: '',
-        payment_time: '',
-      }));
-      setGoodsRows([]);
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        quotation_id: '',
-        client_id: '',
-        company_name: '',
-        pic_name: '',
-        pic_email: '',
-        pic_phone: '',
-        payment_time: '',
-      }));
-      setGoodsRows([{ ...EMPTY_GOOD_ROW }]);
-    }
   };
 
   const handleQuotationChange = (quotationId: string) => {
@@ -626,26 +532,16 @@ export default function Orders() {
       pic_phone: quotation?.pic_phone || '',
       payment_time: quotation?.payment_time || '',
     }));
-    const nextGoods = parseGoods(quotation?.goods || []).map((row) => ({
-      good_id: row.good_id,
-      name: row.name,
-      description: row.description,
-      unit: row.unit,
-      qty: row.qty,
-      price: row.price,
-      deadline_days: '',
-    }));
+      const nextGoods = parseGoods(quotation?.goods || []).map((row) => ({
+        good_id: row.good_id,
+        name: row.name,
+        description: row.description,
+        unit: row.unit,
+        qty: row.qty,
+        price: row.price,
+        deadline_days: '',
+      }));
     setGoodsRows(nextGoods);
-  };
-
-  const handleClientChange = (clientId: string) => {
-    const client = clients.find((item) => String(item.id) === String(clientId));
-    setFormData((prev) => ({
-      ...prev,
-      client_id: clientId,
-      company_name: client?.company_name || '',
-    }));
-    setClientSearch('');
   };
 
   const documentLimitMb = 5;
@@ -705,153 +601,37 @@ export default function Orders() {
     );
   };
 
-  const handleGoodsRowChange = (index: number, field: keyof OrderGood, value: string) => {
-    setGoodsRows((prev) =>
-      prev.map((row, rowIndex) => {
-        if (rowIndex !== index) return row;
-        const updatedValue =
-          field === 'qty' || field === 'price' || field === 'deadline_days'
-            ? value === ''
-              ? ''
-              : Number(value)
-            : value;
-        return { ...row, [field]: updatedValue } as OrderGood;
-      })
-    );
-  };
-
-  const handleGoodSelect = (index: number, goodInput: string) => {
-    const normalizedInput = goodInput.trim().toLowerCase();
-    const selectedGood = goods.find(
-      (good) => String(good.id) === goodInput || good.name.trim().toLowerCase() === normalizedInput
-    );
-    setGoodsRows((prev) =>
-      prev.map((row, rowIndex) => {
-        if (rowIndex !== index) return row;
-        if (!selectedGood) {
-          return {
-            ...row,
-            good_id: '',
-            name: goodInput,
-            description: '',
-            unit: '',
-          };
-        }
-        const isDuplicate = prev.some(
-          (existingRow, existingIndex) =>
-            existingIndex !== index && String(existingRow.good_id) === String(selectedGood.id)
-        );
-        if (isDuplicate) {
-          alert('Barang sudah dipilih di baris lain.');
-          return row;
-        }
-        return {
-          ...row,
-          good_id: String(selectedGood.id),
-          name: selectedGood.name || '',
-          description: selectedGood.description || '',
-          unit: selectedGood.unit || '',
-          qty: row.qty ?? '',
-        };
-      })
-    );
-  };
-
-  const addGoodsRow = () => {
-    setGoodsRows((prev) => [...prev, { ...EMPTY_GOOD_ROW }]);
-  };
-
-  const removeGoodsRow = (index: number) => {
-    setGoodsRows((prev) => (prev.length === 1 ? prev : prev.filter((_, rowIndex) => rowIndex !== index)));
-  };
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (contactError) setContactError('');
-    const isUsingQuotation = useQuotation && Boolean(formData.quotation_id);
-    if (!isUsingQuotation) {
-      if (goodsRows.length === 0) {
-        alert('Please add goods.');
-        return;
+    if (documents.length === 0) {
+      setDocumentsError('Documents are required.');
+      return;
+    }
+    const invalidDeadline = goodsRows.find((row) => {
+      if (row.deadline_days === '' || row.deadline_days === null || row.deadline_days === undefined) {
+        return true;
       }
-      if (!formData.client_id) {
-        alert('Please select company.');
-        return;
-      }
-      if (!isValidEmail(formData.pic_email) || !isValidPhone(formData.pic_phone)) {
-        setContactError('PIC Email atau PIC Number tidak valid. Gunakan format email atau +62.');
-        return;
-      }
-      const invalidGoods = goodsRows.find((row) => !row.good_id);
-      if (invalidGoods) {
-        alert('Please select goods from the list.');
-        return;
-      }
-      const invalidMoq = goodsRows.find((row) => {
-        const selectedGood = goods.find((good) => String(good.id) === String(row.good_id));
-        const minimumQty = Number(selectedGood?.minimum_order_quantity) || 0;
-        return minimumQty > 0 && Number(row.qty) < minimumQty;
-      });
-      if (invalidMoq) {
-        alert('Quantity must meet the minimum order quantity (MOQ) for the selected goods.');
-        return;
-      }
-      const invalidDeliveryTime = goodsRows.find((row) => {
-        if (row.deadline_days === '' || row.deadline_days === null || row.deadline_days === undefined) {
-          return true;
-        }
-        return Number(row.deadline_days) < 0;
-      });
-      if (invalidDeliveryTime) {
-        alert('Delivery time per goods must be filled out.');
-        return;
-      }
-      const invalidQuantity = goodsRows.find((row) => row.qty === '' || row.qty === null || row.qty === undefined);
-      if (invalidQuantity) {
-        alert('Quantity must be filled out.');
-        return;
-      }
-      const invalidPrice = goodsRows.find((row) => row.price === '' || row.price === null || row.price === undefined);
-      if (invalidPrice) {
-        alert('Price must be filled out.');
-        return;
-      }
-    } else {
-      const invalidDeadline = goodsRows.find((row) => {
-        if (row.deadline_days === '' || row.deadline_days === null || row.deadline_days === undefined) {
-          return true;
-        }
-        return Number(row.deadline_days) < 0;
-      });
-      if (invalidDeadline) {
-        alert('Deadline (days) is required for each goods.');
-        return;
-      }
+      return Number(row.deadline_days) < 0;
+    });
+    if (invalidDeadline) {
+      alert('Deadline (days) is required for each goods.');
+      return;
     }
     const totalAmount = goodsRows.reduce(
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
     );
-    const taxAmount = isUsingQuotation
-      ? selectedQuotation && selectedQuotation.tax_amount !== undefined
+    const taxAmount =
+      selectedQuotation && selectedQuotation.tax_amount !== undefined
         ? Number(selectedQuotation.tax_amount) || 0
-        : 0
-      : includeTax
-        ? (totalAmount * taxRate) / (100 + taxRate)
-        : (totalAmount * taxRate) / 100;
-    const grandTotal = isUsingQuotation
-      ? selectedQuotation && selectedQuotation.grand_total !== undefined
+        : 0;
+    const grandTotal =
+      selectedQuotation && selectedQuotation.grand_total !== undefined
         ? Number(selectedQuotation.grand_total) || totalAmount + taxAmount
-        : totalAmount + taxAmount
-      : includeTax
-        ? totalAmount
         : totalAmount + taxAmount;
-    const resolvedTotalAmount = isUsingQuotation
-      ? selectedQuotation && selectedQuotation.total_amount !== undefined
+    const resolvedTotalAmount =
+      selectedQuotation && selectedQuotation.total_amount !== undefined
         ? Number(selectedQuotation.total_amount) || totalAmount
-        : totalAmount
-      : includeTax
-        ? totalAmount - taxAmount
         : totalAmount;
 
     const basePayload = {
@@ -862,8 +642,6 @@ export default function Orders() {
       payment_time: formData.payment_time,
       goods: goodsRows.map((row) => ({
         ...row,
-        qty: Number(row.qty) || 0,
-        price: Number(row.price) || 0,
         deadline_days: Number(row.deadline_days) || 0,
       })),
       total_amount: resolvedTotalAmount,
@@ -871,17 +649,17 @@ export default function Orders() {
       grand_total: grandTotal,
       documents,
       performed_by: profile?.id,
-      quotation_id: isUsingQuotation ? formData.quotation_id : null,
-      client_id: formData.client_id,
-      company_name: formData.company_name,
-      pic_name: formData.pic_name,
-      pic_email: formData.pic_email,
-      pic_phone: formData.pic_phone,
     };
     const payload = editingOrder
       ? basePayload
       : ({
           ...basePayload,
+          quotation_id: formData.quotation_id,
+          client_id: formData.client_id,
+          company_name: formData.company_name,
+          pic_name: formData.pic_name,
+          pic_email: formData.pic_email,
+          pic_phone: formData.pic_phone,
           status: 'ongoing',
           created_by: profile?.id,
         } as OrderType);
@@ -1060,16 +838,6 @@ export default function Orders() {
     if (editingOrder) {
       return resolveOrderTotals(goodsRows, editingOrder);
     }
-    if (!useQuotation || !selectedQuotation) {
-      const rawTotal = goodsRows.reduce(
-        (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
-        0
-      );
-      const tax = includeTax ? (rawTotal * taxRate) / (100 + taxRate) : (rawTotal * taxRate) / 100;
-      const subtotal = includeTax ? rawTotal - tax : rawTotal;
-      const grand = includeTax ? rawTotal : rawTotal + tax;
-      return { subtotal, tax, grand };
-    }
     const subtotal = goodsRows.reduce(
       (sum, row) => sum + (Number(row.qty) || 0) * (Number(row.price) || 0),
       0
@@ -1087,16 +855,7 @@ export default function Orders() {
         ? Number(selectedQuotation.grand_total) || resolvedSubtotal + tax
         : resolvedSubtotal + tax;
     return { subtotal: resolvedSubtotal, tax, grand };
-  }, [editingOrder, goodsRows, includeTax, selectedQuotation, taxRate, useQuotation]);
-
-  const activeGoods = goods.filter((good) => good.status === 'active');
-  const activeClients = clients.filter((client) => (client.status || 'active') === 'active');
-  const filteredClients = activeClients.filter((client) => {
-    const query = clientSearch.trim().toLowerCase();
-    if (!query) return true;
-    return client.company_name.toLowerCase().includes(query);
-  });
-  const shouldShowClientList = clientSearch.trim().length > 0 || !formData.client_id;
+  }, [editingOrder, goodsRows, selectedQuotation]);
 
   if (loading) {
     return (
@@ -1182,13 +941,7 @@ export default function Orders() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.project_name || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {order.quotations?.quotation_number ? (
-                        order.quotations?.quotation_number
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                          No quotation
-                        </span>
-                      )}
+                      {order.quotations?.quotation_number || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.company_name || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">
@@ -1268,41 +1021,6 @@ export default function Orders() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Order Source</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleOrderSourceChange(true)}
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold border ${
-                      useQuotation
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-                    } ${isEditing ? 'cursor-not-allowed opacity-70' : ''}`}
-                    disabled={isEditing}
-                  >
-                    From Quotation
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOrderSourceChange(false)}
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold border ${
-                      !useQuotation
-                        ? 'border-amber-600 bg-amber-600 text-white'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-                    } ${isEditing ? 'cursor-not-allowed opacity-70' : ''}`}
-                    disabled={isEditing}
-                  >
-                    Without Quotation
-                  </button>
-                </div>
-                {!useQuotation && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Sales order ini berdiri sendiri dan tidak memperbarui status RFQ/Quotation.
-                  </p>
-                )}
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1345,16 +1063,16 @@ export default function Orders() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Quotation Number {useQuotation && <span className="text-red-500">*</span>}
+                    Quotation Number <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={formData.quotation_id}
                     onChange={(event) => handleQuotationChange(event.target.value)}
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                      editingOrder || !useQuotation ? 'bg-gray-50 cursor-not-allowed' : ''
+                      editingOrder ? 'bg-gray-50 cursor-not-allowed' : ''
                     }`}
-                    required={useQuotation}
-                    disabled={isEditing || !useQuotation}
+                    required
+                    disabled={isEditing}
                   >
                     <option value="">Select quotation</option>
                     {availableQuotations.map((quotation) => (
@@ -1366,93 +1084,20 @@ export default function Orders() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
-                  {useQuotation ? (
-                    <input
-                      type="text"
-                      value={formData.company_name}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                    />
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={clientSearch}
-                          onChange={(event) => setClientSearch(event.target.value)}
-                          placeholder="Search company name"
-                          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                          required={!formData.client_id}
-                        />
-                      </div>
-                      {formData.client_id ? (
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-800 text-sm rounded-full border border-blue-200">
-                          {formData.company_name}
-                          <button
-                            type="button"
-                            className="text-blue-600 hover:text-blue-800"
-                            onClick={() =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                client_id: '',
-                                company_name: '',
-                              }))
-                            }
-                            aria-label="Remove selected company"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-500">Select an active client.</p>
-                      )}
-                      <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
-                        {!shouldShowClientList ? (
-                          <div className="p-3 text-sm text-gray-600">Type to search company name.</div>
-                        ) : filteredClients.length === 0 ? (
-                          <div className="p-3 text-sm text-gray-600">
-                            {activeClients.length === 0
-                              ? 'No active clients available.'
-                              : 'No clients match your search.'}
-                          </div>
-                        ) : (
-                          filteredClients.map((client) => (
-                            <button
-                              key={client.id}
-                              type="button"
-                              onClick={() => handleClientChange(String(client.id))}
-                              className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-gray-50 text-left"
-                            >
-                              <div>
-                                <span className="text-sm text-gray-800 font-medium">
-                                  {client.company_name}
-                                </span>
-                              </div>
-                              {String(formData.client_id) === String(client.id) && (
-                                <span className="text-xs text-blue-600 font-semibold">Selected</span>
-                              )}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <input
+                    type="text"
+                    value={formData.company_name}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Name</label>
                   <input
                     type="text"
                     value={formData.pic_name}
-                    onChange={(event) => {
-                      if (useQuotation) return;
-                      setFormData((prev) => ({ ...prev, pic_name: event.target.value }));
-                    }}
-                    readOnly={useQuotation}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                      useQuotation ? 'bg-gray-50' : 'bg-white'
-                    }`}
-                    required={!useQuotation}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   />
                 </div>
               </div>
@@ -1463,91 +1108,37 @@ export default function Orders() {
                   <input
                     type="email"
                     value={formData.pic_email}
-                    onChange={(event) => {
-                      if (useQuotation) return;
-                      setFormData((prev) => ({ ...prev, pic_email: event.target.value }));
-                      if (contactError) setContactError('');
-                    }}
-                    readOnly={useQuotation}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                      useQuotation ? 'bg-gray-50' : 'bg-white'
-                    }`}
-                    placeholder={useQuotation ? undefined : 'email@company.com or -'}
-                    required={!useQuotation}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PIC Number</label>
-                  {useQuotation ? (
-                    <input
-                      type="text"
-                      value={formData.pic_phone}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                    />
-                  ) : (
-                    <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-hidden">
-                      <span className="px-3 py-2 bg-gray-50 text-gray-600 text-sm border-r border-gray-200">
-                        +62
-                      </span>
-                      <input
-                        type="tel"
-                        value={formData.pic_phone === '-' ? '-' : formData.pic_phone.replace('+62', '')}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            pic_phone: value === '-' ? '-' : normalizePhoneInput(`+62${value}`),
-                          }));
-                          if (contactError) setContactError('');
-                        }}
-                        className="w-full px-3 py-2 outline-none bg-white"
-                        placeholder="81234567890"
-                        required={!useQuotation}
-                      />
-                    </div>
-                  )}
+                  <input
+                    type="text"
+                    value={formData.pic_phone}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                  />
                 </div>
               </div>
-              {contactError && <p className="text-sm text-red-600">{contactError}</p>}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Payment Time</label>
                   <input
-                    type={useQuotation ? 'text' : 'number'}
-                    min={useQuotation ? undefined : 0}
+                    type="text"
                     value={formData.payment_time}
-                    onChange={(event) => {
-                      if (useQuotation) return;
-                      setFormData((prev) => ({ ...prev, payment_time: event.target.value }));
-                    }}
-                    readOnly={useQuotation}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                      useQuotation ? 'bg-gray-50' : 'bg-white'
-                    }`}
-                    required={!useQuotation}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900">Goods</h3>
-                  {!useQuotation && (
-                    <button
-                      type="button"
-                      onClick={addGoodsRow}
-                      className="text-sm text-blue-600 hover:text-blue-700"
-                    >
-                      + Add Row
-                    </button>
-                  )}
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Goods</h3>
                 {goodsRows.length === 0 ? (
-                  <div className="text-sm text-gray-500">
-                    {useQuotation ? 'Select a quotation to load goods.' : 'Add goods to this order.'}
-                  </div>
+                  <div className="text-sm text-gray-500">Select a quotation to load goods.</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -1560,171 +1151,40 @@ export default function Orders() {
                           <th className="px-3 py-2 text-left">Qty</th>
                           <th className="px-3 py-2 text-left">Price</th>
                           <th className="px-3 py-2 text-left">
-                            Delivery Time (days) <span className="text-red-500">*</span>
+                            Deadline (days) <span className="text-red-500">*</span>
                           </th>
                           <th className="px-3 py-2 text-left">Subtotal</th>
-                          {!useQuotation && <th className="px-3 py-2 text-left">Action</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {goodsRows.map((row, index) => {
-                          const selectedGoodIds = new Set(
-                            goodsRows.map((item) => String(item.good_id)).filter((id) => id)
-                          );
-                          const availableGoods = activeGoods.filter(
-                            (good) =>
-                              !selectedGoodIds.has(String(good.id)) ||
-                              String(good.id) === String(row.good_id)
-                          );
-                          return (
-                            <tr key={`${row.good_id || row.name}-${index}`}>
-                              <td className="px-3 py-2">{index + 1}</td>
-                              <td className="px-3 py-2">
-                                {useQuotation ? (
-                                  row.name || '-'
-                                ) : (
-                                  <div className="relative">
-                                    <input
-                                      type="text"
-                                      value={row.name}
-                                      onChange={(event) => handleGoodSelect(index, event.target.value)}
-                                      list={`goods-options-${index}`}
-                                      className="w-44 max-w-full px-2 py-1 border border-gray-300 rounded-lg bg-white"
-                                      placeholder="Search goods"
-                                      required
-                                    />
-                                    <datalist id={`goods-options-${index}`}>
-                                      {availableGoods.map((good) => (
-                                        <option key={good.id} value={good.name}>
-                                          {good.name}
-                                        </option>
-                                      ))}
-                                    </datalist>
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                {useQuotation ? (
-                                  row.description || '-'
-                                ) : (
-                                  <input
-                                    type="text"
-                                    value={row.description}
-                                    readOnly
-                                    className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-gray-50"
-                                  />
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                {useQuotation ? (
-                                  row.unit || '-'
-                                ) : (
-                                  <input
-                                    type="text"
-                                    value={row.unit}
-                                    readOnly
-                                    className="w-full px-2 py-1 border border-gray-300 rounded-lg bg-gray-50"
-                                  />
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                {useQuotation ? (
-                                  row.qty
-                                ) : (
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={row.qty}
-                                    onChange={(event) =>
-                                      handleGoodsRowChange(index, 'qty', event.target.value)
-                                    }
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded-lg"
-                                    required
-                                  />
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                {useQuotation ? (
-                                  formatCurrency(Number(row.price || 0))
-                                ) : (
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={row.price}
-                                    onChange={(event) =>
-                                      handleGoodsRowChange(index, 'price', event.target.value)
-                                    }
-                                    className="w-28 px-2 py-1 border border-gray-300 rounded-lg"
-                                    required
-                                  />
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={row.deadline_days ?? ''}
-                                  onChange={(event) =>
-                                    useQuotation
-                                      ? handleGoodsDeadlineChange(index, event.target.value)
-                                      : handleGoodsRowChange(index, 'deadline_days', event.target.value)
-                                  }
-                                  className="w-24 px-2 py-1 border border-gray-300 rounded-lg"
-                                  required
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                {formatCurrency((Number(row.qty || 0) * Number(row.price || 0)))}
-                              </td>
-                              {!useQuotation && (
-                                <td className="px-3 py-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => removeGoodsRow(index)}
-                                    className="text-xs text-red-600 hover:text-red-700"
-                                  >
-                                    Remove
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
+                        {goodsRows.map((row, index) => (
+                          <tr key={`${row.good_id || row.name}-${index}`}>
+                            <td className="px-3 py-2">{index + 1}</td>
+                            <td className="px-3 py-2">{row.name || '-'}</td>
+                            <td className="px-3 py-2">{row.description || '-'}</td>
+                            <td className="px-3 py-2">{row.unit || '-'}</td>
+                            <td className="px-3 py-2">{row.qty}</td>
+                            <td className="px-3 py-2">{formatCurrency(Number(row.price || 0))}</td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.deadline_days ?? ''}
+                                onChange={(event) => handleGoodsDeadlineChange(index, event.target.value)}
+                                className="w-24 px-2 py-1 border border-gray-300 rounded-lg"
+                                required
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              {formatCurrency((Number(row.qty || 0) * Number(row.price || 0)))}
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 )}
               </div>
-
-              {!useQuotation && (
-                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Include Tax</p>
-                    <p className="text-xs text-gray-500">
-                      Turn off to add {taxRate}% tax on top of the total.
-                    </p>
-                  </div>
-                  <label className="inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={includeTax}
-                      onChange={(event) => setIncludeTax(event.target.checked)}
-                    />
-                    <span
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                        includeTax ? 'bg-emerald-500' : 'bg-gray-300'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                          includeTax ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </span>
-                  </label>
-                </div>
-              )}
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                 <div className="flex items-center justify-between">
@@ -1732,7 +1192,7 @@ export default function Orders() {
                   <span>{formatCurrency(Number(orderTotals.subtotal) || 0)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>{useQuotation ? 'Tax' : `Tax (${taxRate}%)`}</span>
+                  <span>Tax</span>
                   <span>{formatCurrency(Number(orderTotals.tax) || 0)}</span>
                 </div>
                 <div className="flex items-center justify-between font-semibold text-gray-900">
@@ -1743,7 +1203,7 @@ export default function Orders() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Documents <span className="text-gray-400">(optional)</span>
+                  Upload Documents <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center gap-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <UploadCloud className="h-5 w-5 text-gray-500" />
@@ -1755,6 +1215,7 @@ export default function Orders() {
                       multiple
                       onChange={handleDocumentsChange}
                       className="mt-2"
+                      required={documents.length === 0}
                     />
                   </div>
                 </div>
@@ -1844,15 +1305,9 @@ export default function Orders() {
                 </div>
                 <div>
                   <p className="text-gray-500">Quotation</p>
-                  {detailOrder.quotations?.quotation_number ? (
-                    <p className="font-medium text-gray-900">
-                      {detailOrder.quotations?.quotation_number}
-                    </p>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                      No quotation
-                    </span>
-                  )}
+                  <p className="font-medium text-gray-900">
+                    {detailOrder.quotations?.quotation_number || '-'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-500">Date</p>
