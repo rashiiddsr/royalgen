@@ -9,7 +9,7 @@ interface Good {
   sku: string;
   name: string;
   description: string;
-  category: string;
+  category: 'consumable' | 'instrument' | 'electrical' | 'piping' | 'other';
   unit: string;
   price: number;
   minimum_order_quantity: number;
@@ -24,23 +24,11 @@ type GoodFormData = Omit<
 > & {
   performed_by?: string | number;
   suppliers?: (string | number)[];
-  category: string | '';
+  category: Good['category'] | '';
   unit: string | '';
   price: number | '';
   minimum_order_quantity: number | '';
 };
-
-interface VariantOption {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-const DEFAULT_CATEGORIES = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
-const DEFAULT_UNITS = ['pcs', 'box', 'kg', 'liter', 'meter', 'set'];
-
-const formatSkuCategory = (category: string) =>
-  category.trim().toLowerCase().replace(/\s+/g, '-');
 
 export default function Goods() {
   const [goods, setGoods] = useState<Good[]>([]);
@@ -63,21 +51,20 @@ export default function Goods() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
-  const [categoryOptions, setCategoryOptions] = useState<string[]>(DEFAULT_CATEGORIES);
-  const [unitOptions, setUnitOptions] = useState<string[]>(DEFAULT_UNITS);
   const { profile } = useAuth();
 
   const canToggleStatus = ['manager', 'superadmin'].includes(profile?.role ?? '');
 
-  const getCategoryBadge = (category: string) => {
-    const styles: Record<string, string> = {
+  const categories: Good['category'][] = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
+  const getCategoryBadge = (category: Good['category']) => {
+    const styles: Record<Good['category'], string> = {
       consumable: 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200',
       instrument: 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200',
       electrical: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
       piping: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
       other: 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100',
     };
-    return styles[category.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
+    return styles[category] || 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-100';
   };
 
   useEffect(() => {
@@ -85,9 +72,7 @@ export default function Goods() {
     fetchSuppliers();
   }, []);
 
-  const generateSku = (category: string) => {
-    const skuCategory = formatSkuCategory(category);
-    if (!skuCategory) return '';
+  const generateSku = (category: Good['category']) => {
     const matchingGoods = goods.filter((item) => item.category === category && item.sku);
     const highestSequence = matchingGoods.reduce((max, item) => {
       const match = item.sku.match(/rgi-[^-]+-(\d{4})/i);
@@ -97,7 +82,7 @@ export default function Goods() {
     }, 0);
 
     const nextSequence = (highestSequence || 0) + 1;
-    return `rgi-${skuCategory}-${String(nextSequence).padStart(4, '0')}`;
+    return `rgi-${category}-${String(nextSequence).padStart(4, '0')}`;
   };
 
   const getInitialForm = (): GoodFormData => ({
@@ -121,9 +106,7 @@ export default function Goods() {
       const sorted = [...data].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
-      const normalizedGoods = sorted.map((item) => ({ ...item }));
-      setGoods(normalizedGoods);
-      fetchVariants(normalizedGoods);
+      setGoods(sorted.map((item) => ({ ...item })));
     } catch (error) {
       console.error('Error fetching goods:', error);
     } finally {
@@ -139,43 +122,6 @@ export default function Goods() {
       setSuppliers(data.map((supplier) => ({ id: supplier.id, name: supplier.name, status: supplier.status })));
     } catch (error) {
       console.error('Error fetching suppliers:', error);
-    }
-  };
-
-  const mergeOptions = (primary: string[], fallback: string[], fromGoods: string[]) => {
-    const merged: string[] = [];
-    const seen = new Set<string>();
-    const addValue = (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) return;
-      const key = trimmed.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      merged.push(trimmed);
-    };
-
-    primary.forEach(addValue);
-    fallback.forEach(addValue);
-    fromGoods.forEach(addValue);
-    return merged;
-  };
-
-  const fetchVariants = async (currentGoods: Good[] = goods) => {
-    try {
-      const [categoryData, unitData] = await Promise.all([
-        getRecords<VariantOption>('goods_categories'),
-        getRecords<VariantOption>('goods_units'),
-      ]);
-      const categoryNames = categoryData.map((item) => item.name);
-      const unitNames = unitData.map((item) => item.name);
-      setCategoryOptions(
-        mergeOptions(categoryNames, DEFAULT_CATEGORIES, currentGoods.map((item) => item.category))
-      );
-      setUnitOptions(mergeOptions(unitNames, DEFAULT_UNITS, currentGoods.map((item) => item.unit)));
-    } catch (error) {
-      console.error('Error fetching goods variants:', error);
-      setCategoryOptions(mergeOptions([], DEFAULT_CATEGORIES, currentGoods.map((item) => item.category)));
-      setUnitOptions(mergeOptions([], DEFAULT_UNITS, currentGoods.map((item) => item.unit)));
     }
   };
 
@@ -258,7 +204,7 @@ export default function Goods() {
     setSelectedSuppliers([]);
   };
 
-  const handleCategoryChange = (category: string | '') => {
+  const handleCategoryChange = (category: Good['category'] | '') => {
     if (editingGood) {
       setFormData({ ...formData, category });
     } else {
@@ -612,14 +558,14 @@ export default function Goods() {
                   </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    onChange={(e) => handleCategoryChange(e.target.value as Good['category'] | '')}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
                     <option value="" disabled>
                       Select category
                     </option>
-                    {categoryOptions.map((category) => (
+                    {categories.map((category) => (
                       <option key={category} value={category} className="capitalize">
                         {category}
                       </option>
@@ -640,11 +586,12 @@ export default function Goods() {
                     <option value="" disabled>
                       Select unit
                     </option>
-                    {unitOptions.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
+                    <option value="pcs">Pieces</option>
+                    <option value="box">Box</option>
+                    <option value="kg">Kilogram</option>
+                    <option value="liter">Liter</option>
+                    <option value="meter">Meter</option>
+                    <option value="set">Set</option>
                   </select>
                 </div>
 

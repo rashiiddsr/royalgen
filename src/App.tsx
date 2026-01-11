@@ -8,7 +8,6 @@ import DashboardHome from './components/Pages/DashboardHome';
 import Suppliers from './components/Pages/Suppliers';
 import Clients from './components/Pages/Clients';
 import Goods from './components/Pages/Goods';
-import GoodsVariants from './components/Pages/GoodsVariants';
 import RFQ from './components/Pages/RFQ';
 import Quotations from './components/Pages/Quotations';
 import Orders from './components/Pages/Orders';
@@ -112,8 +111,6 @@ function App() {
         return <Clients />;
       case 'goods':
         return <Goods />;
-      case 'goods-variants':
-        return <GoodsVariants />;
       case 'rfq':
         return <RFQ />;
       case 'quotations':

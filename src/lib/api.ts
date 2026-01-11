@@ -26,8 +26,6 @@ type TableName =
   | 'clients'
   | 'suppliers'
   | 'goods'
-  | 'goods_categories'
-  | 'goods_units'
   | 'rfqs'
   | 'quotations'
   | 'sales_orders'
