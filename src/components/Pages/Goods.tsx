@@ -36,9 +36,6 @@ interface VariantOption {
   created_at: string;
 }
 
-const DEFAULT_CATEGORIES = ['consumable', 'instrument', 'electrical', 'piping', 'other'];
-const DEFAULT_UNITS = ['pcs', 'box', 'kg', 'liter', 'meter', 'set'];
-
 const formatSkuCategory = (category: string) =>
   category.trim().toLowerCase().replace(/\s+/g, '-');
 
@@ -63,8 +60,8 @@ export default function Goods() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
-  const [categoryOptions, setCategoryOptions] = useState<string[]>(DEFAULT_CATEGORIES);
-  const [unitOptions, setUnitOptions] = useState<string[]>(DEFAULT_UNITS);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [unitOptions, setUnitOptions] = useState<string[]>([]);
   const { profile } = useAuth();
 
   const canToggleStatus = ['manager', 'superadmin'].includes(profile?.role ?? '');
@@ -123,7 +120,7 @@ export default function Goods() {
       );
       const normalizedGoods = sorted.map((item) => ({ ...item }));
       setGoods(normalizedGoods);
-      fetchVariants(normalizedGoods);
+      fetchVariants();
     } catch (error) {
       console.error('Error fetching goods:', error);
     } finally {
@@ -142,7 +139,7 @@ export default function Goods() {
     }
   };
 
-  const mergeOptions = (primary: string[], fallback: string[], fromGoods: string[]) => {
+  const normalizeOptions = (options: string[]) => {
     const merged: string[] = [];
     const seen = new Set<string>();
     const addValue = (value: string) => {
@@ -154,28 +151,24 @@ export default function Goods() {
       merged.push(trimmed);
     };
 
-    primary.forEach(addValue);
-    fallback.forEach(addValue);
-    fromGoods.forEach(addValue);
+    options.forEach(addValue);
     return merged;
   };
 
-  const fetchVariants = async (currentGoods: Good[] = goods) => {
+  const fetchVariants = async () => {
     try {
       const [categoryData, unitData] = await Promise.all([
         getRecords<VariantOption>('goods_categories'),
         getRecords<VariantOption>('goods_units'),
       ]);
-      const categoryNames = categoryData.map((item) => item.name);
-      const unitNames = unitData.map((item) => item.name);
-      setCategoryOptions(
-        mergeOptions(categoryNames, DEFAULT_CATEGORIES, currentGoods.map((item) => item.category))
-      );
-      setUnitOptions(mergeOptions(unitNames, DEFAULT_UNITS, currentGoods.map((item) => item.unit)));
+      const categoryNames = normalizeOptions(categoryData.map((item) => item.name));
+      const unitNames = normalizeOptions(unitData.map((item) => item.name));
+      setCategoryOptions(categoryNames);
+      setUnitOptions(unitNames);
     } catch (error) {
       console.error('Error fetching goods variants:', error);
-      setCategoryOptions(mergeOptions([], DEFAULT_CATEGORIES, currentGoods.map((item) => item.category)));
-      setUnitOptions(mergeOptions([], DEFAULT_UNITS, currentGoods.map((item) => item.unit)));
+      setCategoryOptions([]);
+      setUnitOptions([]);
     }
   };
 
@@ -230,6 +223,9 @@ export default function Goods() {
     }
   };
 
+  const resolveOption = (value: string, options: string[]) =>
+    options.includes(value) ? value : '';
+
   const openModal = (good?: Good) => {
     if (good) {
       setEditingGood(good);
@@ -237,8 +233,8 @@ export default function Goods() {
         sku: good.sku,
         name: good.name,
         description: good.description,
-        category: good.category,
-        unit: good.unit,
+        category: resolveOption(good.category, categoryOptions),
+        unit: resolveOption(good.unit, unitOptions),
         price: good.price,
         minimum_order_quantity: good.minimum_order_quantity,
         status: good.status,
