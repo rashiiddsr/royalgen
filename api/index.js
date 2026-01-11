@@ -94,6 +94,8 @@ const TABLES = [
   'suppliers',
   'clients',
   'goods',
+  'goods_categories',
+  'goods_units',
   'goods_suppliers',
   'rfqs',
   'quotations',
@@ -1590,6 +1592,34 @@ app.put('/api/:table/:id', async (req, res) => {
   if (!isValidTable(table)) return res.status(404).json({ error: 'Table not found' });
 
   try {
+    if (table === 'goods_categories' || table === 'goods_units') {
+      const { name } = req.body || {};
+      const trimmedName = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+      if (!trimmedName) {
+        return res.status(400).json({ error: 'Name is required' });
+      }
+      const [existing] = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
+      if (!existing) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      const [duplicate] = await query(
+        'SELECT id FROM ?? WHERE LOWER(name) = LOWER(?) AND id <> ? LIMIT 1',
+        [table, trimmedName, id],
+      );
+      if (duplicate) {
+        return res.status(409).json({ error: 'Name already exists' });
+      }
+
+      await query('UPDATE ?? SET name = ? WHERE id = ?', [table, trimmedName, id]);
+      if (table === 'goods_categories') {
+        await query('UPDATE `goods` SET category = ? WHERE category = ?', [trimmedName, existing.name]);
+      } else {
+        await query('UPDATE `goods` SET unit = ? WHERE unit = ?', [trimmedName, existing.name]);
+      }
+      const [updated] = await query('SELECT * FROM ?? WHERE id = ?', [table, id]);
+      return res.json(updated);
+    }
+
     if (table === 'delivery_orders') {
       const {
         goods = [],
@@ -2251,6 +2281,23 @@ app.delete('/api/:table/:id', async (req, res) => {
     }
     if (table === 'suppliers') {
       return res.status(403).json({ error: 'Suppliers cannot be deleted' });
+    }
+
+    if (table === 'goods_categories' || table === 'goods_units') {
+      const [existing] = await query('SELECT * FROM ?? WHERE id = ? LIMIT 1', [table, id]);
+      if (!existing) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      const field = table === 'goods_categories' ? 'category' : 'unit';
+      const [related] = await query(
+        `SELECT COUNT(*) as count FROM \`goods\` WHERE ${field} = ?`,
+        [existing.name],
+      );
+      if (Number(related?.count) > 0) {
+        return res.status(400).json({ error: 'Cannot delete item in use' });
+      }
+      await query('DELETE FROM ?? WHERE id = ?', [table, id]);
+      return res.status(204).send();
     }
 
     await query('DELETE FROM ?? WHERE id = ?', [table, id]);
