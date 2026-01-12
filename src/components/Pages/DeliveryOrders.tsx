@@ -744,6 +744,7 @@ export default function DeliveryOrders() {
     });
     return Array.from(options);
   }, [formData.ship_address, resolvedShipAddresses]);
+  const isShipAddressLocked = shipAddressOptions.length <= 1;
   const isEditing = Boolean(editingDelivery);
 
   if (loading) {
@@ -967,11 +968,12 @@ export default function DeliveryOrders() {
                     <input
                       type="text"
                       value={formData.ship_address}
-                      onChange={(event) =>
-                        setFormData((prev) => ({ ...prev, ship_address: event.target.value }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      placeholder="Enter ship address"
+                      readOnly
+                      disabled={isShipAddressLocked}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+                        isShipAddressLocked ? 'bg-gray-50 text-gray-500' : ''
+                      }`}
+                      placeholder={selectedOrder ? undefined : 'Select a sales order'}
                       required
                     />
                   )}
