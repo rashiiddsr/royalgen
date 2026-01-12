@@ -156,57 +156,15 @@ export function openHtmlDocument(html: string, filename: string) {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const newWindow = window.open(url, '_blank', 'noopener');
-  const triggerPrint = (target: Window) => {
-    target.focus();
-    target.print();
-  };
   if (newWindow) {
     newWindow.document.title = `${safeName}.pdf`;
-    const readyCheck = window.setInterval(() => {
-      try {
-        if (newWindow.document.readyState === 'complete') {
-          window.clearInterval(readyCheck);
-          triggerPrint(newWindow);
-        }
-      } catch {
-        // ignore cross-origin read errors while waiting
-      }
-    }, 250);
-    newWindow.addEventListener(
-      'load',
-      () => {
-        window.clearInterval(readyCheck);
-        triggerPrint(newWindow);
-      },
-      { once: true },
-    );
-    newWindow.addEventListener(
-      'afterprint',
-      () => {
-        newWindow.close();
-        URL.revokeObjectURL(url);
-      },
-      { once: true },
-    );
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    return;
+    newWindow.onload = () => {
+      newWindow.focus();
+      newWindow.print();
+    };
+    newWindow.onafterprint = () => {
+      newWindow.close();
+    };
   }
-
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  iframe.srcdoc = html;
-  document.body.appendChild(iframe);
-  iframe.onload = () => {
-    const printWindow = iframe.contentWindow;
-    if (!printWindow) return;
-    setTimeout(() => triggerPrint(printWindow), 250);
-  };
-  setTimeout(() => {
-    iframe.remove();
-  }, 60_000);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
