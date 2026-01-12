@@ -1974,7 +1974,13 @@ app.put('/api/:table/:id', async (req, res) => {
     }
 
     if (table === 'rfqs') {
-      const { goods = [], attachment_data: attachmentData, performed_by: performedBy, performer_role: performerRole, ...rfqUpdates } = req.body || {};
+      const {
+        goods = [],
+        attachment_data: attachmentData,
+        performed_by: performedBy,
+        performer_role: performerRole,
+        ...rfqUpdates
+      } = req.body || {};
       const [existing] = await query('SELECT * FROM `rfqs` WHERE id = ? LIMIT 1', [id]);
 
       if (!existing) {
@@ -1991,8 +1997,17 @@ app.put('/api/:table/:id', async (req, res) => {
         return res.status(403).json({ error: 'Not authorized to edit this RFQ' });
       }
 
-      if (existing.status === 'process') {
+      let sanitizedUpdates = { ...rfqUpdates };
+      const requestedStatus = sanitizedUpdates.status;
+      const isStatusChange = requestedStatus && requestedStatus !== existing.status;
+      const isRejectRequest = requestedStatus === 'reject' || requestedStatus === 'rejected';
+      const canOverrideProcess = existing.status === 'process' && isStatusChange && isRejectRequest && isPrivileged;
+
+      if (existing.status === 'process' && !canOverrideProcess) {
         return res.status(403).json({ error: 'RFQ is already in process and cannot be edited' });
+      }
+      if (canOverrideProcess) {
+        sanitizedUpdates = { status: requestedStatus };
       }
 
       let attachmentUrl = existing.attachment_url;
@@ -2009,7 +2024,7 @@ app.put('/api/:table/:id', async (req, res) => {
           }))
         : JSON.parse(existing.goods || '[]');
 
-      const nextUpdates = { ...rfqUpdates };
+      const nextUpdates = { ...sanitizedUpdates };
       if (Object.prototype.hasOwnProperty.call(nextUpdates, 'deadline_days')) {
         const rawDeadlineDays = nextUpdates.deadline_days;
         const resolvedDeadlineDays =
