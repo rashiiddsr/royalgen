@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { getRecords, updateRecord } from '../../lib/api';
+import { downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
-import { openPrintWindow } from '../../lib/print';
 
 interface InvoiceGood {
   no: number;
@@ -406,10 +405,13 @@ export default function Invoices() {
     const latestSettings = settingsData[0] || null;
     setCompanySettings(latestSettings);
     const html = buildInvoiceTemplate(invoice, latestSettings);
-    const opened = openPrintWindow(html);
-    if (!opened) {
-      console.error('Failed to open invoice document');
-      alert('Failed to open document. Please allow pop-ups and try again.');
+    const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
+    try {
+      const { blob } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
+      downloadPdfBlob(blob, safeNumber);
+    } catch (error) {
+      console.error('Failed to download invoice PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
