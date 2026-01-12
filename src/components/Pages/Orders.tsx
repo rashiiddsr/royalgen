@@ -587,6 +587,7 @@ export default function Orders() {
     if (isEditing) return;
     setUseQuotation(nextUseQuotation);
     setIncludeTax(false);
+    setDocumentsError('');
     if (nextUseQuotation) {
       setFormData((prev) => ({
         ...prev,
@@ -769,6 +770,10 @@ export default function Orders() {
     event.preventDefault();
     if (contactError) setContactError('');
     const isUsingQuotation = useQuotation && Boolean(formData.quotation_id);
+    if (isUsingQuotation && documents.length === 0) {
+      setDocumentsError('Upload documents is required for sales orders with quotations.');
+      return;
+    }
     if (!isUsingQuotation) {
       if (goodsRows.length === 0) {
         alert('Please add goods.');
@@ -1570,7 +1575,7 @@ export default function Orders() {
                           <th className="px-3 py-2 text-left">Qty</th>
                           <th className="px-3 py-2 text-left">Price</th>
                           <th className="px-3 py-2 text-left">
-                            Delivery Time (days) <span className="text-red-500">*</span>
+                            Deadline Time (days) <span className="text-red-500">*</span>
                           </th>
                           <th className="px-3 py-2 text-left">Subtotal</th>
                           {!useQuotation && <th className="px-3 py-2 text-left">Action</th>}
@@ -1753,7 +1758,12 @@ export default function Orders() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Documents <span className="text-gray-400">(optional)</span>
+                  Upload Documents{' '}
+                  {useQuotation ? (
+                    <span className="text-red-500">*</span>
+                  ) : (
+                    <span className="text-gray-400">(optional)</span>
+                  )}
                 </label>
                 <div className="flex items-center gap-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <UploadCloud className="h-5 w-5 text-gray-500" />
