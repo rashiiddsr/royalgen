@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { addRecord, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { openHtmlViewer } from '../../lib/documentViewer';
 import { formatRupiah } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -260,7 +261,7 @@ export default function Quotations() {
       <html lang="id">
         <head>
           <meta charset="utf-8" />
-          <title>${escapeHtml(quotation.quotation_number || 'Quotation')}.pdf</title>
+          <title>${escapeHtml(quotation.quotation_number || 'Quotation')}</title>
           <style>
             :root {
               --ink: #0f172a;
@@ -412,11 +413,10 @@ export default function Quotations() {
     const html = buildQuotationTemplate(quotation, latestSettings);
     const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
     try {
-      const { blob } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
-      downloadPdfBlob(blob, safeNumber);
+      openHtmlViewer(html, { title: safeNumber });
     } catch (error) {
-      console.error('Failed to download quotation PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Failed to open quotation document', error);
+      alert('Failed to open document. Please try again.');
     }
   };
 
