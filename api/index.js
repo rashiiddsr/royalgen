@@ -9,7 +9,6 @@ import net from 'net';
 import tls from 'tls';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import puppeteer from 'puppeteer';
 import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -135,49 +134,6 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 };
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
-
-let pdfBrowser;
-const getPdfBrowser = async () => {
-  if (pdfBrowser?.isConnected?.()) return pdfBrowser;
-  pdfBrowser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
-  return pdfBrowser;
-};
-
-const closePdfBrowser = async () => {
-  if (!pdfBrowser) return;
-  try {
-    await pdfBrowser.close();
-  } catch (error) {
-    console.error('Failed to close PDF browser', error);
-  } finally {
-    pdfBrowser = undefined;
-  }
-};
-
-process.on('exit', () => {
-  void closePdfBrowser();
-});
-process.on('SIGINT', () => {
-  void closePdfBrowser().finally(() => process.exit(0));
-});
-process.on('SIGTERM', () => {
-  void closePdfBrowser().finally(() => process.exit(0));
-});
-
-const generatePdfFromHtml = async (html) => {
-  const browser = await getPdfBrowser();
-  const page = await browser.newPage();
-  try {
-    await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
-    await page.emulateMediaType('screen');
-    return await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
-  } finally {
-    await page.close();
-  }
-};
 
 const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') => {
   if (!Array.isArray(documents)) return [];
@@ -957,47 +913,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
   } catch (error) {
     console.error('Reset password error', error);
     return res.status(500).json({ error: 'Failed to reset password' });
-  }
-});
-
-const documentTables = {
-  quotations: 'quotations',
-  delivery_orders: 'delivery_orders',
-  invoices: 'invoices',
-  sales_orders: 'sales_orders',
-};
-
-app.post('/api/documents/:type/:id/pdf', async (req, res) => {
-  const { type, id } = req.params;
-  const { html, filename } = req.body || {};
-  const table = documentTables[type];
-
-  if (!table) {
-    return res.status(400).json({ error: 'Invalid document type' });
-  }
-
-  if (!html || typeof html !== 'string') {
-    return res.status(400).json({ error: 'HTML content is required' });
-  }
-
-  try {
-    const rows = await query(`SELECT id FROM \`${table}\` WHERE id = ? LIMIT 1`, [id]);
-    if (!rows.length) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-
-    const safePrefix = (typeof filename === 'string' ? filename.trim() : '') || `${type}-${id}`;
-    const normalizedPrefix = safePrefix.replace(/[^\w.-]+/g, '_') || `${type}-${id}`;
-    const pdfBuffer = await generatePdfFromHtml(html);
-    const resolvedBuffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${normalizedPrefix}.pdf"`);
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Length', resolvedBuffer.length);
-    return res.end(resolvedBuffer);
-  } catch (error) {
-    console.error('Failed to generate pdf', error);
-    return res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, downloadFileBlob, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, downloadFileBlob, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
+import { openPrintWindow } from '../../lib/print';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
@@ -993,13 +994,11 @@ export default function Orders() {
       salesOrderNumber: orderNumber,
       settingsOverride: latestSettings,
     });
-    const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
     try {
-      const { blob } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
-      downloadPdfBlob(blob, safeNumber);
+      openPrintWindow(html);
     } catch (error) {
-      console.error('Failed to download delivery order PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Failed to open delivery order document', error);
+      alert('Failed to open document. Please allow pop-ups and try again.');
     }
   };
 
@@ -1011,7 +1010,6 @@ export default function Orders() {
     setCompanySettings(latestSettings);
     const baseNumber = resolveBaseDeliveryNumber(latestDelivery.delivery_number);
     const orderNumber = detailOrder.po_number || detailOrder.order_number || '-';
-    const safeNumber = baseNumber.replace(/[^\w.-]+/g, '_') || 'delivery-order';
     try {
       if (linkedDeliveries.length === 1) {
         const html = buildDeliveryOrderTemplate({
@@ -1024,8 +1022,7 @@ export default function Orders() {
           salesOrderNumber: orderNumber,
           settingsOverride: latestSettings,
         });
-        const { blob } = await generateDocumentPdf('delivery_orders', latestDelivery.id, html, safeNumber);
-        downloadPdfBlob(blob, safeNumber);
+        openPrintWindow(html);
         return;
       }
 
@@ -1039,11 +1036,10 @@ export default function Orders() {
         salesOrderNumber: orderNumber,
         settingsOverride: latestSettings,
       });
-      const { blob } = await generateDocumentPdf('sales_orders', detailOrder.id, html, safeNumber);
-      downloadPdfBlob(blob, safeNumber);
+      openPrintWindow(html);
     } catch (error) {
-      console.error('Failed to download delivery order PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Failed to open delivery order document', error);
+      alert('Failed to open document. Please allow pop-ups and try again.');
     }
   };
 
