@@ -9,9 +9,7 @@ import net from 'net';
 import tls from 'tls';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import React from 'react';
-import { Document, Page, pdf } from '@react-pdf/renderer';
-import { Html } from 'react-pdf-html';
+import puppeteer from 'puppeteer';
 import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -138,17 +136,47 @@ const saveBase64File = (fileData, filenamePrefix = 'upload') => {
 
 const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(photoData, filenamePrefix);
 
+let pdfBrowser;
+const getPdfBrowser = async () => {
+  if (pdfBrowser?.isConnected?.()) return pdfBrowser;
+  pdfBrowser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  return pdfBrowser;
+};
+
+const closePdfBrowser = async () => {
+  if (!pdfBrowser) return;
+  try {
+    await pdfBrowser.close();
+  } catch (error) {
+    console.error('Failed to close PDF browser', error);
+  } finally {
+    pdfBrowser = undefined;
+  }
+};
+
+process.on('exit', () => {
+  void closePdfBrowser();
+});
+process.on('SIGINT', () => {
+  void closePdfBrowser().finally(() => process.exit(0));
+});
+process.on('SIGTERM', () => {
+  void closePdfBrowser().finally(() => process.exit(0));
+});
+
 const generatePdfFromHtml = async (html) => {
-  const doc = React.createElement(
-    Document,
-    null,
-    React.createElement(
-      Page,
-      { size: 'A4', style: { padding: 0 } },
-      React.createElement(Html, null, html)
-    )
-  );
-  return pdf(doc).toBuffer();
+  const browser = await getPdfBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
+    await page.emulateMediaType('screen');
+    return await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
+  } finally {
+    await page.close();
+  }
 };
 
 const normalizeDocumentsPayload = (documents = [], filenamePrefix = 'document') => {
