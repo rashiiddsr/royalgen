@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
-import { openPrintWindow } from '../../lib/print';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
@@ -411,11 +410,13 @@ export default function Quotations() {
     const latestSettings = settingsData[0] || null;
     setCompanySettings(latestSettings);
     const html = buildQuotationTemplate(quotation, latestSettings);
+    const safeNumber = quotation.quotation_number?.replace(/[^\w.-]+/g, '_') || 'quotation';
     try {
-      openPrintWindow(html);
+      const { blob } = await generateDocumentPdf('quotations', quotation.id, html, safeNumber);
+      downloadPdfBlob(blob, safeNumber);
     } catch (error) {
-      console.error('Failed to open quotation document', error);
-      alert('Failed to open document. Please allow pop-ups and try again.');
+      console.error('Failed to download quotation PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
