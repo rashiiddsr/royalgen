@@ -159,6 +159,9 @@ export function openHtmlDocument(html: string, filename: string) {
       window.addEventListener('load', () => {
         if (!shouldPrint) return;
         setTimeout(() => {
+         if (window.opener) {
+            window.opener = null;
+          }
           window.focus();
           window.print();
         }, 0);
@@ -173,8 +176,9 @@ export function openHtmlDocument(html: string, filename: string) {
     : `${html}${printScript}`;
   const blob = new Blob([htmlWithPrint], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
-  const newWindow = window.open(url, '_blank', 'noopener');
+ const newWindow = window.open(url, '_blank');
   if (newWindow) {
+    newWindow.opener = null;
     newWindow.document.title = `${safeName}.pdf`;
     newWindow.addEventListener(
       'afterprint',
