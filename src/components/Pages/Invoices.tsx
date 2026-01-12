@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRecords, openHtmlDocument, updateRecord } from '../../lib/api';
+import { downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -406,7 +406,13 @@ export default function Invoices() {
     setCompanySettings(latestSettings);
     const html = buildInvoiceTemplate(invoice, latestSettings);
     const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
-    openHtmlDocument(html, safeNumber);
+    try {
+      const { blob } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
+      downloadPdfBlob(blob, safeNumber);
+    } catch (error) {
+      console.error('Failed to download invoice PDF', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
 
   const getStatusColor = (status: string) => {
