@@ -37,8 +37,6 @@ type TableName =
   | 'users'
   | 'activity_logs';
 
-type DocumentType = 'quotations' | 'delivery_orders' | 'invoices' | 'sales_orders';
-
 type BaseRecord = { id: string | number; created_at?: string } & Record<string, unknown>;
 
 async function handleResponse(response: Response) {
@@ -140,35 +138,6 @@ export async function getActivityLogs(userId?: number | string) {
   return handleResponse(response) as Promise<ActivityLog[]>;
 }
 
-export async function generateDocumentPdf(
-  type: DocumentType,
-  id: string | number,
-  html: string,
-  filename?: string,
-): Promise<{ blob: Blob }> {
-  const response = await fetch(`${API_BASE_URL}/documents/${type}/${id}/pdf`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html, filename }),
-  });
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    const message = data?.error || 'Request failed';
-    throw new Error(message);
-  }
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/pdf')) {
-    const payload = await response.text().catch(() => '');
-    throw new Error(payload || 'Invalid PDF response');
-  }
-  const buffer = await response.arrayBuffer();
-  if (!buffer.byteLength) {
-    throw new Error('Empty PDF response');
-  }
-  const blob = new Blob([buffer], { type: 'application/pdf' });
-  return { blob };
-}
-
 export function downloadFileBlob(blob: Blob, filename: string) {
   const safeName = filename.replace(/[^\w.-]+/g, '_') || 'document';
   const url = URL.createObjectURL(blob);
@@ -182,7 +151,13 @@ export function downloadFileBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function downloadPdfBlob(blob: Blob, filename: string) {
+export function openHtmlDocument(html: string, filename: string) {
   const safeName = filename.replace(/[^\w.-]+/g, '_') || 'document';
-  downloadFileBlob(blob, `${safeName}.pdf`);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const newWindow = window.open(url, '_blank', 'noopener');
+  if (newWindow) {
+    newWindow.document.title = `${safeName}.pdf`;
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
