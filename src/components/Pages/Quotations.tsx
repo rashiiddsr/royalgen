@@ -245,8 +245,8 @@ export default function Quotations() {
             <td>${index + 1}</td>
             <td>${escapeHtml(row.name || '-')}</td>
             <td>${escapeHtml(row.description || '-')}</td>
-            <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">${qty}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">Rp ${formatRupiah(price)}</td>
             <td style="text-align:center;">${row.delivery_time ?? '-'}</td>
             <td style="text-align:right;">Rp ${formatRupiah(subtotal)}</td>
@@ -363,8 +363,8 @@ export default function Quotations() {
                   <th style="width: 40px;">No</th>
                   <th>Barang</th>
                   <th>Deskripsi</th>
-                  <th style="width: 60px;">Unit</th>
                   <th style="width: 56px; text-align:right;">Qty</th>
+                  <th style="width: 60px;">Unit</th>
                   <th style="width: 110px; text-align:right;">Harga</th>
                   <th style="width: 90px; text-align:center;">Pengiriman</th>
                   <th style="width: 120px; text-align:right;">Jumlah</th>

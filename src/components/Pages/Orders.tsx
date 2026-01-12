@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, downloadFileBlob, getRecords, openHtmlDocument, updateRecord } from '../../lib/api';
+import { addRecord, getRecords, openHtmlDocument, updateRecord } from '../../lib/api';
 import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,7 +18,7 @@ interface OrderGood {
   unit?: string;
   qty: number | '';
   price: number | '';
-  deadline_days?: number | '';
+  deadline_days?: string | number | '';
 }
 
 interface OrderType {
@@ -226,6 +226,16 @@ export default function Orders() {
     return formatDateInput(value);
   };
 
+  const formatDeadlineInput = (value?: string | number | null) => {
+    if (value === null || value === undefined || value === '') return '';
+    return formatDateInput(String(value));
+  };
+
+  const formatDeadlineDisplay = (value?: string | number | null) => {
+    if (value === null || value === undefined || value === '') return '-';
+    return formatShortDate(String(value));
+  };
+
   const formatCurrency = (value: number) => `Rp ${formatRupiah(value)}`;
   const canEditOrder = (order: OrderType) => !['waiting payment', 'done'].includes(order.status);
   const normalizePhoneInput = (value: string) => {
@@ -286,21 +296,26 @@ export default function Orders() {
     return doc.data;
   };
 
+  const openPrintWindow = (url: string) => {
+    const newWindow = window.open(url, '_blank', 'noopener');
+    if (!newWindow) return;
+    newWindow.onload = () => {
+      newWindow.focus();
+      newWindow.print();
+    };
+    newWindow.onafterprint = () => {
+      newWindow.close();
+    };
+  };
+
   const handleDownloadDocument = async (doc: OrderDocument) => {
     const url = resolveDocumentUrl(doc);
     if (!url) return;
-    const filename = doc.name || 'document';
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Failed to download document');
-      }
-      const blob = await response.blob();
-      downloadFileBlob(blob, filename);
-    } catch (error) {
-      console.error('Failed to download document', error);
+    if (url.startsWith('blob:')) {
       window.open(url, '_blank', 'noopener');
+      return;
     }
+    openPrintWindow(url);
   };
 
   const buildDeliveryOrderTemplate = ({
@@ -340,8 +355,8 @@ export default function Orders() {
             <td>${index + 1}</td>
             <td>${escapeHtml(row.name || '-')}</td>
             <td>${escapeHtml(row.description || '-')}</td>
-            <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">${qty}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
           </tr>
         `;
       })
@@ -442,8 +457,8 @@ export default function Orders() {
                   <th style="width: 40px;">No</th>
                   <th>Barang</th>
                   <th>Deskripsi</th>
-                  <th style="width: 60px;">Unit</th>
                   <th style="width: 60px; text-align:right;">Qty</th>
+                  <th style="width: 60px;">Unit</th>
                 </tr>
               </thead>
               <tbody>
@@ -700,8 +715,7 @@ export default function Orders() {
     setGoodsRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
-        const deadlineValue = value === '' ? '' : Number(value);
-        return { ...row, deadline_days: deadlineValue };
+        return { ...row, deadline_days: value };
       })
     );
   };
@@ -711,7 +725,7 @@ export default function Orders() {
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const updatedValue =
-          field === 'qty' || field === 'price' || field === 'deadline_days'
+          field === 'qty' || field === 'price'
             ? value === ''
               ? ''
               : Number(value)
@@ -801,16 +815,6 @@ export default function Orders() {
         alert('Quantity must meet the minimum order quantity (MOQ) for the selected goods.');
         return;
       }
-      const invalidDeliveryTime = goodsRows.find((row) => {
-        if (row.deadline_days === '' || row.deadline_days === null || row.deadline_days === undefined) {
-          return true;
-        }
-        return Number(row.deadline_days) < 0;
-      });
-      if (invalidDeliveryTime) {
-        alert('Delivery time per goods must be filled out.');
-        return;
-      }
       const invalidQuantity = goodsRows.find((row) => row.qty === '' || row.qty === null || row.qty === undefined);
       if (invalidQuantity) {
         alert('Quantity must be filled out.');
@@ -822,14 +826,9 @@ export default function Orders() {
         return;
       }
     } else {
-      const invalidDeadline = goodsRows.find((row) => {
-        if (row.deadline_days === '' || row.deadline_days === null || row.deadline_days === undefined) {
-          return true;
-        }
-        return Number(row.deadline_days) < 0;
-      });
+      const invalidDeadline = goodsRows.find((row) => !row.deadline_days);
       if (invalidDeadline) {
-        alert('Deadline (days) is required for each goods.');
+        alert('Deadline date is required for each goods.');
         return;
       }
     }
@@ -869,7 +868,7 @@ export default function Orders() {
         ...row,
         qty: Number(row.qty) || 0,
         price: Number(row.price) || 0,
-        deadline_days: Number(row.deadline_days) || 0,
+        deadline_days: row.deadline_days || '',
       })),
       total_amount: resolvedTotalAmount,
       tax_amount: taxAmount,
@@ -1562,7 +1561,7 @@ export default function Orders() {
                           <th className="px-3 py-2 text-left">Qty</th>
                           <th className="px-3 py-2 text-left">Price</th>
                           <th className="px-3 py-2 text-left">
-                            Deadline Time (days) <span className="text-red-500">*</span>
+                            Deadline Date {useQuotation && <span className="text-red-500">*</span>}
                           </th>
                           <th className="px-3 py-2 text-left">Subtotal</th>
                           {!useQuotation && <th className="px-3 py-2 text-left">Action</th>}
@@ -1663,16 +1662,15 @@ export default function Orders() {
                               </td>
                               <td className="px-3 py-2">
                                 <input
-                                  type="number"
-                                  min="0"
-                                  value={row.deadline_days ?? ''}
+                                  type="date"
+                                  value={formatDeadlineInput(row.deadline_days)}
                                   onChange={(event) =>
                                     useQuotation
                                       ? handleGoodsDeadlineChange(index, event.target.value)
                                       : handleGoodsRowChange(index, 'deadline_days', event.target.value)
                                   }
-                                  className="w-24 px-2 py-1 border border-gray-300 rounded-lg"
-                                  required
+                                  className="w-40 px-2 py-1 border border-gray-300 rounded-lg"
+                                  required={useQuotation}
                                 />
                               </td>
                               <td className="px-3 py-2">
@@ -1982,7 +1980,7 @@ export default function Orders() {
                           <th className="px-3 py-2 text-left">Unit</th>
                           <th className="px-3 py-2 text-left">Qty</th>
                           <th className="px-3 py-2 text-left">Price</th>
-                          <th className="px-3 py-2 text-left">Deadline (days)</th>
+                          <th className="px-3 py-2 text-left">Deadline Date</th>
                           <th className="px-3 py-2 text-left">Subtotal</th>
                         </tr>
                       </thead>
@@ -1995,7 +1993,7 @@ export default function Orders() {
                             <td className="px-3 py-2">{row.unit || '-'}</td>
                             <td className="px-3 py-2">{row.qty}</td>
                             <td className="px-3 py-2">{formatCurrency(Number(row.price || 0))}</td>
-                            <td className="px-3 py-2">{row.deadline_days ?? '-'}</td>
+                            <td className="px-3 py-2">{formatDeadlineDisplay(row.deadline_days)}</td>
                             <td className="px-3 py-2">
                               {formatCurrency((Number(row.qty || 0) * Number(row.price || 0)))}
                             </td>

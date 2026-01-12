@@ -251,8 +251,8 @@ export default function Invoices() {
             <td>${index + 1}</td>
             <td>${escapeHtml(row.goods || '-')}</td>
             <td>${escapeHtml(row.description || '-')}</td>
-            <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">${qty}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">Rp ${formatRupiah(price)}</td>
             <td style="text-align:right;">Rp ${formatRupiah(subtotal)}</td>
           </tr>
@@ -359,8 +359,8 @@ export default function Invoices() {
                   <th style="width: 40px;">No</th>
                   <th>Barang</th>
                   <th>Deskripsi</th>
-                  <th style="width: 60px;">Unit</th>
                   <th style="width: 56px; text-align:right;">Qty</th>
+                  <th style="width: 60px;">Unit</th>
                   <th style="width: 110px; text-align:right;">Harga</th>
                   <th style="width: 120px; text-align:right;">Jumlah</th>
                 </tr>
