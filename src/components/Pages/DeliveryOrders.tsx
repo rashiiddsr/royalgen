@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
-import { addRecord, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, getRecords, updateRecord } from '../../lib/api';
+import { openPrintWindow } from '../../lib/print';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
@@ -313,13 +314,10 @@ export default function DeliveryOrders() {
     const latestSettings = settingsData[0] || null;
     setCompanySettings(latestSettings);
     const html = buildDeliveryOrderTemplate(delivery, latestSettings);
-    const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    try {
-      const { blob } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
-      downloadPdfBlob(blob, safeNumber);
-    } catch (error) {
-      console.error('Failed to download delivery order PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+    const opened = openPrintWindow(html);
+    if (!opened) {
+      console.error('Failed to open delivery order document');
+      alert('Failed to open document. Please allow pop-ups and try again.');
     }
   };
 
