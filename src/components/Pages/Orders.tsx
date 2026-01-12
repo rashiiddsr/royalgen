@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addRecord, downloadFileBlob, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
+import { addRecord, downloadFileBlob, getRecords, updateRecord } from '../../lib/api';
+import { openHtmlViewer } from '../../lib/documentViewer';
 import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -352,7 +353,7 @@ export default function Orders() {
       <html lang="id">
         <head>
           <meta charset="utf-8" />
-          <title>${escapeHtml(deliveryNumber || 'Delivery Order')}.pdf</title>
+          <title>${escapeHtml(deliveryNumber || 'Delivery Order')}</title>
           <style>
             :root {
               --ink: #0f172a;
@@ -995,11 +996,10 @@ export default function Orders() {
     });
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
     try {
-      const { blob } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
-      downloadPdfBlob(blob, safeNumber);
+      openHtmlViewer(html, { title: safeNumber });
     } catch (error) {
-      console.error('Failed to download delivery order PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Failed to open delivery order document', error);
+      alert('Failed to open document. Please try again.');
     }
   };
 
@@ -1024,8 +1024,7 @@ export default function Orders() {
           salesOrderNumber: orderNumber,
           settingsOverride: latestSettings,
         });
-        const { blob } = await generateDocumentPdf('delivery_orders', latestDelivery.id, html, safeNumber);
-        downloadPdfBlob(blob, safeNumber);
+        openHtmlViewer(html, { title: safeNumber });
         return;
       }
 
@@ -1039,11 +1038,10 @@ export default function Orders() {
         salesOrderNumber: orderNumber,
         settingsOverride: latestSettings,
       });
-      const { blob } = await generateDocumentPdf('sales_orders', detailOrder.id, html, safeNumber);
-      downloadPdfBlob(blob, safeNumber);
+      openHtmlViewer(html, { title: safeNumber });
     } catch (error) {
-      console.error('Failed to download delivery order PDF', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Failed to open delivery order document', error);
+      alert('Failed to open document. Please try again.');
     }
   };
 
