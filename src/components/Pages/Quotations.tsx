@@ -85,11 +85,6 @@ interface CompanySetting {
   logo_url?: string | null;
 }
 
-interface SalesOrderLite {
-  id: string;
-  quotation_id?: string | null;
-}
-
 const EMPTY_GOOD_ROW: QuotationGood = {
   good_id: '',
   name: '',
@@ -115,7 +110,6 @@ export default function Quotations() {
   const [taxRate, setTaxRate] = useState(0);
   const [includeTax, setIncludeTax] = useState(false);
   const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
-  const [linkedQuotationIds, setLinkedQuotationIds] = useState<Set<string>>(new Set());
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
   const [formData, setFormData] = useState({
     quotation_number: '',
@@ -138,14 +132,13 @@ export default function Quotations() {
   const fetchQuotations = async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
     try {
-      const [quotationData, rfqData, goodsData, userData, settingsData, clientData, salesOrderData] = await Promise.all([
+      const [quotationData, rfqData, goodsData, userData, settingsData, clientData] = await Promise.all([
         getRecords<QuotationType>('quotations'),
         getRecords<RFQTypeLite>('rfqs'),
         getRecords<GoodOption>('goods'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
         getRecords<CompanySetting>('settings'),
         getRecords<ClientOption>('clients'),
-        getRecords<SalesOrderLite>('sales_orders'),
       ]);
 
       const rfqsById = new Map(rfqData.map((rfq) => [rfq.id, rfq]));
@@ -186,14 +179,6 @@ export default function Quotations() {
       setQuotations(mappedQuotations);
       setRfqs(rfqData);
       setGoods(goodsData);
-      setLinkedQuotationIds(
-        new Set(
-          salesOrderData
-            .map((order) => order.quotation_id)
-            .filter((quotationId): quotationId is string => Boolean(quotationId))
-            .map((quotationId) => String(quotationId))
-        )
-      );
       const currentSettings = settingsData[0];
       setTaxRate(Number(currentSettings?.tax_rate) || 0);
       setCompanySettings(currentSettings || null);
@@ -707,9 +692,6 @@ export default function Quotations() {
     return goodsList.map((row) => row.name || 'Item').join(', ');
   };
 
-  const hasLinkedSalesOrder = (quotationId?: string | null) =>
-    quotationId ? linkedQuotationIds.has(String(quotationId)) : false;
-
   const filteredQuotations = quotations.filter((quotation) => {
     const query = searchTerm.toLowerCase();
     if (!query) return true;
@@ -725,9 +707,8 @@ export default function Quotations() {
 
   const handleStatusUpdate = async (quotation: QuotationType, nextStatus: string) => {
     if (!canUpdateStatus || !profile) return;
-    const isRejecting = nextStatus === 'reject' || nextStatus === 'rejected';
-    if (isRejecting && hasLinkedSalesOrder(quotation.id)) {
-      alert('Quotations linked to a sales order cannot be rejected.');
+    if (quotation.status === 'process' && (nextStatus === 'reject' || nextStatus === 'rejected')) {
+      alert('Processed quotations cannot be rejected.');
       return;
     }
     if (nextStatus === 'reject' || nextStatus === 'rejected') {
@@ -740,13 +721,6 @@ export default function Quotations() {
         performed_by: profile.id,
         performer_role: profile.role,
       });
-      if (isRejecting && quotation.rfq_id) {
-        await updateRecord<RFQTypeLite>('rfqs', quotation.rfq_id, {
-          status: 'draft',
-          performed_by: profile.id,
-          performer_role: profile.role,
-        });
-      }
       await fetchQuotations();
       if (updated) {
         setDetailQuotation((prev) => (prev && prev.id === quotation.id ? { ...prev, ...updated } : prev));
@@ -773,10 +747,7 @@ export default function Quotations() {
       ];
     }
     if (quotation.status === 'process') {
-      if (hasLinkedSalesOrder(quotation.id)) {
-        return [];
-      }
-      return [{ label: 'Reject', status: 'reject', style: 'bg-red-600 hover:bg-red-700' }];
+      return [];
     }
     return [];
   };
