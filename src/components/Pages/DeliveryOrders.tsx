@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Eye, Pencil, Plus, Search, Truck, X } from 'lucide-react';
-import { addRecord, getRecords, updateRecord } from '../../lib/api';
-import { openHtmlViewer } from '../../lib/documentViewer';
+import { addRecord, downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
@@ -187,7 +186,7 @@ export default function DeliveryOrders() {
       <html lang="id">
         <head>
           <meta charset="utf-8" />
-          <title>${escapeHtml(delivery.delivery_number || 'Delivery Order')}</title>
+          <title>${escapeHtml(delivery.delivery_number || 'Delivery Order')}.pdf</title>
           <style>
             :root {
               --ink: #0f172a;
@@ -316,10 +315,11 @@ export default function DeliveryOrders() {
     const html = buildDeliveryOrderTemplate(delivery, latestSettings);
     const safeNumber = delivery.delivery_number?.replace(/[^\w.-]+/g, '_') || 'delivery-order';
     try {
-      openHtmlViewer(html, { title: safeNumber });
+      const { blob } = await generateDocumentPdf('delivery_orders', delivery.id, html, safeNumber);
+      downloadPdfBlob(blob, safeNumber);
     } catch (error) {
-      console.error('Failed to open delivery order document', error);
-      alert('Failed to open document. Please try again.');
+      console.error('Failed to download delivery order PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
