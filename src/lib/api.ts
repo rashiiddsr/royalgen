@@ -158,6 +158,13 @@ export function openHtmlDocument(html: string, filename: string) {
   const newWindow = window.open(url, '_blank', 'noopener');
   if (newWindow) {
     newWindow.document.title = `${safeName}.pdf`;
+    newWindow.onload = () => {
+      newWindow.focus();
+      newWindow.print();
+    };
+    newWindow.onafterprint = () => {
+      newWindow.close();
+    };
   }
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
