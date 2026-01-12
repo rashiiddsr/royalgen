@@ -9,7 +9,7 @@ import net from 'net';
 import tls from 'tls';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import { chromium } from 'playwright';
+import puppeteer from 'puppeteer';
 import { loadEnv, query } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -139,8 +139,8 @@ const saveBase64Image = (photoData, filenamePrefix = 'user') => saveBase64File(p
 let pdfBrowser;
 const getPdfBrowser = async () => {
   if (pdfBrowser?.isConnected?.()) return pdfBrowser;
-  pdfBrowser = await chromium.launch({
-    headless: true,
+  pdfBrowser = await puppeteer.launch({
+    headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
   return pdfBrowser;
@@ -171,8 +171,8 @@ const generatePdfFromHtml = async (html) => {
   const browser = await getPdfBrowser();
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: 'networkidle' });
-    await page.emulateMedia({ media: 'screen' });
+    await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
+    await page.emulateMediaType('screen');
     return await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
   } finally {
     await page.close();
