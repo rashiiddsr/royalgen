@@ -174,8 +174,8 @@ export default function DeliveryOrders() {
             <td>${index + 1}</td>
             <td>${escapeHtml(row.name || '-')}</td>
             <td>${escapeHtml(row.description || '-')}</td>
-            <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">${qty}</td>
+            <td>${escapeHtml(row.unit || '-')}</td>
           </tr>
         `;
       })
@@ -276,8 +276,8 @@ export default function DeliveryOrders() {
                   <th style="width: 40px;">No</th>
                   <th>Barang</th>
                   <th>Deskripsi</th>
-                  <th style="width: 60px;">Unit</th>
                   <th style="width: 60px; text-align:right;">Qty</th>
+                  <th style="width: 60px;">Unit</th>
                 </tr>
               </thead>
               <tbody>

@@ -118,6 +118,18 @@ export default function RFQ() {
     return String(rfq.performed_by) === String(profile.id);
   };
 
+  const openPrintWindow = (url: string) => {
+    const newWindow = window.open(url, '_blank', 'noopener');
+    if (!newWindow) return;
+    newWindow.onload = () => {
+      newWindow.focus();
+      newWindow.print();
+    };
+    newWindow.onafterprint = () => {
+      newWindow.close();
+    };
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -917,14 +929,13 @@ export default function RFQ() {
               {detailRfq.attachment_url && (
                 <div>
                   <p className="font-semibold text-gray-700">Attachment</p>
-                  <a
-                    href={`${apiRoot}${detailRfq.attachment_url}`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openPrintWindow(`${apiRoot}${detailRfq.attachment_url}`)}
                     className="text-blue-600 hover:underline"
                   >
                     View attached document
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
