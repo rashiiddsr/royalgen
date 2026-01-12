@@ -153,18 +153,57 @@ export function downloadFileBlob(blob: Blob, filename: string) {
 
 export function openHtmlDocument(html: string, filename: string) {
   const safeName = filename.replace(/[^\w.-]+/g, '_') || 'document';
-  const blob = new Blob([html], { type: 'text/html' });
+  const printScript = `
+    <script>
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          window.focus();
+          window.print();
+        }, 0);
+      });
+      window.addEventListener('afterprint', () => {
+        window.close();
+      });
+    </script>
+  `;
+  const htmlWithPrint = html.includes('</body>')
+    ? html.replace('</body>', `${printScript}</body>`)
+    : `${html}${printScript}`;
+  const blob = new Blob([htmlWithPrint], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const newWindow = window.open(url, '_blank', 'noopener');
   if (newWindow) {
     newWindow.document.title = `${safeName}.pdf`;
-    newWindow.onload = () => {
-      newWindow.focus();
-      newWindow.print();
-    };
-    newWindow.onafterprint = () => {
-      newWindow.close();
-    };
+    newWindow.addEventListener(
+      'afterprint',
+      () => {
+        newWindow.close();
+        URL.revokeObjectURL(url);
+      },
+      { once: true },
+    );
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
   }
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.srcdoc = html;
+  document.body.appendChild(iframe);
+  iframe.onload = () => {
+    const printWindow = iframe.contentWindow;
+    if (!printWindow) return;
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 250);
+  };
+  setTimeout(() => {
+    iframe.remove();
+  }, 60_000);
 }
