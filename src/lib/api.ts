@@ -153,23 +153,18 @@ export function downloadFileBlob(blob: Blob, filename: string) {
 
 export function openHtmlDocument(html: string, filename: string) {
   const safeName = filename.replace(/[^\w.-]+/g, '_') || 'document';
-  const newWindow = window.open('', '_blank', 'noopener');
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const newWindow = window.open(url, '_blank', 'noopener');
   if (newWindow) {
-    newWindow.document.open();
-    newWindow.document.write(html);
-    newWindow.document.close();
     newWindow.document.title = `${safeName}.pdf`;
-    const triggerPrint = () => {
+    newWindow.onload = () => {
       newWindow.focus();
       newWindow.print();
     };
-    if (newWindow.document.readyState === 'complete') {
-      triggerPrint();
-    } else {
-      newWindow.addEventListener('load', triggerPrint, { once: true });
-    }
     newWindow.onafterprint = () => {
       newWindow.close();
     };
   }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
