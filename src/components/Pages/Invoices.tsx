@@ -279,8 +279,8 @@ export default function Invoices() {
             body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin: 0; color: var(--ink); background: #ffffff; font-size: 14px; font-weight: 500; }
             .page { padding: 0; }
             .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
-            .logo-block { display: flex; flex-direction: column; gap: 12px; }
-            .logo { max-height: 64px; object-fit: contain; }
+            .logo-block { display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+            .logo { max-height: 80px; max-width: 180px; width: auto; object-fit: contain; display: block; }
             .logo-placeholder { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
             .logo-placeholder svg { width: 32px; height: 32px; }
             .brand-name { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -307,7 +307,7 @@ export default function Invoices() {
             .totals-row { display: flex; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
             .totals-row:last-child { border-bottom: none; background: var(--accent-soft); font-weight: 600; }
             .signature { margin-top: 36px; display: flex; justify-content: flex-end; text-align: right; font-size: 13px; }
-            .signature .name { margin-top: 58px; font-weight: 600; }
+            .signature .name { margin-top: 68px; font-weight: 600; }
           </style>
         </head>
         <body>
