@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRecords, updateRecord } from '../../lib/api';
-import { openHtmlViewer } from '../../lib/documentViewer';
+import { downloadPdfBlob, generateDocumentPdf, getRecords, updateRecord } from '../../lib/api';
 import { CheckCircle, Download, Edit2, Eye, Receipt, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -266,7 +265,7 @@ export default function Invoices() {
       <html lang="id">
         <head>
           <meta charset="utf-8" />
-          <title>${escapeHtml(invoice.invoice_number || 'Invoice')}</title>
+          <title>${escapeHtml(invoice.invoice_number || 'Invoice')}.pdf</title>
           <style>
             :root {
               --ink: #0f172a;
@@ -408,10 +407,11 @@ export default function Invoices() {
     const html = buildInvoiceTemplate(invoice, latestSettings);
     const safeNumber = invoice.invoice_number?.replace(/[^\w.-]+/g, '_') || 'invoice';
     try {
-      openHtmlViewer(html, { title: safeNumber });
+      const { blob } = await generateDocumentPdf('invoices', invoice.id, html, safeNumber);
+      downloadPdfBlob(blob, safeNumber);
     } catch (error) {
-      console.error('Failed to open invoice document', error);
-      alert('Failed to open document. Please try again.');
+      console.error('Failed to download invoice PDF', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
