@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { addRecord, getRecords, openHtmlDocument, updateRecord } from '../../lib/api';
-import { formatRupiah } from '../../lib/format';
+import { formatRupiah, formatRupiahWithDecimals, parseRupiahInput } from '../../lib/format';
 import { Plus, Eye, FileCheck, X, Pencil, CheckCircle, Search, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
@@ -243,8 +243,8 @@ export default function Quotations() {
         return `
           <tr>
             <td>${index + 1}</td>
-            <td>${escapeHtml(row.name || '-')}</td>
-            <td>${escapeHtml(row.description || '-')}</td>
+            <td class="col-item">${escapeHtml(row.name || '-')}</td>
+            <td class="col-desc">${escapeHtml(row.description || '-')}</td>
             <td style="text-align:right;">${qty}</td>
             <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">Rp ${formatRupiah(price)}</td>
@@ -288,9 +288,11 @@ export default function Quotations() {
             .address-card { padding: 12px 0; }
             .address-card p { margin: 4px 0; }
             .address-card .name { font-weight: 600; color: #111827; }
-            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; table-layout: fixed; }
             th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; white-space: normal; }
+            .col-item { width: 18%; }
+            .col-desc { width: 32%; }
             tr:nth-child(even) td { background: #f9fafb; }
             .summary-grid { margin-top: 24px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 32px; }
             .terms { font-size: 13px; }
@@ -361,8 +363,8 @@ export default function Quotations() {
               <thead>
                 <tr>
                   <th style="width: 40px;">No</th>
-                  <th>Barang</th>
-                  <th>Deskripsi</th>
+                  <th class="col-item">Barang</th>
+                  <th class="col-desc">Deskripsi</th>
                   <th style="width: 56px; text-align:right;">Qty</th>
                   <th style="width: 60px;">Unit</th>
                   <th style="width: 110px; text-align:right;">Harga</th>
@@ -556,11 +558,13 @@ export default function Quotations() {
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const updatedValue =
-          field === 'qty' || field === 'price' || field === 'delivery_time'
-            ? value === ''
-              ? ''
-              : Number(value)
-            : value;
+          field === 'price'
+            ? parseRupiahInput(value)
+            : field === 'qty' || field === 'delivery_time'
+              ? value === ''
+                ? ''
+                : Number(value)
+              : value;
         return { ...row, [field]: updatedValue } as QuotationGood;
       })
     );
@@ -1208,9 +1212,11 @@ export default function Quotations() {
                             </td>
                             <td className="px-3 py-2">
                               <input
-                                type="number"
-                                min="0"
-                                value={row.price}
+                                type="text"
+                                inputMode="numeric"
+                                value={
+                                  row.price === '' ? '' : formatRupiahWithDecimals(Number(row.price) || 0)
+                                }
                                 onChange={(event) =>
                                   handleGoodsRowChange(index, 'price', event.target.value)
                                 }
