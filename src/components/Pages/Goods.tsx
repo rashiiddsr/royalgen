@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { addRecord, getRecord, getRecords, updateRecord } from '../../lib/api';
 import { Plus, Edit2, Search, Package, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatRupiahWithDecimals, parseRupiahInput } from '../../lib/format';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface Good {
@@ -649,15 +650,14 @@ export default function Goods() {
                     Price (Rp) <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="number"
-                    value={formData.price}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.price === '' ? '' : formatRupiahWithDecimals(Number(formData.price) || 0)}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, price: value === '' ? '' : Number(value) });
+                      const value = parseRupiahInput(e.target.value);
+                      setFormData({ ...formData, price: value });
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
-                    step="0.01"
                     required
                   />
                 </div>
