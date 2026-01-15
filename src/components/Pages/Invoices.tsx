@@ -249,8 +249,8 @@ export default function Invoices() {
         return `
           <tr>
             <td>${index + 1}</td>
-            <td class="col-item">${escapeHtml(row.goods || '-')}</td>
-            <td class="col-desc">${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.goods || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
             <td style="text-align:right;">${qty}</td>
             <td>${escapeHtml(row.unit || '-')}</td>
             <td style="text-align:right;">Rp ${formatRupiah(price)}</td>
@@ -293,16 +293,9 @@ export default function Invoices() {
             .address-card { padding: 12px 0; }
             .address-card p { margin: 4px 0; }
             .address-card .name { font-weight: 600; color: #111827; }
-            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; table-layout: fixed; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
             th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; white-space: normal; }
-            .col-no { width: 36px; }
-            .col-item { width: 26%; }
-            .col-desc { width: 42%; }
-            .col-qty { width: 52px; }
-            .col-unit { width: 60px; }
-            .col-price { width: 90px; }
-            .col-total { width: 100px; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
             tr:nth-child(even) td { background: #f9fafb; }
             .summary-grid { margin-top: 24px; display: grid; grid-template-columns: 1fr 0.8fr; gap: 32px; }
             .payment { font-size: 13px; }
@@ -363,13 +356,13 @@ export default function Invoices() {
             <table>
               <thead>
                 <tr>
-                  <th class="col-no">No</th>
-                  <th class="col-item">Barang</th>
-                  <th class="col-desc">Deskripsi</th>
-                  <th class="col-qty" style="text-align:right;">Qty</th>
-                  <th class="col-unit">Unit</th>
-                  <th class="col-price" style="text-align:right;">Harga</th>
-                  <th class="col-total" style="text-align:right;">Jumlah</th>
+                  <th style="width: 40px;">No</th>
+                  <th>Barang</th>
+                  <th>Deskripsi</th>
+                  <th style="width: 56px; text-align:right;">Qty</th>
+                  <th style="width: 60px;">Unit</th>
+                  <th style="width: 110px; text-align:right;">Harga</th>
+                  <th style="width: 120px; text-align:right;">Jumlah</th>
                 </tr>
               </thead>
               <tbody>
