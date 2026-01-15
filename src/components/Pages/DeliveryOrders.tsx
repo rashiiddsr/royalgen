@@ -172,8 +172,8 @@ export default function DeliveryOrders() {
         return `
           <tr>
             <td>${index + 1}</td>
-            <td class="col-item">${escapeHtml(row.name || '-')}</td>
-            <td class="col-desc">${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.name || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
             <td style="text-align:right;">${qty}</td>
             <td>${escapeHtml(row.unit || '-')}</td>
           </tr>
@@ -214,14 +214,9 @@ export default function DeliveryOrders() {
             .address-card { padding: 12px 0; }
             .address-card p { margin: 4px 0; }
             .address-card .name { font-weight: 600; color: #111827; }
-            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; table-layout: fixed; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
             th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; white-space: normal; }
-            .col-no { width: 36px; }
-            .col-item { width: 28%; }
-            .col-desc { width: 46%; }
-            .col-qty { width: 52px; }
-            .col-unit { width: 60px; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
             tr:nth-child(even) td { background: #f9fafb; }
             .notes { margin-top: 24px; font-size: 13px; }
             .notes h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
@@ -278,11 +273,11 @@ export default function DeliveryOrders() {
             <table>
               <thead>
                 <tr>
-                  <th class="col-no">No</th>
-                  <th class="col-item">Barang</th>
-                  <th class="col-desc">Deskripsi</th>
-                  <th class="col-qty" style="text-align:right;">Qty</th>
-                  <th class="col-unit">Unit</th>
+                  <th style="width: 40px;">No</th>
+                  <th>Barang</th>
+                  <th>Deskripsi</th>
+                  <th style="width: 60px; text-align:right;">Qty</th>
+                  <th style="width: 60px;">Unit</th>
                 </tr>
               </thead>
               <tbody>
