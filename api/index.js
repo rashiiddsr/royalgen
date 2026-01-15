@@ -171,6 +171,34 @@ const normalizeSettingsPayload = (payload = {}, id) => {
   return nextPayload;
 };
 
+const normalizeRfqAttachments = (attachments, filenamePrefix = 'rfq') => {
+  if (!attachments) return [];
+  if (Array.isArray(attachments)) {
+    return normalizeDocumentsPayload(attachments, filenamePrefix);
+  }
+  if (typeof attachments === 'string') {
+    if (attachments.startsWith('data:')) {
+      try {
+        const url = saveBase64File(attachments, filenamePrefix);
+        return [{ name: 'document', url }];
+      } catch (error) {
+        console.error('Failed to save RFQ attachment', error);
+        return [];
+      }
+    }
+    return [{ name: 'document', url: attachments }];
+  }
+  return [];
+};
+
+const serializeRfqAttachments = (attachments) => {
+  if (!Array.isArray(attachments) || attachments.length === 0) return null;
+  if (attachments.length === 1 && !attachments[0]?.name) {
+    return attachments[0].url;
+  }
+  return JSON.stringify(attachments);
+};
+
 const formatDateOnly = (value) => {
   if (!value) return value;
   if (value instanceof Date) {
@@ -1190,11 +1218,8 @@ app.post('/api/:table', async (req, res) => {
 
     if (table === 'rfqs') {
       const { goods = [], attachment_data: attachmentData, performed_by: performedBy, performer_role: performerRole, ...rfqPayload } = payload;
-      let attachmentUrl = null;
-
-      if (attachmentData) {
-        attachmentUrl = saveBase64File(attachmentData, 'rfq');
-      }
+      const normalizedAttachments = normalizeRfqAttachments(attachmentData, 'rfq');
+      const attachmentUrl = serializeRfqAttachments(normalizedAttachments);
 
       const rawDeadlineDays = rfqPayload.deadline_days;
       const resolvedDeadlineDays =
@@ -1927,7 +1952,8 @@ app.put('/api/:table/:id', async (req, res) => {
 
       let attachmentUrl = existing.attachment_url;
       if (attachmentData) {
-        attachmentUrl = saveBase64File(attachmentData, `rfq-${id}`);
+        const normalizedAttachments = normalizeRfqAttachments(attachmentData, `rfq-${id}`);
+        attachmentUrl = serializeRfqAttachments(normalizedAttachments);
       }
 
       const hasGoodsPayload = Object.prototype.hasOwnProperty.call(req.body || {}, 'goods');
