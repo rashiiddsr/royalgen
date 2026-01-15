@@ -133,13 +133,24 @@ export default function Suppliers() {
         return;
       }
 
-      const payload: SupplierFormData = {
+      const basePayload: SupplierFormData = {
         ...formData,
         email: emailValue,
         phone: phoneValue,
         country: 'Indonesia',
         performed_by: profile?.id,
       };
+
+      let payload: SupplierFormData & { performer_role?: string };
+      if (editingSupplier && !canDeactivateSupplier) {
+        const { status, ...rest } = basePayload;
+        payload = rest;
+      } else {
+        payload = {
+          ...basePayload,
+          ...(editingSupplier && canDeactivateSupplier ? { performer_role: profile?.role } : {}),
+        };
+      }
 
       if (editingSupplier) {
         await updateRecord<Supplier>('suppliers', editingSupplier.id, payload as Supplier);
