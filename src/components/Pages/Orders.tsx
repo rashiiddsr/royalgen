@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, openHtmlDocument, updateRecord } from '../../lib/api';
-import { formatRupiah, formatRupiahWithDecimals, parseRupiahInput } from '../../lib/format';
+import { formatRupiah } from '../../lib/format';
 import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
@@ -353,8 +353,8 @@ export default function Orders() {
         return `
           <tr>
             <td>${index + 1}</td>
-            <td class="col-item">${escapeHtml(row.name || '-')}</td>
-            <td class="col-desc">${escapeHtml(row.description || '-')}</td>
+            <td>${escapeHtml(row.name || '-')}</td>
+            <td>${escapeHtml(row.description || '-')}</td>
             <td style="text-align:right;">${qty}</td>
             <td>${escapeHtml(row.unit || '-')}</td>
           </tr>
@@ -395,11 +395,9 @@ export default function Orders() {
             .address-card { padding: 12px 0; }
             .address-card p { margin: 4px 0; }
             .address-card .name { font-weight: 600; color: #111827; }
-            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; table-layout: fixed; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
             th { background: var(--accent); color: #ffffff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; white-space: normal; }
-            .col-item { width: 24%; }
-            .col-desc { width: 44%; }
+            td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
             tr:nth-child(even) td { background: #f9fafb; }
             .notes { margin-top: 24px; font-size: 13px; }
             .notes h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
@@ -457,8 +455,8 @@ export default function Orders() {
               <thead>
                 <tr>
                   <th style="width: 40px;">No</th>
-                  <th class="col-item">Barang</th>
-                  <th class="col-desc">Deskripsi</th>
+                  <th>Barang</th>
+                  <th>Deskripsi</th>
                   <th style="width: 60px; text-align:right;">Qty</th>
                   <th style="width: 60px;">Unit</th>
                 </tr>
@@ -727,13 +725,11 @@ export default function Orders() {
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const updatedValue =
-          field === 'qty'
+          field === 'qty' || field === 'price'
             ? value === ''
               ? ''
               : Number(value)
-            : field === 'price'
-              ? parseRupiahInput(value)
-              : value;
+            : value;
         return { ...row, [field]: updatedValue } as OrderGood;
       })
     );
@@ -1653,15 +1649,13 @@ export default function Orders() {
                                   formatCurrency(Number(row.price || 0))
                                 ) : (
                                   <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={
-                                      row.price === '' ? '' : formatRupiahWithDecimals(Number(row.price) || 0)
-                                    }
+                                    type="number"
+                                    min="0"
+                                    value={row.price}
                                     onChange={(event) =>
                                       handleGoodsRowChange(index, 'price', event.target.value)
                                     }
-                                    className="w-36 px-2 py-1 border border-gray-300 rounded-lg"
+                                    className="w-28 px-2 py-1 border border-gray-300 rounded-lg"
                                     required
                                   />
                                 )}
