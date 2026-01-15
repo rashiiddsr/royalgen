@@ -28,6 +28,12 @@ interface RFQType {
   requester_name?: string;
 }
 
+interface RFQAttachment {
+  name?: string | null;
+  data?: string;
+  url?: string;
+}
+
 interface GoodOption {
   id: string;
   name: string;
@@ -83,7 +89,7 @@ export default function RFQ() {
   const [clientSearch, setClientSearch] = useState('');
   const [selectedGoods, setSelectedGoods] = useState<string[]>([]);
   const [otherGoods, setOtherGoods] = useState<string[]>(['']);
-  const [attachmentData, setAttachmentData] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<RFQAttachment[]>([]);
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [goodsError, setGoodsError] = useState('');
   const [attachmentError, setAttachmentError] = useState('');
@@ -218,25 +224,79 @@ export default function RFQ() {
   const attachmentLimitMb = 5;
   const attachmentLimitBytes = attachmentLimitMb * 1000 * 1000;
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.size > attachmentLimitBytes) {
+  const parseAttachments = (value?: string | null): RFQAttachment[] => {
+    if (!value) return [];
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((item) => {
+              if (!item) return null;
+              if (typeof item === 'string') {
+                return { url: item };
+              }
+              if (typeof item === 'object' && item.url) {
+                return { url: item.url, name: item.name || null };
+              }
+              return null;
+            })
+            .filter(Boolean) as RFQAttachment[];
+        }
+      } catch {
+        return [{ url: value }];
+      }
+    }
+    return [{ url: value }];
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    const oversizedFile = files.find((file) => file.size > attachmentLimitBytes);
+    if (oversizedFile) {
       event.target.value = '';
-      setAttachmentData(null);
-      setAttachmentError(`File too large. Maximum size is ${attachmentLimitMb} MB.`);
+      setAttachmentError(`File ${oversizedFile.name} terlalu besar. Maksimal ${attachmentLimitMb} MB.`);
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result?.toString();
-      if (result) {
-        setAttachmentData(result);
-        if (attachmentError) setAttachmentError('');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const uploads = await Promise.all(
+        files.map(
+          (file) =>
+            new Promise<RFQAttachment>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const result = reader.result?.toString();
+                if (!result) {
+                  reject(new Error('Empty file'));
+                  return;
+                }
+                resolve({ name: file.name, data: result });
+              };
+              reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
+              reader.readAsDataURL(file);
+            })
+        )
+      );
+
+      setAttachments((prev) => {
+        const existingNames = new Set(prev.map((item) => item.name).filter(Boolean));
+        const nextUploads = uploads.filter((file) => !file.name || !existingNames.has(file.name));
+        return [...prev, ...nextUploads];
+      });
+      if (attachmentError) setAttachmentError('');
+    } catch (error) {
+      console.error('Failed to upload attachments', error);
+      setAttachmentError('Failed to upload file.');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const handleClientChange = (clientId: string) => {
@@ -261,7 +321,7 @@ export default function RFQ() {
     setFormData(DEFAULT_FORM);
     setSelectedGoods([]);
     setOtherGoods(['']);
-    setAttachmentData(null);
+    setAttachments([]);
     setGoodsSearch('');
     setClientSearch('');
     setEditingRfq(null);
@@ -294,7 +354,7 @@ export default function RFQ() {
           .map((item) => String(item.good_id)),
       );
       setOtherGoods(rfq.goods.filter((item) => item.type === 'other' && item.name).map((item) => item.name || ''));
-      setAttachmentData(null);
+      setAttachments(parseAttachments(rfq.attachment_url));
     } else {
       resetForm();
     }
@@ -344,7 +404,7 @@ export default function RFQ() {
         setGoodsError('At least one item is required.');
         return;
       }
-      if (!editingRfq && !attachmentData) {
+      if (attachments.length === 0) {
         setAttachmentError('Document is required.');
         return;
       }
@@ -363,7 +423,11 @@ export default function RFQ() {
         client_id: formData.client_id,
         deadline_days: formData.deadline_days === '' ? 30 : Number(formData.deadline_days),
         goods: goodsPayload,
-        attachment_data: attachmentData,
+        attachment_data: attachments.map((item) => ({
+          name: item.name,
+          data: item.data,
+          url: item.url,
+        })),
         performed_by: profile?.id,
         performer_role: profile?.role,
       } as any;
@@ -825,26 +889,34 @@ export default function RFQ() {
                     <p className="text-sm text-gray-800">
                       Upload supporting file <span className="text-red-500">*</span>
                     </p>
-                    <p className="text-xs text-gray-500">PDF or image, maximum {attachmentLimitMb} MB</p>
+                    <p className="text-xs text-gray-500">PDF or image, maximum {attachmentLimitMb} MB per file</p>
                     <input
                       type="file"
                       accept=".pdf,image/*"
                       className="mt-2"
                       onChange={handleFileChange}
-                      required={!editingRfq}
+                      multiple
                     />
-                    {attachmentData && <p className="text-xs text-green-600 mt-1">File attached</p>}
-                    {editingRfq?.attachment_url && !attachmentData && (
-                      <a
-                        href={`${apiRoot}${editingRfq.attachment_url}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-blue-600 hover:underline block mt-1"
-                      >
-                        View current attachment
-                      </a>
-                    )}
                     {attachmentError && <p className="text-xs text-red-600 mt-1">{attachmentError}</p>}
+                    {attachments.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-xs text-gray-700">
+                        {attachments.map((item, index) => {
+                          const label = item.name || `Attachment ${index + 1}`;
+                          return (
+                            <li key={`${label}-${index}`} className="flex items-center justify-between gap-2">
+                              <span className="truncate">{label}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeAttachment(index)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>
@@ -926,16 +998,26 @@ export default function RFQ() {
                 )}
               </div>
 
-              {detailRfq.attachment_url && (
+              {parseAttachments(detailRfq.attachment_url).length > 0 && (
                 <div>
                   <p className="font-semibold text-gray-700">Attachment</p>
-                  <button
-                    type="button"
-                    onClick={() => openPrintWindow(`${apiRoot}${detailRfq.attachment_url}`)}
-                    className="text-blue-600 hover:underline"
-                  >
-                    View attached document
-                  </button>
+                  <ul className="mt-2 space-y-1">
+                    {parseAttachments(detailRfq.attachment_url).map((item, index) => {
+                      const label = item.name || `Attachment ${index + 1}`;
+                      if (!item.url) return null;
+                      return (
+                        <li key={`${item.url}-${index}`}>
+                          <button
+                            type="button"
+                            onClick={() => openPrintWindow(`${apiRoot}${item.url}`)}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {label}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
             </div>
