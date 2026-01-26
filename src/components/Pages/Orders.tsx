@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addRecord, getRecords, openHtmlDocument, updateRecord } from '../../lib/api';
 import { formatRupiah, formatRupiahWithDecimals, parseRupiahInput } from '../../lib/format';
-import { CheckCircle, Download, Eye, Pencil, Plus, Search, ShoppingCart, UploadCloud, X } from 'lucide-react';
+import {
+  CheckCircle,
+  Download,
+  Eye,
+  Paperclip,
+  Pencil,
+  Plus,
+  Search,
+  ShoppingCart,
+  UploadCloud,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
@@ -76,6 +87,13 @@ interface DeliveryOrder {
   created_at: string;
 }
 
+interface InvoiceType {
+  id: string;
+  invoice_number: string;
+  sales_order_id?: string | null;
+  created_at: string;
+}
+
 interface GoodOption {
   id: string;
   name: string;
@@ -138,10 +156,12 @@ export default function Orders() {
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [usersById, setUsersById] = useState<Record<string, string>>({});
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [detailOrder, setDetailOrder] = useState<OrderType | null>(null);
   const [showDoModal, setShowDoModal] = useState(false);
+  const [attachmentOrder, setAttachmentOrder] = useState<OrderType | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderType | null>(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [goodsRows, setGoodsRows] = useState<OrderGood[]>([]);
@@ -500,12 +520,21 @@ export default function Orders() {
       if (!silent) {
         setLoading(true);
       }
-      const [orderData, quotationData, userData, deliveryData, settingsData, goodsData, clientData] =
-        await Promise.all([
+      const [
+        orderData,
+        quotationData,
+        userData,
+        deliveryData,
+        invoiceData,
+        settingsData,
+        goodsData,
+        clientData,
+      ] = await Promise.all([
         getRecords<OrderType>('sales_orders'),
         getRecords<QuotationType>('quotations'),
         getRecords<{ id: string; full_name?: string; email?: string }>('users'),
         getRecords<DeliveryOrder>('delivery_orders'),
+        getRecords<InvoiceType>('invoices'),
         getRecords<CompanySetting>('settings'),
         getRecords<GoodOption>('goods'),
         getRecords<ClientOption>('clients'),
@@ -534,6 +563,7 @@ export default function Orders() {
           goods: parseDeliveryGoods(delivery.goods),
         }))
       );
+      setInvoices(invoiceData);
       const settings = settingsData[0] || null;
       setCompanySettings(settings);
       setTaxRate(Number(settings?.tax_rate) || 0);
@@ -557,7 +587,7 @@ export default function Orders() {
 
   useAutoRefresh({
     onRefresh: () => fetchOrders({ silent: true }),
-    pause: showModal || Boolean(detailOrder),
+    pause: showModal || Boolean(detailOrder) || Boolean(attachmentOrder),
   });
 
   const openCreateModal = () => {
@@ -965,17 +995,25 @@ export default function Orders() {
     });
   }, [orders, searchTerm]);
 
-  const linkedDeliveries = detailOrder
-    ? deliveries
-        .filter((delivery) => String(delivery.sales_order_id) === String(detailOrder.id))
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    : [];
+  const getLinkedDeliveries = (orderId?: string) =>
+    deliveries
+      .filter((delivery) => String(delivery.sales_order_id) === String(orderId))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const linkedDeliveries = detailOrder ? getLinkedDeliveries(detailOrder.id) : [];
+  const attachmentDeliveries = attachmentOrder ? getLinkedDeliveries(attachmentOrder.id) : [];
   const detailGoods = detailOrder ? parseGoods(detailOrder.goods) : [];
   const detailTotals = detailOrder ? resolveOrderTotals(detailGoods, detailOrder) : null;
   const canDownloadGlobalDo =
     detailOrder &&
     linkedDeliveries.length > 0 &&
     ['waiting approval', 'waiting payment', 'done'].includes(detailOrder.status);
+  const canViewAttachments = (order: OrderType) =>
+    ['waiting payment', 'done'].includes(order.status);
+  const latestAttachmentInvoice = attachmentOrder
+    ? invoices
+        .filter((invoice) => String(invoice.sales_order_id) === String(attachmentOrder.id))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+    : null;
 
   const resolveBaseDeliveryNumber = (deliveryNumber?: string | null) => {
     if (!deliveryNumber) return '';
@@ -1003,21 +1041,22 @@ export default function Orders() {
     openHtmlDocument(html, safeNumber);
   };
 
-  const handleDownloadGlobalDeliveryOrder = async () => {
-    if (!detailOrder || linkedDeliveries.length === 0) return;
-    const latestDelivery = linkedDeliveries[0];
+  const handleDownloadGlobalDeliveryOrder = async (order: OrderType) => {
+    const linked = getLinkedDeliveries(order.id);
+    if (linked.length === 0) return;
+    const latestDelivery = linked[0];
     const settingsData = await getRecords<CompanySetting>('settings');
     const latestSettings = settingsData[0] || null;
     setCompanySettings(latestSettings);
     const baseNumber = resolveBaseDeliveryNumber(latestDelivery.delivery_number);
-    const orderNumber = detailOrder.po_number || detailOrder.order_number || '-';
+    const orderNumber = order.po_number || order.order_number || '-';
     const safeNumber = baseNumber.replace(/[^\w.-]+/g, '_') || 'delivery-order';
-    if (linkedDeliveries.length === 1) {
+    if (linked.length === 1) {
       const html = buildDeliveryOrderTemplate({
         deliveryNumber: latestDelivery.delivery_number,
         deliveryDate: latestDelivery.delivery_date,
         shipAddress: latestDelivery.ship_address || '-',
-        companyName: latestDelivery.company_name || detailOrder.company_name || '-',
+        companyName: latestDelivery.company_name || order.company_name || '-',
         notes: latestDelivery.notes,
         goods: parseDeliveryGoods(latestDelivery.goods),
         salesOrderNumber: orderNumber,
@@ -1031,13 +1070,22 @@ export default function Orders() {
       deliveryNumber: baseNumber,
       deliveryDate: latestDelivery.delivery_date,
       shipAddress: latestDelivery.ship_address || '-',
-      companyName: latestDelivery.company_name || detailOrder.company_name || '-',
+      companyName: latestDelivery.company_name || order.company_name || '-',
       notes: null,
-      goods: detailGoods,
+      goods: parseGoods(order.goods),
       salesOrderNumber: orderNumber,
       settingsOverride: latestSettings,
     });
     openHtmlDocument(html, safeNumber);
+  };
+
+  const handleOpenInvoiceShortcut = (order: OrderType) => {
+    if (typeof window === 'undefined') return;
+    const orderNumber = order.order_number || order.po_number || '';
+    if (orderNumber) {
+      sessionStorage.setItem('invoiceSearchPrefill', orderNumber);
+    }
+    window.dispatchEvent(new CustomEvent('app:navigate', { detail: 'invoices' }));
   };
 
   const usedQuotationIds = useMemo(
@@ -1214,6 +1262,18 @@ export default function Orders() {
                         aria-label="View order"
                       >
                         <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setAttachmentOrder(order)}
+                        className={`inline-flex items-center p-2 rounded-lg transition ${
+                          canViewAttachments(order)
+                            ? 'text-indigo-600 hover:bg-indigo-50'
+                            : 'text-gray-300 cursor-not-allowed'
+                        }`}
+                        aria-label="View attachments"
+                        disabled={!canViewAttachments(order)}
+                      >
+                        <Paperclip className="h-4 w-4" />
                       </button>
                       {canApprovePayment && order.status === 'waiting approval' && (
                         <button
@@ -1842,6 +1902,18 @@ export default function Orders() {
                 )}
                 <button
                   type="button"
+                  onClick={() => setAttachmentOrder(detailOrder)}
+                  disabled={!canViewAttachments(detailOrder)}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    canViewAttachments(detailOrder)
+                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30'
+                      : 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-500'
+                  }`}
+                >
+                  View Lampiran
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowDoModal((prev) => !prev)}
                   className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-500/20 dark:text-blue-200 dark:hover:bg-blue-500/30"
                 >
@@ -1930,7 +2002,7 @@ export default function Orders() {
                   {canDownloadGlobalDo && (
                     <button
                       type="button"
-                      onClick={handleDownloadGlobalDeliveryOrder}
+                      onClick={() => handleDownloadGlobalDeliveryOrder(detailOrder)}
                       className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
                     >
                       <Download className="h-4 w-4" />
@@ -2065,6 +2137,81 @@ export default function Orders() {
                     ))}
                   </ul>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {attachmentOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-xl mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <p className="text-sm text-gray-500 font-semibold uppercase">Lampiran Sales Order</p>
+                <h2 className="text-xl font-bold text-gray-900">
+                  {attachmentOrder.po_number || attachmentOrder.order_number}
+                </h2>
+              </div>
+              <button
+                onClick={() => setAttachmentOrder(null)}
+                className="p-2 rounded-full hover:bg-gray-100 transition"
+                aria-label="Close attachment modal"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-900">Delivery Order Global</p>
+                    <p className="text-xs text-gray-500">
+                      {attachmentDeliveries.length > 0
+                        ? `DO terakhir: ${attachmentDeliveries[0].delivery_number}`
+                        : 'Belum ada delivery order.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadGlobalDeliveryOrder(attachmentOrder)}
+                    disabled={attachmentDeliveries.length === 0}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      attachmentDeliveries.length > 0
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        : 'border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    <Download className="h-4 w-4" />
+                    View DO Global
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-900">Dokumen Invoice</p>
+                    <p className="text-xs text-gray-500">
+                      {latestAttachmentInvoice
+                        ? `Invoice: ${latestAttachmentInvoice.invoice_number}`
+                        : 'Invoice belum tersedia.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenInvoiceShortcut(attachmentOrder)}
+                    disabled={!latestAttachmentInvoice}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      latestAttachmentInvoice
+                        ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        : 'border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    <Eye className="h-4 w-4" />
+                    View Dokumen Invoice
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -82,7 +82,10 @@ export default function Invoices() {
   const [ordersById, setOrdersById] = useState<Record<string, OrderType>>({});
   const [clientsById, setClientsById] = useState<Record<string, ClientType>>({});
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return sessionStorage.getItem('invoiceSearchPrefill') || '';
+  });
   const [detailInvoice, setDetailInvoice] = useState<InvoiceType | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceType | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySetting | null>(null);
@@ -94,6 +97,13 @@ export default function Invoices() {
 
   useEffect(() => {
     fetchInvoices();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (sessionStorage.getItem('invoiceSearchPrefill')) {
+      sessionStorage.removeItem('invoiceSearchPrefill');
+    }
   }, []);
 
   const fetchInvoices = async (options?: { silent?: boolean }) => {
